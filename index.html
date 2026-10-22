@@ -23,6 +23,7 @@
             <button type="button" role="menuitem" data-action="open-drawer" data-section="assignment">Assignment</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="exam">Exam</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="break">Break</button>
           </div>
         </details>
       </div>
@@ -189,6 +190,37 @@
             <button type="button" class="text-button" id="exam-cancel" hidden>Cancel</button>
           </div>
         </form>
+      </section>
+      <section class="panel" id="break-panel" aria-labelledby="break-heading" hidden>
+        <h2 id="break-heading">Add break</h2>
+        <form id="break-form" novalidate>
+          <label class="field">
+            <span>Name</span>
+            <input name="name" type="text" maxlength="30" placeholder="e.g. Thanksgiving break" autocomplete="off" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>First day</span>
+              <input name="startDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Last day</span>
+              <input name="endDate" type="date" />
+            </label>
+          </div>
+          <fieldset class="field">
+            <legend>Banner theme</legend>
+            <div class="theme-picker" id="break-theme-picker"></div>
+          </fieldset>
+          <p class="hint">During a break, classes don't meet and repeating assignments are skipped.</p>
+          <ul class="form-errors" id="break-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="break-submit">Add break</button>
+            <button type="button" class="text-button" id="break-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+        <h3 class="subheading">Your breaks</h3>
+        <ul class="class-list" id="break-list"></ul>
       </section>
     </aside>
 

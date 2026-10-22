@@ -15,6 +15,49 @@
     { name: 'Pink', value: '#d6409f' },
   ];
   const NO_CLASS_COLOR = '#8b8d98';
+  // Pennant colors and decorations for each break banner theme.
+  const BREAK_THEME_STYLES = {
+    fall: {
+      label: 'Fall',
+      emoji: '🍂',
+      decorations: ['🍁', '🍂', '🍃', '🌰', '🍁', '🎃'],
+      colors: ['#c2410c', '#d97706', '#92400e', '#b45309', '#9a3412'],
+      text: '#fff7ed',
+    },
+    winter: {
+      label: 'Winter',
+      emoji: '❄️',
+      decorations: ['❄️', '❄️', '⛄', '❄️', '✨'],
+      colors: ['#bfdbfe', '#e0f2fe', '#93c5fd', '#f8fafc', '#c7d2fe'],
+      text: '#1e3a8a',
+    },
+    spring: {
+      label: 'Spring',
+      emoji: '🌸',
+      decorations: ['🌸', '🌷', '🦋', '🌸', '🌼'],
+      colors: ['#fbcfe8', '#bbf7d0', '#ddd6fe', '#fef08a', '#a5f3fc'],
+      text: '#581c87',
+    },
+    summer: {
+      label: 'Summer',
+      emoji: '☀️',
+      decorations: ['☀️', '🌊', '🐚', '🌴', '🕶️'],
+      colors: ['#facc15', '#fb7185', '#38bdf8', '#fb923c', '#2dd4bf'],
+      text: '#1f2937',
+    },
+    party: {
+      label: 'Party',
+      emoji: '🎉',
+      decorations: ['🎈', '🎊', '✨', '🎉', '🎈'],
+      colors: ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'],
+      text: '#ffffff',
+    },
+  };
+  // The banner's string: how far below the top it hangs at the ends, and how much it sags in the middle (px).
+  const BUNTING_STRING_TOP = 8;
+  const BUNTING_SAG = 22;
+  // How many decorations drift down behind each banner.
+  const BANNER_DECORATION_COUNT = 12;
   const TOAST_DURATION_MS = 6000;
   const VIEW_STORAGE_KEY = 'student-planner-view';
   const TAB_STORAGE_KEY = 'student-planner-tab';
@@ -29,9 +72,12 @@
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
-  // Which part of the Add panel is showing: 'assignment', 'class', or 'exam'.
+  // Which part of the Add panel is showing: 'assignment', 'class', 'exam', or 'break'.
   let drawerSection = 'assignment';
   let editingExamId = null;
+  let editingBreakId = null;
+  // Whether the break theme was picked by hand; until then it follows the first day's month.
+  let breakThemeChosen = false;
   let showLater = false;
   let showDone = false;
   let showMissed = false;
@@ -67,6 +113,14 @@
     examSubmit: document.getElementById('exam-submit'),
     examCancel: document.getElementById('exam-cancel'),
     examErrors: document.getElementById('exam-errors'),
+    breakPanel: document.getElementById('break-panel'),
+    breakForm: document.getElementById('break-form'),
+    breakHeading: document.getElementById('break-heading'),
+    breakSubmit: document.getElementById('break-submit'),
+    breakCancel: document.getElementById('break-cancel'),
+    breakErrors: document.getElementById('break-errors'),
+    breakList: document.getElementById('break-list'),
+    breakThemePicker: document.getElementById('break-theme-picker'),
     assignmentForm: document.getElementById('assignment-form'),
     assignmentClass: document.getElementById('assignment-class'),
     assignmentErrors: document.getElementById('assignment-errors'),
@@ -222,6 +276,7 @@
   function render() {
     renderSemester();
     renderClasses();
+    renderBreaks();
     renderClassOptions();
     renderTabs();
     renderDueList();
@@ -518,7 +573,7 @@
         isToday ? 'is-today' : '',
       );
     }
-    return `${renderWeekNav(renderProgress(week.progress))}<div class="week-grid">${columns}</div>`;
+    return `${renderWeekNav(renderProgress(week.progress))}${renderBreakBanners(weekDates(7))}<div class="week-grid">${columns}</div>`;
   }
 
   // ← week → navigation, shared by the assignments Week view and the calendar. extra goes at the end.
@@ -532,6 +587,103 @@
         ${isCurrentWeek ? '' : '<button type="button" class="text-button" data-action="this-week">This week</button>'}
         ${extra}
       </div>`;
+  }
+
+  // ---------- Breaks ----------
+
+  function breakDateRange(schoolBreak) {
+    return `${model.formatDate(schoolBreak.startDate)} – ${model.formatDate(schoolBreak.endDate)}`;
+  }
+
+  function sortedBreaks() {
+    return (state.breaks || [])
+      .filter((schoolBreak) => schoolBreak.semesterId === state.currentSemesterId)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }
+
+  function renderBreaks() {
+    const breaks = sortedBreaks();
+    elements.breakList.innerHTML =
+      breaks.length === 0
+        ? '<li class="empty">No breaks yet.</li>'
+        : breaks
+            .map(
+              (schoolBreak) => `
+                <li class="class-item">
+                  <span aria-hidden="true">${BREAK_THEME_STYLES[schoolBreak.theme].emoji}</span>
+                  <span class="class-info">
+                    <span class="class-name">${escapeHtml(schoolBreak.name)}</span>
+                    <span class="class-count">${breakDateRange(schoolBreak)}</span>
+                  </span>
+                  <button type="button" class="text-button" data-action="edit-break" data-id="${schoolBreak.id}">Edit</button>
+                  <button type="button" class="text-button danger" data-action="delete-break" data-id="${schoolBreak.id}">Delete</button>
+                </li>`,
+            )
+            .join('');
+  }
+
+  // A string of triangle flags spelling the break's name, sagging in the middle like real bunting.
+  function renderBreakBanner(schoolBreak) {
+    const style = BREAK_THEME_STYLES[schoolBreak.theme];
+    const letters = [...schoolBreak.name.toUpperCase()];
+    let colorIndex = 0;
+    const flags = letters
+      .map((letter, index) => {
+        if (!letter.trim()) {
+          return ''; // A space leaves a gap on the string.
+        }
+        const position = (index + 0.5) / letters.length;
+        const drop = BUNTING_SAG * 4 * position * (1 - position);
+        // Lean with the string: tipped one way on the left, the other way on the right.
+        const tilt = 7 * (1 - 2 * position);
+        const color = style.colors[colorIndex % style.colors.length];
+        colorIndex += 1;
+        return `<span class="flag" style="left: ${position * 100}%; top: ${BUNTING_STRING_TOP + drop}px; --tilt: ${-tilt}deg; --flag-color: ${color}; --flag-text: ${style.text}">${escapeHtml(letter)}</span>`;
+      })
+      .join('');
+    const stringMiddle = BUNTING_STRING_TOP + 2 * BUNTING_SAG;
+    // Spread out evenly-ish but not in a grid, with staggered timing so they don't fall in step.
+    // Each one's place in its fall comes from the clock, so the once-a-minute redraw
+    // continues the animation instead of restarting it.
+    const secondsNow = Date.now() / 1000;
+    const falling = Array.from({ length: BANNER_DECORATION_COUNT }, (_, index) => {
+      const symbol = style.decorations[index % style.decorations.length];
+      const left = (index * 37 + 5) % 100;
+      const duration = 7 + (index % 4) * 1.5;
+      const delay = -((secondsNow + index * 1.7) % duration);
+      const size = 14 + (index % 3) * 5;
+      return `<span class="falling-decoration" style="left: ${left}%; animation-delay: ${delay}s; animation-duration: ${duration}s; font-size: ${size}px">${symbol}</span>`;
+    }).join('');
+    return `
+      <div class="break-banner">
+        <div class="banner-decorations" aria-hidden="true">${falling}</div>
+        <span class="string-end string-end-left" aria-hidden="true">${style.decorations[0]}</span>
+        <span class="string-end string-end-right" aria-hidden="true">${style.decorations[1]}</span>
+        <div class="bunting" style="--flag-count: ${letters.length}" role="img" aria-label="${escapeHtml(schoolBreak.name)} banner">
+          <svg class="bunting-string" viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 ${BUNTING_STRING_TOP} Q50 ${stringMiddle} 100 ${BUNTING_STRING_TOP}" vector-effect="non-scaling-stroke" />
+          </svg>
+          ${flags}
+        </div>
+        <p class="break-caption">
+          <span aria-hidden="true">${style.emoji}</span>
+          <strong>${escapeHtml(schoolBreak.name)}</strong> · ${breakDateRange(schoolBreak)} · no classes
+          <span aria-hidden="true">${style.emoji}</span>
+          <button type="button" class="text-button" data-action="edit-break" data-id="${schoolBreak.id}" aria-label="Edit ${escapeHtml(schoolBreak.name)}">✎</button>
+        </p>
+      </div>`;
+  }
+
+  // Banners for every break covering any of the given dates.
+  function renderBreakBanners(dates) {
+    return model
+      .breaksDuring(state, dates)
+      .map(renderBreakBanner)
+      .join('');
+  }
+
+  function weekDates(dayCount) {
+    return Array.from({ length: dayCount }, (_, offset) => model.addDays(weekStart, offset));
   }
 
   // ---------- Calendar ----------
@@ -683,6 +835,7 @@
         (day) => `
           <div class="calendar-day-heading${day.date === today ? ' is-today' : ''}">
             <span class="weekday">${day.label}</span> <span class="day-number">${Number(day.date.slice(8))}</span>
+            ${model.breakOn(state, day.date) ? '<span class="break-tag">Break</span>' : ''}
           </div>`,
       )
       .join('');
@@ -701,6 +854,7 @@
       ${week.hasMeetings ? renderNextClass() : ''}
       ${renderExamCountdown()}
       ${renderWeekNav()}
+      ${renderBreakBanners(weekDates(5))}
       ${notice}
       <div class="calendar">
         <div class="calendar-row calendar-headings"><span></span>${headers}</div>
@@ -719,17 +873,25 @@
 
   // The panel's title follows what it shows, e.g. "Classes" or "Edit assignment".
   function renderDrawerHeading() {
-    const headings = { class: 'Classes', assignment: elements.assignmentHeading.textContent, exam: elements.examHeading.textContent };
+    const headings = {
+      class: 'Classes',
+      assignment: elements.assignmentHeading.textContent,
+      exam: elements.examHeading.textContent,
+      break: 'Breaks',
+    };
     elements.drawerHeading.textContent = headings[drawerSection];
   }
 
-  // Opens the Add panel showing one section ('assignment', 'class', or 'exam'), or closes it.
+  // Opens the Add panel showing one section ('assignment', 'class', 'exam', or 'break'), or closes it.
   function setDrawerOpen(open, section = drawerSection) {
     if (!open && editingAssignment) {
       stopEditingAssignment();
     }
     if (!open && editingExamId) {
       stopEditingExam();
+    }
+    if (!open && editingBreakId) {
+      stopEditingBreak();
     }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
@@ -739,8 +901,14 @@
       elements.classPanel.hidden = section !== 'class';
       elements.assignmentPanel.hidden = section !== 'assignment';
       elements.examPanel.hidden = section !== 'exam';
+      elements.breakPanel.hidden = section !== 'break';
       renderDrawerHeading();
-      const firstFields = { class: elements.classForm.elements.name, assignment: elements.assignmentForm.elements.title, exam: elements.examForm.elements.title };
+      const firstFields = {
+        class: elements.classForm.elements.name,
+        assignment: elements.assignmentForm.elements.title,
+        exam: elements.examForm.elements.title,
+        break: elements.breakForm.elements.name,
+      };
       firstFields[section].focus();
     }
   }
@@ -911,6 +1079,13 @@
         </label>`,
     ).join('');
     elements.dayPicker.innerHTML = renderDayOptions(ALL_DAYS, [], 'name="days"');
+    elements.breakThemePicker.innerHTML = model.BREAK_THEMES.map(
+      (theme, index) => `
+        <label class="theme-option">
+          <input type="radio" name="theme" value="${theme}" ${index === 0 ? 'checked' : ''} />
+          <span><span aria-hidden="true">${BREAK_THEME_STYLES[theme].emoji}</span> ${BREAK_THEME_STYLES[theme].label}</span>
+        </label>`,
+    ).join('');
   }
 
   function resetAssignmentDates() {
@@ -1033,6 +1208,70 @@
       }
     });
     setDrawerOpen(false);
+  }
+
+  // ---------- Break form ----------
+
+  function setBreakTheme(theme) {
+    const input = elements.breakThemePicker.querySelector(`input[value="${theme}"]`);
+    if (input) {
+      input.checked = true;
+    }
+  }
+
+  function startEditingBreak(id) {
+    const schoolBreak = state.breaks.find((candidate) => candidate.id === id);
+    editingBreakId = id;
+    breakThemeChosen = true;
+    const form = elements.breakForm;
+    form.elements.name.value = schoolBreak.name;
+    form.elements.startDate.value = schoolBreak.startDate;
+    form.elements.endDate.value = schoolBreak.endDate;
+    setBreakTheme(schoolBreak.theme);
+    elements.breakHeading.textContent = 'Edit break';
+    elements.breakSubmit.textContent = 'Save break';
+    elements.breakCancel.hidden = false;
+    showErrors(elements.breakErrors, []);
+    if (!isDrawerOpen() || drawerSection !== 'break') {
+      setDrawerOpen(true, 'break');
+    }
+    form.elements.name.focus();
+  }
+
+  function stopEditingBreak() {
+    editingBreakId = null;
+    breakThemeChosen = false;
+    elements.breakForm.reset();
+    setBreakTheme('fall');
+    elements.breakHeading.textContent = 'Add break';
+    elements.breakSubmit.textContent = 'Add break';
+    elements.breakCancel.hidden = true;
+    showErrors(elements.breakErrors, []);
+  }
+
+  function handleBreakSubmit(event) {
+    event.preventDefault();
+    const form = elements.breakForm;
+    const fields = {
+      name: form.elements.name.value.trim(),
+      startDate: form.elements.startDate.value,
+      endDate: form.elements.endDate.value,
+      theme: form.elements.theme.value,
+    };
+    const errors = model.validateBreak(fields);
+    showErrors(elements.breakErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    if (editingBreakId) {
+      const schoolBreak = state.breaks.find((candidate) => candidate.id === editingBreakId);
+      applyChange(`Saved ${fields.name}.`, () => Object.assign(schoolBreak, fields));
+    } else {
+      applyChange(`Added ${fields.name} ${BREAK_THEME_STYLES[fields.theme].emoji}`, () => {
+        state.breaks = [...(state.breaks || []), { id: newId('break'), semesterId: state.currentSemesterId, ...fields }];
+      });
+    }
+    stopEditingBreak();
   }
 
   // ---------- Exams ----------
@@ -1290,6 +1529,16 @@
       if (scope) {
         startEditingAssignment(assignment, scope, date);
       }
+    } else if (action === 'edit-break') {
+      startEditingBreak(id);
+    } else if (action === 'delete-break') {
+      const schoolBreak = state.breaks.find((candidate) => candidate.id === id);
+      if (editingBreakId === id) {
+        stopEditingBreak();
+      }
+      applyChange(`Deleted ${schoolBreak.name}.`, () => {
+        state.breaks = state.breaks.filter((candidate) => candidate.id !== id);
+      });
     } else if (action === 'edit-exam') {
       startEditingExam(id);
     } else if (action === 'delete-exam') {
@@ -1303,6 +1552,9 @@
       }
       if (editingExamId) {
         stopEditingExam();
+      }
+      if (editingBreakId) {
+        stopEditingBreak();
       }
       setDrawerOpen(true, target.dataset.section || 'assignment');
     } else if (action === 'set-view') {
@@ -1350,6 +1602,15 @@
   });
   elements.classForm.addEventListener('submit', handleClassSubmit);
   elements.examForm.addEventListener('submit', handleExamSubmit);
+  elements.breakForm.addEventListener('submit', handleBreakSubmit);
+  elements.breakCancel.addEventListener('click', stopEditingBreak);
+  elements.breakForm.addEventListener('change', (event) => {
+    if (event.target.name === 'theme') {
+      breakThemeChosen = true;
+    } else if (event.target.name === 'startDate' && !breakThemeChosen && model.isValidDateKey(event.target.value)) {
+      setBreakTheme(model.guessBreakTheme(event.target.value));
+    }
+  });
   elements.examCancel.addEventListener('click', () => setDrawerOpen(false));
   elements.classCancel.addEventListener('click', stopEditingClass);
   elements.semesterButton.addEventListener('click', openSemesterDialog);

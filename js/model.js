@@ -70,6 +70,55 @@ const PlannerModel = (() => {
     return dates;
   }
 
+  // ---------- Breaks ----------
+
+  const BREAK_THEMES = ['fall', 'winter', 'spring', 'summer', 'party'];
+
+  // Data saved before breaks existed has no breaks list.
+  function breaksOf(state) {
+    return (state.breaks || []).filter((schoolBreak) => schoolBreak.semesterId === state.currentSemesterId);
+  }
+
+  function breakOn(state, date) {
+    return breaksOf(state).find((schoolBreak) => schoolBreak.startDate <= date && date <= schoolBreak.endDate) || null;
+  }
+
+  // Breaks that cover any of the given dates, in date order.
+  function breaksDuring(state, dates) {
+    return breaksOf(state)
+      .filter((schoolBreak) => dates.some((date) => schoolBreak.startDate <= date && date <= schoolBreak.endDate))
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }
+
+  // A starting theme from the month a break begins: Sep–Nov fall, Dec–Feb winter,
+  // Mar–May spring, Jun–Aug summer. (Party is only picked by hand.)
+  function guessBreakTheme(startDate) {
+    const month = parseDateKey(startDate).getMonth() + 1;
+    if (month >= 9 && month <= 11) {
+      return 'fall';
+    }
+    if (month === 12 || month <= 2) {
+      return 'winter';
+    }
+    return month <= 5 ? 'spring' : 'summer';
+  }
+
+  function validateBreak(schoolBreak) {
+    const errors = [];
+    if (!schoolBreak.name.trim()) {
+      errors.push('Give the break a name, like Thanksgiving break.');
+    }
+    if (!isValidDateKey(schoolBreak.startDate) || !isValidDateKey(schoolBreak.endDate)) {
+      errors.push('Pick the first and last day of the break.');
+    } else if (schoolBreak.endDate < schoolBreak.startDate) {
+      errors.push('The last day must be on or after the first day.');
+    }
+    if (!BREAK_THEMES.includes(schoolBreak.theme)) {
+      errors.push('Pick a theme.');
+    }
+    return errors;
+  }
+
   function isOccurrenceDone(assignment, date) {
     return assignment.kind === 'once' ? assignment.done : assignment.doneDates.includes(date);
   }
@@ -83,6 +132,10 @@ const PlannerModel = (() => {
         continue;
       }
       for (const date of occurrenceDates(assignment)) {
+        // Repeating assignments take break days off; one-time ones were entered on purpose.
+        if (assignment.kind === 'weekly' && breakOn(state, date)) {
+          continue;
+        }
         items.push({
           assignment,
           plannerClass: classesById.get(assignment.classId) || null,
@@ -287,11 +340,11 @@ const PlannerModel = (() => {
     return (meeting.cancelledDates || []).includes(date);
   }
 
-  // Every class meeting on one date (only inside the current semester), including
-  // cancelled ones, which are marked so the calendar can show them faded.
+  // Every class meeting on one date (only inside the current semester and not on a break),
+  // including cancelled ones, which are marked so the calendar can show them faded.
   function classMeetingsOn(state, date) {
     const semester = state.semesters.find((candidate) => candidate.id === state.currentSemesterId);
-    if (date < semester.startDate || date > semester.endDate) {
+    if (date < semester.startDate || date > semester.endDate || breakOn(state, date)) {
       return [];
     }
     const weekday = parseDateKey(date).getDay();
@@ -489,6 +542,11 @@ const PlannerModel = (() => {
     buildDueList,
     allowsLateWork,
     itemStatus,
+    BREAK_THEMES,
+    breakOn,
+    breaksDuring,
+    guessBreakTheme,
+    validateBreak,
     groupDueList,
     groupByDay,
     startOfWeek,

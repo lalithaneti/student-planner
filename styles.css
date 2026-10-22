@@ -819,6 +819,172 @@ button:focus-visible {
   transition: width 0.3s ease;
 }
 
+/* ---------- Break banner ---------- */
+
+.break-banner {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 12px;
+  padding: 4px 12px 8px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+/* Leaves (or snowflakes, blossoms...) drifting down behind the flags. */
+.banner-decorations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.falling-decoration {
+  position: absolute;
+  top: -30px;
+  opacity: 0.85;
+  animation: drift-down linear infinite;
+}
+
+@keyframes drift-down {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(12px, 40px) rotate(60deg);
+  }
+  50% {
+    transform: translate(-8px, 80px) rotate(140deg);
+  }
+  75% {
+    transform: translate(14px, 120px) rotate(220deg);
+  }
+  100% {
+    transform: translate(0, 170px) rotate(320deg);
+  }
+}
+
+/* For people who turn on "Reduce motion": scattered, but still. */
+@media (prefers-reduced-motion: reduce) {
+  .falling-decoration {
+    animation: none;
+    top: auto;
+    bottom: 8px;
+    opacity: 0.5;
+  }
+}
+
+/* One tied on at each end of the string. */
+.string-end {
+  position: absolute;
+  top: 2px;
+  z-index: 1;
+  font-size: 22px;
+}
+
+.string-end-left {
+  left: 4px;
+  transform: rotate(-20deg);
+}
+
+.string-end-right {
+  right: 4px;
+  transform: rotate(20deg);
+}
+
+/* Flags are placed along the string by app.js (left/top per flag). */
+.bunting {
+  position: relative;
+  z-index: 1;
+  height: 92px;
+  container-type: inline-size;
+}
+
+.bunting-string {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+}
+
+.bunting-string path {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+
+.flag {
+  /* Sized from the banner's width (cqw) so short and long names both fit. Padding in %
+     would be a share of the whole banner, so it uses the flag's own width instead. */
+  --flag-width: min(46px, calc(100cqw / var(--flag-count) - 4px));
+  position: absolute;
+  width: var(--flag-width);
+  height: calc(var(--flag-width) * 1.15);
+  display: flex;
+  justify-content: center;
+  padding-top: calc(var(--flag-width) * 0.14);
+  background: var(--flag-color);
+  color: var(--flag-text);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  font-size: calc(var(--flag-width) * 0.42);
+  font-weight: 800;
+  line-height: 1;
+  transform: translateX(-50%) rotate(var(--tilt));
+  transform-origin: top center;
+}
+
+.break-caption {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.break-tag {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.theme-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.theme-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.theme-option span {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.theme-option input:checked + span {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  font-weight: 700;
+}
+
+.theme-option input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Calendar ---------- */
 
 .calendar-notice {
