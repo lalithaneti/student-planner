@@ -21,9 +21,13 @@
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
   let editingClassId = null;
+  // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
+  let editingAssignment = null;
   let showLater = false;
   let showDone = false;
+  let showMissed = false;
   let toastTimer = null;
+  let resolveChoice = null;
   let currentView = loadSavedView();
   let weekStart = model.startOfWeek(todayKey());
 
@@ -54,7 +58,11 @@
     toastUndo: document.getElementById('toast-undo'),
     confirmDialog: document.getElementById('confirm-dialog'),
     confirmMessage: document.getElementById('confirm-message'),
-    confirmYes: document.getElementById('confirm-yes'),
+    confirmChoices: document.getElementById('confirm-choices'),
+    assignmentHeading: document.getElementById('add-assignment-heading'),
+    assignmentSubmit: document.getElementById('assignment-submit'),
+    assignmentCancel: document.getElementById('assignment-cancel'),
+    kindField: document.getElementById('kind-field'),
     drawer: document.getElementById('add-drawer'),
   };
 
@@ -94,6 +102,15 @@
     return model.toDateKey(new Date());
   }
 
+  // The current time as "HH:MM", to compare with due times.
+  function currentTime() {
+    return new Date().toTimeString().slice(0, 5);
+  }
+
+  function statusOf(item) {
+    return model.itemStatus(item, todayKey(), currentTime());
+  }
+
   function currentSemester() {
     return state.semesters.find((semester) => semester.id === state.currentSemesterId);
   }
@@ -122,16 +139,37 @@
     render();
   }
 
-  // An in-page "Are you sure?" box. The browser's own confirm() is silently
-  // blocked in some embedded browsers, which made delete buttons do nothing.
-  function askToConfirm(message, confirmLabel) {
+  // Answers the open question box (null means cancelled) and closes it.
+  function finishChoice(answer) {
+    if (resolveChoice) {
+      resolveChoice(answer);
+      resolveChoice = null;
+    }
+    if (elements.confirmDialog.open) {
+      elements.confirmDialog.close();
+    }
+  }
+
+  // An in-page question box with one button per choice. Resolves to the chosen value,
+  // or null if cancelled. The browser's own confirm() is silently blocked in some
+  // embedded browsers, and some never send a dialog's "close" event, so answers come
+  // straight from the button clicks.
+  function askChoice(message, choices) {
+    finishChoice(null);
     elements.confirmMessage.textContent = message;
-    elements.confirmYes.textContent = confirmLabel;
-    elements.confirmDialog.returnValue = '';
+    elements.confirmChoices.innerHTML =
+      choices
+        .map((choice) => `<button type="button" class="${choice.className}" data-choice="${choice.value}">${escapeHtml(choice.label)}</button>`)
+        .join('') + '<button type="button" class="text-button" data-choice="cancel">Cancel</button>';
     elements.confirmDialog.showModal();
     return new Promise((resolve) => {
-      elements.confirmDialog.addEventListener('close', () => resolve(elements.confirmDialog.returnValue === 'confirm'), { once: true });
+      resolveChoice = resolve;
     });
+  }
+
+  async function askToConfirm(message, confirmLabel) {
+    const answer = await askChoice(message, [{ value: 'confirm', label: confirmLabel, className: 'primary-button danger-button' }]);
+    return answer === 'confirm';
   }
 
   function showToast(message, undoData) {
@@ -233,11 +271,13 @@
   function renderMenu(item) {
     const { assignment, date } = item;
     const dataAttributes = `data-id="${assignment.id}" data-date="${date}"`;
+    const editItem = `<button type="button" data-action="edit-assignment" ${dataAttributes}>Edit…</button>`;
     const menuItems =
-      assignment.kind === 'weekly'
+      editItem +
+      (assignment.kind === 'weekly'
         ? `<button type="button" data-action="skip" ${dataAttributes}>Skip this date</button>
            <button type="button" class="danger" data-action="delete-series" ${dataAttributes}>Delete all dates…</button>`
-        : `<button type="button" class="danger" data-action="delete-assignment" ${dataAttributes}>Delete</button>`;
+        : `<button type="button" class="danger" data-action="delete-assignment" ${dataAttributes}>Delete</button>`);
     return `
       <details class="row-menu">
         <summary aria-label="More actions for ${escapeHtml(assignment.title)}">⋯</summary>
@@ -269,13 +309,23 @@
 
   // One row: checkbox, class tag and time, title, and the ⋯ menu.
   // showDate adds the day to the time, for sections that aren't already grouped by day.
+  // Classes and an optional label that show an item's status (done, overdue, missed).
+  function statusDecorations(item) {
+    const status = statusOf(item);
+    return {
+      className: { done: ' is-done', overdue: ' is-overdue', missed: ' is-missed', upcoming: '' }[status],
+      label: status === 'missed' ? ' · <span class="missed-label">Missed</span>' : '',
+    };
+  }
+
   function renderListItem(item, showDate) {
     const when = showDate ? `${model.formatDate(item.date)} · ${model.formatTime(item.time)}` : model.formatTime(item.time);
+    const status = statusDecorations(item);
     return `
-      <li class="due-item${item.done ? ' is-done' : ''}" style="--class-color: ${itemColor(item)}">
+      <li class="due-item${status.className}" style="--class-color: ${itemColor(item)}">
         ${renderCheckbox(item)}
         <div class="due-main">
-          <span class="due-top-line">${renderClassTag(item)}<span class="due-time">${when}</span></span>
+          <span class="due-top-line">${renderClassTag(item)}<span class="due-time">${when}${status.label}</span></span>
           ${renderTitle(item.assignment)}
         </div>
         ${renderMenu(item)}
@@ -314,7 +364,7 @@
   }
 
   function renderListView(items) {
-    const groups = model.groupDueList(items, todayKey());
+    const groups = model.groupDueList(items, todayKey(), currentTime());
     let html = '';
     if (groups.overdue.length > 0) {
       html += renderHeading('Overdue', groups.overdue.length, 'overdue') + renderList(groups.overdue, true);
@@ -327,6 +377,12 @@
       html += renderToggle('toggle-later', showLater, showLater ? 'Hide later' : `Show later (${groups.later.length})`);
       if (showLater) {
         html += renderDays(groups.later);
+      }
+    }
+    if (groups.missed.length > 0) {
+      html += renderToggle('toggle-missed', showMissed, showMissed ? 'Hide missed' : `Show missed (${groups.missed.length})`);
+      if (showMissed) {
+        html += renderHeading('Missed', groups.missed.length) + renderList(groups.missed, true);
       }
     }
     if (groups.done.length > 0) {
@@ -342,12 +398,12 @@
 
   // A compact card for a narrow day column: class tag and ⋯ on top, then checkbox and title, then time.
   function renderWeekItem(item, when) {
-    const isOverdue = !item.done && item.date < todayKey();
+    const status = statusDecorations(item);
     return `
-      <li class="due-item week-item${item.done ? ' is-done' : ''}${isOverdue ? ' is-overdue' : ''}" style="--class-color: ${itemColor(item)}">
+      <li class="due-item week-item${status.className}" style="--class-color: ${itemColor(item)}">
         <span class="week-item-top">${renderClassTag(item)}${renderMenu(item)}</span>
         <span class="week-item-title">${renderCheckbox(item)}${renderTitle(item.assignment)}</span>
-        <span class="due-time">${when}</span>
+        <span class="due-time">${when}${status.label}</span>
       </li>`;
   }
 
@@ -357,6 +413,20 @@
         ? '<p class="week-empty">Nothing due</p>'
         : `<ul class="due-items">${items.map((item) => renderWeekItem(item, whenText(item))).join('')}</ul>`;
     return `<section class="week-column ${className}"><h3 class="week-column-heading">${heading}</h3>${body}</section>`;
+  }
+
+  function renderProgress({ done, total }) {
+    if (total === 0) {
+      return '<span class="week-progress"><span class="progress-text">Nothing due this week</span></span>';
+    }
+    const percent = Math.round((done / total) * 100);
+    return `
+      <span class="week-progress">
+        <span class="progress-text">${done} of ${total} done</span>
+        <span class="progress-bar" role="progressbar" aria-label="Done this week" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
+          <span class="progress-fill" style="width: ${percent}%"></span>
+        </span>
+      </span>`;
   }
 
   function weekRangeLabel(start) {
@@ -371,7 +441,7 @@
 
   function renderWeekView(items) {
     const today = todayKey();
-    const week = model.buildWeek(items, weekStart, today);
+    const week = model.buildWeek(items, weekStart, today, currentTime());
     const isCurrentWeek = weekStart === model.startOfWeek(today);
     let columns = '';
     if (week.overdue.length > 0) {
@@ -399,6 +469,7 @@
         <span class="week-range">${weekRangeLabel(weekStart)}</span>
         <button type="button" class="icon-button" data-action="next-week" aria-label="Next week">→</button>
         ${isCurrentWeek ? '' : '<button type="button" class="text-button" data-action="this-week">This week</button>'}
+        ${renderProgress(week.progress)}
       </div>
       <div class="week-grid">${columns}</div>`;
   }
@@ -410,13 +481,17 @@
   }
 
   function setDrawerOpen(open) {
+    if (!open && editingAssignment) {
+      stopEditingAssignment();
+    }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
     document.body.classList.toggle('drawer-open', open);
     document.querySelectorAll('[data-action="open-drawer"]').forEach((button) => button.setAttribute('aria-expanded', String(open)));
     if (open) {
-      // With no classes yet, start at the class form; otherwise at the assignment name.
-      const firstField = currentClasses().length === 0 ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
+      // When editing, or once classes exist, start at the assignment name; otherwise at the class form.
+      const startAtClasses = !editingAssignment && currentClasses().length === 0;
+      const firstField = startAtClasses ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
       firstField.focus();
     }
   }
@@ -470,36 +545,28 @@
     elements.weeklyFields.hidden = !isWeekly;
   }
 
-  function handleAssignmentSubmit(event) {
-    event.preventDefault();
+  // Reads the form into the fields an assignment of this kind stores.
+  function readAssignmentForm(kind) {
     const form = elements.assignmentForm;
-    const kind = form.elements.kind.value;
-    const assignment = {
-      id: newId('assignment'),
-      semesterId: state.currentSemesterId,
+    const fields = {
       classId: form.elements.classId.value || null,
       title: form.elements.title.value.trim(),
       link: form.elements.link.value.trim(),
-      kind,
       dueTime: form.elements.dueTime.value,
+      lateAllowed: form.elements.lateAllowed.checked,
     };
     if (kind === 'once') {
-      assignment.dueDate = form.elements.dueDate.value;
-      assignment.done = false;
+      fields.dueDate = form.elements.dueDate.value;
     } else {
-      assignment.days = [...form.querySelectorAll('input[name="days"]:checked')].map((input) => Number(input.value));
-      assignment.startDate = form.elements.startDate.value;
-      assignment.endDate = form.elements.endDate.value;
-      assignment.skippedDates = [];
-      assignment.doneDates = [];
+      fields.days = [...form.querySelectorAll('input[name="days"]:checked')].map((input) => Number(input.value));
+      fields.startDate = form.elements.startDate.value;
+      fields.endDate = form.elements.endDate.value;
     }
-    const errors = model.validateAssignment(assignment);
-    showErrors(elements.assignmentErrors, errors);
-    if (errors.length > 0) {
-      return;
-    }
-    applyChange(`Added “${assignment.title}”.`, () => state.assignments.push(assignment));
-    // Keep the class, type, and time so adding several similar assignments is quick.
+    return fields;
+  }
+
+  function clearAssignmentForm() {
+    const form = elements.assignmentForm;
     form.elements.title.value = '';
     form.elements.link.value = '';
     form.elements.dueDate.value = '';
@@ -507,7 +574,84 @@
       input.checked = false;
     });
     resetAssignmentDates();
-    form.elements.title.focus();
+    showErrors(elements.assignmentErrors, []);
+  }
+
+  function handleAssignmentSubmit(event) {
+    event.preventDefault();
+    const kind = elements.assignmentForm.elements.kind.value;
+    const fields = readAssignmentForm(kind);
+    const errors = model.validateAssignment({ kind, ...fields });
+    showErrors(elements.assignmentErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    if (editingAssignment) {
+      saveAssignmentEdit(fields);
+      return;
+    }
+    const progress = kind === 'once' ? { done: false } : { skippedDates: [], doneDates: [] };
+    const assignment = { id: newId('assignment'), semesterId: state.currentSemesterId, kind, ...fields, ...progress };
+    applyChange(`Added “${assignment.title}”.`, () => state.assignments.push(assignment));
+    // Keep the class, type, time, and late setting so adding several similar assignments is quick.
+    clearAssignmentForm();
+    elements.assignmentForm.elements.title.focus();
+  }
+
+  // Fills the form with an assignment. scope 'date' edits one date of a repeating
+  // assignment, so the form shows it as a one-time assignment on that date.
+  function startEditingAssignment(assignment, scope, date) {
+    editingAssignment = { id: assignment.id, scope, date };
+    const form = elements.assignmentForm;
+    const editsOneDate = assignment.kind === 'once' || scope === 'date';
+    form.elements.title.value = assignment.title;
+    form.elements.classId.value = assignment.classId || '';
+    form.elements.link.value = assignment.link;
+    form.elements.dueTime.value = assignment.dueTime;
+    form.elements.lateAllowed.checked = model.allowsLateWork(assignment);
+    form.elements.kind.value = editsOneDate ? 'once' : 'weekly';
+    if (editsOneDate) {
+      form.elements.dueDate.value = assignment.kind === 'once' ? assignment.dueDate : date;
+    } else {
+      form.querySelectorAll('input[name="days"]').forEach((input) => {
+        input.checked = assignment.days.includes(Number(input.value));
+      });
+      form.elements.startDate.value = assignment.startDate;
+      form.elements.endDate.value = assignment.endDate;
+    }
+    updateKindFields();
+    // Switching between one-time and repeating isn't supported while editing.
+    elements.kindField.hidden = true;
+    elements.assignmentHeading.textContent = scope === 'date' ? `Edit ${model.formatDate(date)} only` : 'Edit assignment';
+    elements.assignmentSubmit.textContent = 'Save changes';
+    elements.assignmentCancel.hidden = false;
+    showErrors(elements.assignmentErrors, []);
+    setDrawerOpen(true);
+  }
+
+  function stopEditingAssignment() {
+    editingAssignment = null;
+    elements.kindField.hidden = false;
+    elements.assignmentHeading.textContent = 'Add assignment';
+    elements.assignmentSubmit.textContent = 'Add assignment';
+    elements.assignmentCancel.hidden = true;
+    elements.assignmentForm.elements.lateAllowed.checked = true;
+    clearAssignmentForm();
+    updateKindFields();
+  }
+
+  function saveAssignmentEdit(fields) {
+    const { id, scope, date } = editingAssignment;
+    const assignment = findAssignment(id);
+    applyChange(`Saved “${fields.title}”.`, () => {
+      if (scope === 'date') {
+        const single = model.detachOccurrence(assignment, date, newId('assignment'));
+        state.assignments.push(Object.assign(single, fields));
+      } else {
+        Object.assign(assignment, fields);
+      }
+    });
+    setDrawerOpen(false);
   }
 
   function startEditingClass(id) {
@@ -643,7 +787,21 @@
           state.assignments = state.assignments.filter((candidate) => candidate.classId !== id);
         });
       }
+    } else if (action === 'edit-assignment') {
+      let scope = 'all';
+      if (assignment.kind === 'weekly') {
+        scope = await askChoice(`Edit “${assignment.title}” for…`, [
+          { value: 'date', label: `Only ${model.formatDate(date)}`, className: 'primary-button' },
+          { value: 'all', label: `All dates (every ${model.formatDays(assignment.days)})`, className: 'secondary-button' },
+        ]);
+      }
+      if (scope) {
+        startEditingAssignment(assignment, scope, date);
+      }
     } else if (action === 'open-drawer') {
+      if (editingAssignment) {
+        stopEditingAssignment();
+      }
       setDrawerOpen(true);
     } else if (action === 'set-view') {
       currentView = target.dataset.view;
@@ -657,6 +815,9 @@
       renderDueList();
     } else if (action === 'toggle-later') {
       showLater = !showLater;
+      renderDueList();
+    } else if (action === 'toggle-missed') {
+      showMissed = !showMissed;
       renderDueList();
     } else if (action === 'toggle-done-section') {
       showDone = !showDone;
@@ -685,6 +846,23 @@
   elements.semesterForm.addEventListener('submit', handleSemesterSubmit);
   document.getElementById('semester-cancel').addEventListener('click', () => elements.semesterDialog.close());
   document.getElementById('drawer-close').addEventListener('click', () => setDrawerOpen(false));
+  elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
+  elements.confirmChoices.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-choice]');
+    if (button) {
+      finishChoice(button.dataset.choice === 'cancel' ? null : button.dataset.choice);
+    }
+  });
+  // Escape closes the box; treat that as Cancel.
+  elements.confirmDialog.addEventListener('cancel', () => finishChoice(null));
+  elements.confirmDialog.addEventListener('close', () => finishChoice(null));
+  // Redraw each minute so items turn overdue or missed when their due time passes,
+  // unless a ⋯ menu is open (redrawing would close it).
+  setInterval(() => {
+    if (!document.querySelector('.row-menu[open]')) {
+      renderDueList();
+    }
+  }, 60 * 1000);
   // 'toggle' doesn't bubble, so listen during the capture phase to catch every ⋯ menu.
   document.addEventListener(
     'toggle',

@@ -96,15 +96,37 @@ const PlannerModel = (() => {
     return items;
   }
 
-  // Splits the due list into the sections shown on screen.
-  function groupDueList(items, todayKey) {
+  // Assignments made before the "late work allowed" setting existed count as allowing it.
+  function allowsLateWork(assignment) {
+    return assignment.lateAllowed !== false;
+  }
+
+  // Where an item stands right now: 'done', 'upcoming', 'overdue' (past due, late work
+  // allowed), or 'missed' (past due, no late work). nowTime is "HH:MM".
+  function itemStatus(item, todayKey, nowTime) {
+    if (item.done) {
+      return 'done';
+    }
+    const isPastDue = item.date < todayKey || (item.date === todayKey && item.time < nowTime);
+    if (!isPastDue) {
+      return 'upcoming';
+    }
+    return allowsLateWork(item.assignment) ? 'overdue' : 'missed';
+  }
+
+  // Splits the due list into the sections shown on screen. Missed items stay on their
+  // day if that's today; earlier missed items go in their own section.
+  function groupDueList(items, todayKey, nowTime = '00:00') {
     const weekEnd = addDays(todayKey, 7);
-    const groups = { overdue: [], today: [], thisWeek: [], later: [], done: [] };
+    const groups = { overdue: [], today: [], thisWeek: [], later: [], missed: [], done: [] };
     for (const item of items) {
-      if (item.done) {
+      const status = itemStatus(item, todayKey, nowTime);
+      if (status === 'done') {
         groups.done.push(item);
-      } else if (item.date < todayKey) {
+      } else if (status === 'overdue') {
         groups.overdue.push(item);
+      } else if (status === 'missed' && item.date < todayKey) {
+        groups.missed.push(item);
       } else if (item.date === todayKey) {
         groups.today.push(item);
       } else if (item.date <= weekEnd) {
@@ -113,8 +135,9 @@ const PlannerModel = (() => {
         groups.later.push(item);
       }
     }
-    // Most recently finished first, so the list of done items stays useful.
+    // Most recent first, so these lists stay useful as they grow.
     groups.done.reverse();
+    groups.missed.reverse();
     return groups;
   }
 
@@ -139,8 +162,9 @@ const PlannerModel = (() => {
   }
 
   // Planner columns for one week: Mon–Fri, then Saturday and Sunday together.
-  // When viewing the current week, unfinished items from earlier weeks go in overdue.
-  function buildWeek(items, weekStart, todayKey) {
+  // When viewing the current week, overdue items from earlier weeks go in overdue
+  // (missed ones don't, since they can't be turned in). progress counts the week's items.
+  function buildWeek(items, weekStart, todayKey, nowTime = '00:00') {
     const columns = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((label, index) => ({
       label,
       dates: [addDays(weekStart, index)],
@@ -153,11 +177,33 @@ const PlannerModel = (() => {
     for (const item of items) {
       if (item.date >= weekStart && item.date <= weekEnd) {
         columns.find((column) => column.dates.includes(item.date)).items.push(item);
-      } else if (isCurrentWeek && item.date < weekStart && !item.done) {
+      } else if (isCurrentWeek && item.date < weekStart && itemStatus(item, todayKey, nowTime) === 'overdue') {
         overdue.push(item);
       }
     }
-    return { overdue, columns };
+    const weekItems = columns.flatMap((column) => column.items);
+    const progress = { done: weekItems.filter((item) => item.done).length, total: weekItems.length };
+    return { overdue, columns, progress };
+  }
+
+  // Pulls one date out of a repeating assignment into its own one-time assignment,
+  // keeping whether it was done. This is how "edit only this date" works.
+  function detachOccurrence(series, date, newAssignmentId) {
+    const wasDone = series.doneDates.includes(date);
+    series.skippedDates.push(date);
+    series.doneDates = series.doneDates.filter((doneDate) => doneDate !== date);
+    return {
+      id: newAssignmentId,
+      semesterId: series.semesterId,
+      classId: series.classId,
+      title: series.title,
+      link: series.link,
+      kind: 'once',
+      dueDate: date,
+      dueTime: series.dueTime,
+      lateAllowed: allowsLateWork(series),
+      done: wasDone,
+    };
   }
 
   function formatTime(time) {
@@ -222,10 +268,13 @@ const PlannerModel = (() => {
     defaultSemester,
     occurrenceDates,
     buildDueList,
+    allowsLateWork,
+    itemStatus,
     groupDueList,
     groupByDay,
     startOfWeek,
     buildWeek,
+    detachOccurrence,
     formatTime,
     formatDate,
     formatMonthDay,

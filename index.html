@@ -56,7 +56,7 @@
           </div>
         </form>
       </section>
-      <section class="panel" aria-labelledby="add-assignment-heading">
+      <section class="panel" id="assignment-panel" aria-labelledby="add-assignment-heading">
         <h2 id="add-assignment-heading">Add assignment</h2>
         <form id="assignment-form" novalidate>
           <label class="field">
@@ -72,7 +72,7 @@
             <input name="link" type="url" placeholder="https://" autocomplete="off" />
           </label>
 
-          <fieldset class="field">
+          <fieldset class="field" id="kind-field">
             <legend>How often?</legend>
             <div class="segmented">
               <label><input type="radio" name="kind" value="once" checked /> One time</label>
@@ -109,8 +109,19 @@
             <input name="dueTime" type="time" value="23:59" />
           </label>
 
+          <label class="checkbox-field">
+            <input name="lateAllowed" type="checkbox" checked />
+            <span>
+              Late work allowed
+              <small>If not, it's marked Missed once the due time passes, instead of Overdue.</small>
+            </span>
+          </label>
+
           <ul class="form-errors" id="assignment-errors" role="alert"></ul>
-          <button type="submit" class="primary-button">Add assignment</button>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="assignment-submit">Add assignment</button>
+            <button type="button" class="text-button" id="assignment-cancel" hidden>Cancel</button>
+          </div>
         </form>
       </section>
     </aside>
@@ -144,10 +155,7 @@
     <dialog id="confirm-dialog" aria-labelledby="confirm-message">
       <form method="dialog">
         <p id="confirm-message" class="confirm-message"></p>
-        <div class="button-row">
-          <button type="submit" class="primary-button danger-button" value="confirm" id="confirm-yes">Delete</button>
-          <button type="submit" class="text-button" value="cancel">Cancel</button>
-        </div>
+        <div class="button-row choice-buttons" id="confirm-choices"></div>
       </form>
     </dialog>
 
