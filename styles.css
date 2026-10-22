@@ -1439,3 +1439,77 @@ dialog::backdrop {
 .danger-button {
   background: var(--danger);
 }
+
+/* Dark mode: a light tint of a color turns muddy on a dark background, so colored blocks,
+   tags, and dots use mostly their color with dark text on top. --bright-color lifts darker
+   colors (the earthy RSO ones) to at least this lightness; pastels are already above it. */
+@media (prefers-color-scheme: dark) {
+  /* Browsers that can't compute it skip this, and everything below falls back to --class-color. */
+  @supports (color: oklch(from red max(l, 0.5) c h)) {
+    [style*='--class-color'] {
+      --bright-color: oklch(from var(--class-color) max(l, 0.74) c h);
+    }
+  }
+
+  .swatch,
+  .exam-countdown .swatch,
+  .next-class .swatch {
+    background: var(--bright-color, var(--class-color));
+  }
+
+  .class-tag {
+    background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, transparent);
+    color: #1c2024;
+  }
+
+  .due-item.week-item {
+    border-left-color: var(--bright-color, var(--class-color));
+  }
+
+  .row-menu .class-block {
+    border-left-color: var(--bright-color, var(--class-color));
+    background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, var(--surface));
+    color: #1c2024;
+  }
+
+  .row-menu .class-block:hover,
+  .row-menu[open] .class-block {
+    background: var(--bright-color, var(--class-color));
+  }
+
+  .class-block .class-block-details,
+  .class-block .class-block-time {
+    color: rgb(28 32 36 / 75%);
+  }
+
+  .row-menu .class-block.is-exam {
+    border-color: var(--bright-color, var(--class-color));
+  }
+
+  /* A light dashed outline still marks one-time events against their bright fill. */
+  .row-menu .class-block.is-event {
+    border-color: rgb(255 255 255 / 75%);
+    border-left-color: var(--bright-color, var(--class-color));
+  }
+
+  .row-menu .class-block.is-exam {
+    background: var(--bright-color, var(--class-color));
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+
+  .exam-tag {
+    background: #1c2024;
+    color: var(--bright-color, var(--class-color));
+  }
+
+  /* Cancelled blocks stay dark and faded, so they still read as "not happening". */
+  .row-menu .class-block.is-cancelled {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .class-block.is-cancelled .class-block-details,
+  .class-block.is-cancelled .class-block-time {
+    color: var(--text-muted);
+  }
+}
