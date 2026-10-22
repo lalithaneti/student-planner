@@ -1,0 +1,841 @@
+:root {
+  --background: #f6f6f9;
+  --surface: #ffffff;
+  --text: #1c2024;
+  --text-muted: #60646c;
+  --border: #e0e1e6;
+  --accent: #3e63dd;
+  --accent-text: #ffffff;
+  --danger: #ce2c31;
+  --overdue: #ce2c31;
+  --radius: 12px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111113;
+    --surface: #1c1c1f;
+    --text: #edeef0;
+    --text-muted: #a0a3ab;
+    --border: #2e3035;
+    --accent: #7b9bff;
+    --accent-text: #111113;
+    --danger: #ff8589;
+    --overdue: #ff8589;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-header h1 {
+  font-size: 1.5rem;
+}
+
+.semester-button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.banner {
+  max-width: 728px;
+  margin: 0 auto 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--text);
+}
+
+/* ---------- Layout ---------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px 96px;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.panel h2 {
+  font-size: 1.15rem;
+  margin-bottom: 12px;
+}
+
+.panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-header h2 {
+  margin-bottom: 0;
+}
+
+.view-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--background);
+  border: 1px solid var(--border);
+}
+
+.view-switch button {
+  min-height: 32px;
+  padding: 4px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-switch button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Week view needs room for its columns. */
+body.week-view .layout,
+body.week-view .app-header {
+  max-width: 1240px;
+}
+
+.empty {
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+
+/* ---------- Forms ---------- */
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.field > span,
+.field > legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.field small {
+  font-weight: 400;
+}
+
+input[type='text'],
+input[type='url'],
+input[type='date'],
+input[type='time'],
+select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+}
+
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.segmented label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.day-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.day-option input,
+.color-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.day-option span {
+  display: inline-block;
+  min-width: 44px;
+  padding: 8px 6px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.day-option input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.day-option input:focus-visible + span,
+.color-option input:focus-visible + .swatch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.color-option {
+  cursor: pointer;
+}
+
+.color-option .swatch {
+  width: 30px;
+  height: 30px;
+}
+
+.color-option input:checked + .swatch {
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 5px var(--class-color);
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--class-color);
+  flex-shrink: 0;
+}
+
+.form-errors {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.form-errors:empty {
+  display: none;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.primary-button {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.text-button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.text-button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.text-button.danger {
+  color: var(--danger);
+}
+
+.text-button.danger:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.hint {
+  color: var(--text-muted);
+  margin: 4px 0 12px;
+}
+
+/* ---------- Classes ---------- */
+
+.class-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.class-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.class-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+
+.class-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.class-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* ---------- Due list ---------- */
+
+.due-heading {
+  font-size: 0.95rem;
+  margin: 16px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.due-heading:first-child {
+  margin-top: 0;
+}
+
+.due-heading.overdue {
+  color: var(--overdue);
+}
+
+.count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--background);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.due-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.due-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.done-checkbox {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--class-color);
+  cursor: pointer;
+}
+
+.due-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+
+.due-top-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.class-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--class-color) 18%, transparent);
+  color: color-mix(in srgb, var(--class-color) 70%, var(--text));
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.due-title {
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.due-title a {
+  text-decoration-color: var(--class-color);
+  text-underline-offset: 3px;
+}
+
+.repeat-icon {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.due-time {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.row-menu {
+  position: relative;
+}
+
+.row-menu summary {
+  list-style: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.row-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.row-menu summary:hover,
+.row-menu[open] summary {
+  background: var(--background);
+}
+
+.row-menu-items {
+  /* Placed by positionMenu() in app.js, relative to the window. */
+  position: fixed;
+  z-index: 30;
+  display: grid;
+  min-width: 170px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 15%);
+}
+
+.row-menu-items button {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-menu-items button:hover {
+  background: var(--background);
+}
+
+.row-menu-items button.danger {
+  color: var(--danger);
+}
+
+.due-item.is-done .due-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.toggle-button {
+  display: block;
+  margin: 12px 0 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Week view ---------- */
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.week-range {
+  min-width: 120px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--background);
+}
+
+/* Columns keep a readable width; if they don't all fit, swipe or scroll sideways. */
+.week-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 8px;
+}
+
+.week-column {
+  scroll-snap-align: start;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.week-column.is-today {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.week-column.overdue {
+  background: color-mix(in srgb, var(--overdue) 8%, var(--background));
+}
+
+.week-column-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.week-column.overdue .week-column-heading {
+  color: var(--overdue);
+}
+
+.weekday {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.day-number {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.today-badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.7rem;
+}
+
+.week-empty {
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.due-item.week-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 8px;
+  border-left: 4px solid var(--class-color);
+}
+
+.week-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-item-top .class-tag {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.week-item-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.week-item-title .due-title {
+  min-width: 0;
+}
+
+.week-item .done-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.week-item .due-time {
+  white-space: normal;
+}
+
+.week-item .row-menu summary {
+  width: 28px;
+  height: 28px;
+}
+
+.week-item .due-title {
+  font-size: 0.9rem;
+}
+
+.week-item.is-overdue .due-time {
+  color: var(--overdue);
+  font-weight: 600;
+}
+
+/* ---------- Add panel ---------- */
+
+body {
+  transition: padding-right 0.2s ease;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  width: min(400px, 100vw);
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 0 16px 32px;
+  background: var(--background);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 12%);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 0.2s ease,
+    visibility 0.2s;
+}
+
+.drawer.is-open {
+  transform: none;
+  visibility: visible;
+  /* Visible right away when opening, so the first field can take focus. */
+  transition:
+    transform 0.2s ease,
+    visibility 0s;
+}
+
+.drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 8px;
+  background: var(--background);
+}
+
+.drawer-header h2 {
+  font-size: 1.25rem;
+}
+
+.close-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* On wide screens, make room so the list stays visible beside the panel. */
+@media (min-width: 1000px) {
+  body.drawer-open {
+    padding-right: 400px;
+  }
+}
+
+.empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+/* ---------- Dialog and toast ---------- */
+
+dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: 20px;
+  width: min(420px, calc(100vw - 32px));
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--background);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 20%);
+}
+
+.toast .text-button {
+  color: var(--background);
+  font-weight: 700;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.confirm-message {
+  margin: 0 0 16px;
+  font-size: 1rem;
+}
+
+.danger-button {
+  background: var(--danger);
+}

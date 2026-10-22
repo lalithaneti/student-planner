@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Student Planner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Planner</h1>
+      <div class="header-actions">
+        <button type="button" class="semester-button" id="semester-button" aria-haspopup="dialog">
+          <span id="semester-label"></span> <span aria-hidden="true">✎</span>
+        </button>
+        <button type="button" class="primary-button" data-action="open-drawer" aria-controls="add-drawer" aria-expanded="false">+ Add</button>
+      </div>
+    </header>
+
+    <p class="banner" id="banner" role="alert" hidden></p>
+
+    <main class="layout" id="layout">
+      <section class="panel due-panel" aria-labelledby="due-heading">
+        <div class="panel-header">
+          <h2 id="due-heading">Assignments</h2>
+          <div class="view-switch" role="group" aria-label="Display assignments as">
+            <button type="button" data-action="set-view" data-view="list" aria-pressed="true">List</button>
+            <button type="button" data-action="set-view" data-view="week" aria-pressed="false">Week</button>
+          </div>
+        </div>
+        <div id="due-list"></div>
+      </section>
+    </main>
+
+    <aside class="drawer" id="add-drawer" aria-labelledby="drawer-heading" inert>
+      <div class="drawer-header">
+        <h2 id="drawer-heading">Add</h2>
+        <button type="button" class="close-button" id="drawer-close" aria-label="Close">×</button>
+      </div>
+      <section class="panel" aria-labelledby="classes-heading">
+        <h2 id="classes-heading">Classes</h2>
+        <ul class="class-list" id="class-list"></ul>
+        <form id="class-form" novalidate>
+          <label class="field">
+            <span id="class-form-label">New class</span>
+            <input name="name" type="text" maxlength="60" placeholder="e.g. MATH 241" autocomplete="off" />
+          </label>
+          <fieldset class="field">
+            <legend>Color</legend>
+            <div class="color-picker" id="color-picker"></div>
+          </fieldset>
+          <ul class="form-errors" id="class-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="class-submit">Add class</button>
+            <button type="button" class="text-button" id="class-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel" aria-labelledby="add-assignment-heading">
+        <h2 id="add-assignment-heading">Add assignment</h2>
+        <form id="assignment-form" novalidate>
+          <label class="field">
+            <span>Name</span>
+            <input name="title" type="text" maxlength="120" placeholder="e.g. Math HW" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Class</span>
+            <select name="classId" id="assignment-class"></select>
+          </label>
+          <label class="field">
+            <span>Link <small>(optional: Canvas or course page)</small></span>
+            <input name="link" type="url" placeholder="https://" autocomplete="off" />
+          </label>
+
+          <fieldset class="field">
+            <legend>How often?</legend>
+            <div class="segmented">
+              <label><input type="radio" name="kind" value="once" checked /> One time</label>
+              <label><input type="radio" name="kind" value="weekly" /> Repeats weekly</label>
+            </div>
+          </fieldset>
+
+          <div id="once-fields">
+            <label class="field">
+              <span>Due date</span>
+              <input name="dueDate" type="date" />
+            </label>
+          </div>
+
+          <div id="weekly-fields" hidden>
+            <fieldset class="field">
+              <legend>Due every</legend>
+              <div class="day-picker" id="day-picker"></div>
+            </fieldset>
+            <div class="field-row">
+              <label class="field">
+                <span>Starting</span>
+                <input name="startDate" type="date" />
+              </label>
+              <label class="field">
+                <span>Until</span>
+                <input name="endDate" type="date" />
+              </label>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Due time</span>
+            <input name="dueTime" type="time" value="23:59" />
+          </label>
+
+          <ul class="form-errors" id="assignment-errors" role="alert"></ul>
+          <button type="submit" class="primary-button">Add assignment</button>
+        </form>
+      </section>
+    </aside>
+
+    <dialog id="semester-dialog" aria-labelledby="semester-dialog-heading">
+      <form id="semester-form" method="dialog" novalidate>
+        <h2 id="semester-dialog-heading">Semester</h2>
+        <p class="hint">New repeating assignments run until the semester ends.</p>
+        <label class="field">
+          <span>Name</span>
+          <input name="name" type="text" maxlength="40" />
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Starts</span>
+            <input name="startDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Ends</span>
+            <input name="endDate" type="date" />
+          </label>
+        </div>
+        <ul class="form-errors" id="semester-errors" role="alert"></ul>
+        <div class="button-row">
+          <button type="submit" class="primary-button" value="save">Save</button>
+          <button type="button" class="text-button" id="semester-cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog" aria-labelledby="confirm-message">
+      <form method="dialog">
+        <p id="confirm-message" class="confirm-message"></p>
+        <div class="button-row">
+          <button type="submit" class="primary-button danger-button" value="confirm" id="confirm-yes">Delete</button>
+          <button type="submit" class="text-button" value="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" hidden>
+      <span id="toast-message"></span>
+      <button type="button" class="text-button" id="toast-undo" hidden>Undo</button>
+    </div>
+
+    <script src="js/model.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
