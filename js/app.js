@@ -136,6 +136,7 @@
     rsoColorPicker: document.getElementById('rso-color-picker'),
     rsoMeetingList: document.getElementById('rso-meeting-list'),
     rsoEventList: document.getElementById('rso-event-list'),
+    classExamList: document.getElementById('class-exam-list'),
     rsoLastsHint: document.getElementById('rso-lasts-hint'),
     eventPanel: document.getElementById('event-panel'),
     eventForm: document.getElementById('event-form'),
@@ -1075,50 +1076,57 @@
     renderMeetingRows(list, meetings, days);
   }
 
-  // ---------- Events in the RSO form ----------
+  // ---------- One-time rows: an RSO's events and a class's exams ----------
 
-  function renderRsoEventRows(rows) {
-    elements.rsoEventList.innerHTML = rows
+  // The list's data-kind ("event" or "exam") picks the wording.
+  const ONE_TIME_ROW_TEXT = {
+    event: { name: 'Event', example: 'e.g. Fall social', place: 'Place' },
+    exam: { name: 'Exam', example: 'e.g. Midterm 2', place: 'Room' },
+  };
+
+  function renderOneTimeRows(list, rows) {
+    const text = ONE_TIME_ROW_TEXT[list.dataset.kind];
+    list.innerHTML = rows
       .map(
         (row, index) => `
-          <li class="meeting-row rso-event-row" data-event-id="${row.id}">
+          <li class="meeting-row one-time-row" data-row-id="${row.id}">
             <div class="meeting-row-top">
-              <input class="event-title" type="text" maxlength="80" placeholder="e.g. Fall social" value="${escapeHtml(row.title)}"
-                aria-label="Event ${index + 1} name" />
-              <button type="button" class="text-button danger" data-rso-event-action="remove">Remove</button>
+              <input class="one-time-title" type="text" maxlength="80" placeholder="${text.example}" value="${escapeHtml(row.title)}"
+                aria-label="${text.name} ${index + 1} name" />
+              <button type="button" class="text-button danger" data-one-time-action="remove">Remove</button>
             </div>
-            <label class="field"><span>Date</span><input class="event-date" type="date" value="${row.date}" /></label>
+            <label class="field"><span>Date</span><input class="one-time-date" type="date" value="${row.date}" /></label>
             <div class="field-row">
-              <label class="field"><span>Starts</span><input class="event-start" type="time" value="${row.startTime}" /></label>
-              <label class="field"><span>Ends</span><input class="event-end" type="time" value="${row.endTime}" /></label>
+              <label class="field"><span>Starts</span><input class="one-time-start" type="time" value="${row.startTime}" /></label>
+              <label class="field"><span>Ends</span><input class="one-time-end" type="time" value="${row.endTime}" /></label>
             </div>
-            <input class="event-location" type="text" maxlength="40" placeholder="Place (optional)" value="${escapeHtml(row.location)}"
-              aria-label="Event ${index + 1} place" />
+            <input class="one-time-location" type="text" maxlength="40" placeholder="${text.place} (optional)" value="${escapeHtml(row.location)}"
+              aria-label="${text.name} ${index + 1} ${text.place.toLowerCase()}" />
           </li>`,
       )
       .join('');
   }
 
-  function readRsoEventRows() {
-    return [...elements.rsoEventList.querySelectorAll('.rso-event-row')].map((row) => ({
-      id: row.dataset.eventId,
-      title: row.querySelector('.event-title').value.trim(),
-      date: row.querySelector('.event-date').value,
-      startTime: row.querySelector('.event-start').value,
-      endTime: row.querySelector('.event-end').value,
-      location: row.querySelector('.event-location').value.trim(),
+  function readOneTimeRows(list) {
+    return [...list.querySelectorAll('.one-time-row')].map((row) => ({
+      id: row.dataset.rowId,
+      title: row.querySelector('.one-time-title').value.trim(),
+      date: row.querySelector('.one-time-date').value,
+      startTime: row.querySelector('.one-time-start').value,
+      endTime: row.querySelector('.one-time-end').value,
+      location: row.querySelector('.one-time-location').value.trim(),
     }));
   }
 
-  function addRsoEventRow() {
-    const rows = readRsoEventRows();
-    rows.push({ id: newId('event'), title: '', date: '', startTime: '', endTime: '', location: '' });
-    renderRsoEventRows(rows);
-    elements.rsoEventList.querySelector('.rso-event-row:last-child .event-title').focus();
+  function addOneTimeRow(list) {
+    const rows = readOneTimeRows(list);
+    rows.push({ id: newId(list.dataset.kind), title: '', date: '', startTime: '', endTime: '', location: '' });
+    renderOneTimeRows(list, rows);
+    list.querySelector('.one-time-row:last-child .one-time-title').focus();
   }
 
-  function removeRsoEventRow(row) {
-    renderRsoEventRows(readRsoEventRows().filter((candidate) => candidate.id !== row.dataset.eventId));
+  function removeOneTimeRow(list, row) {
+    renderOneTimeRows(list, readOneTimeRows(list).filter((candidate) => candidate.id !== row.dataset.rowId));
   }
 
   // ---------- Recurring assignments in the class form ----------
@@ -1457,6 +1465,10 @@
     if (errors.length > 0) {
       return;
     }
+    // A half-edited class form lists that class's exams and would undo this change when saved.
+    if (editingClassId) {
+      stopEditingClass();
+    }
     if (editingExamId) {
       const exam = state.exams.find((candidate) => candidate.id === editingExamId);
       applyChange(`Saved ${fields.title}.`, () => Object.assign(exam, fields));
@@ -1497,9 +1509,14 @@
     renderMeetingRows(elements.meetingList, plannerClass.meetings || []);
     renderRecurringRows([]);
     renderExistingRecurring(id);
+    renderOneTimeRows(
+      elements.classExamList,
+      (state.exams || []).filter((exam) => exam.classId === id).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
+    );
     elements.classFormLabel.textContent = `Edit ${plannerClass.name}`;
     elements.classSubmit.textContent = 'Save class';
     elements.classCancel.hidden = false;
+    showErrors(elements.classErrors, []);
     elements.classForm.elements.name.focus();
   }
 
@@ -1508,6 +1525,7 @@
     elements.classForm.reset();
     renderMeetingRows(elements.meetingList, []);
     renderRecurringRows([]);
+    renderOneTimeRows(elements.classExamList, []);
     elements.existingRecurring.innerHTML = '';
     elements.classFormLabel.textContent = 'New class';
     elements.classSubmit.textContent = 'Add class';
@@ -1537,6 +1555,11 @@
       const which = assignment.title || `Recurring assignment ${index + 1}`;
       model.validateAssignment(assignment).forEach((error) => errors.push(`${which}: ${error}`));
     });
+    const exams = readOneTimeRows(elements.classExamList).map((row) => ({ ...row, semesterId: state.currentSemesterId, classId }));
+    exams.forEach((exam, index) => {
+      const which = exam.title || `Exam ${index + 1}`;
+      model.validateExam(exam).forEach((error) => errors.push(`${which}: ${error}`));
+    });
     showErrors(elements.classErrors, errors);
     if (errors.length > 0) {
       return;
@@ -1551,6 +1574,8 @@
         state.classes.push({ id: classId, semesterId: state.currentSemesterId, name, color, meetings });
       }
       state.assignments.push(...recurring);
+      // The form lists all of this class's exams, so it replaces them.
+      state.exams = [...(state.exams || []).filter((exam) => exam.classId !== classId), ...exams];
     });
     stopEditingClass();
   }
@@ -1588,7 +1613,7 @@
     selectColor(form, rso.color);
     form.elements.lasts.value = rso.lasts;
     renderMeetingRows(elements.rsoMeetingList, rso.meetings, ALL_DAYS);
-    renderRsoEventRows(rso.events || []);
+    renderOneTimeRows(elements.rsoEventList, rso.events || []);
     elements.rsoFormLabel.textContent = `Edit ${rso.name}`;
     elements.rsoSubmit.textContent = 'Save RSO';
     elements.rsoCancel.hidden = false;
@@ -1603,7 +1628,7 @@
     editingRsoId = null;
     elements.rsoForm.reset();
     renderMeetingRows(elements.rsoMeetingList, [], ALL_DAYS);
-    renderRsoEventRows([]);
+    renderOneTimeRows(elements.rsoEventList, []);
     elements.rsoFormLabel.textContent = 'New RSO';
     elements.rsoSubmit.textContent = 'Add RSO';
     elements.rsoCancel.hidden = true;
@@ -1616,7 +1641,7 @@
     const name = form.elements.name.value.trim();
     const existing = editingRsoId ? state.rsos.find((candidate) => candidate.id === editingRsoId) : null;
     const meetings = readMeetingsKeepingCancellations(elements.rsoMeetingList, existing ? existing.meetings : []);
-    const events = readRsoEventRows();
+    const events = readOneTimeRows(elements.rsoEventList);
     const errors = [];
     if (!name) {
       errors.push('Give the RSO a name.');
@@ -1870,6 +1895,9 @@
       startEditingExam(id);
     } else if (action === 'delete-exam') {
       const exam = state.exams.find((candidate) => candidate.id === id);
+      if (editingClassId === exam.classId) {
+        stopEditingClass();
+      }
       applyChange(`Deleted ${exam.title}.`, () => {
         state.exams = state.exams.filter((candidate) => candidate.id !== id);
       });
@@ -1950,7 +1978,8 @@
   elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
   document.getElementById('add-meeting').addEventListener('click', () => addMeetingRow(elements.meetingList, MEETING_DAYS, 'Lecture'));
   document.getElementById('add-rso-meeting').addEventListener('click', () => addMeetingRow(elements.rsoMeetingList, ALL_DAYS, 'General meeting'));
-  document.getElementById('add-rso-event').addEventListener('click', addRsoEventRow);
+  document.getElementById('add-rso-event').addEventListener('click', () => addOneTimeRow(elements.rsoEventList));
+  document.getElementById('add-class-exam').addEventListener('click', () => addOneTimeRow(elements.classExamList));
   elements.rsoForm.addEventListener('submit', handleRsoSubmit);
   elements.rsoCancel.addEventListener('click', stopEditingRso);
   elements.eventForm.addEventListener('submit', handleEventSubmit);
@@ -1964,11 +1993,13 @@
       }
     }
   });
-  elements.rsoEventList.addEventListener('click', (event) => {
-    const removeButton = event.target.closest('[data-rso-event-action="remove"]');
-    if (removeButton) {
-      removeRsoEventRow(removeButton.closest('.rso-event-row'));
-    }
+  [elements.rsoEventList, elements.classExamList].forEach((list) => {
+    list.addEventListener('click', (event) => {
+      const removeButton = event.target.closest('[data-one-time-action="remove"]');
+      if (removeButton) {
+        removeOneTimeRow(list, removeButton.closest('.one-time-row'));
+      }
+    });
   });
   document.getElementById('add-recurring').addEventListener('click', addRecurringRow);
   elements.recurringList.addEventListener('click', (event) => {

@@ -80,6 +80,11 @@
             <ul class="meeting-list" id="recurring-list"></ul>
             <button type="button" class="text-button" id="add-recurring">+ Add recurring assignment</button>
           </fieldset>
+          <fieldset class="field">
+            <legend>Exams <small>(optional: midterms, final…)</small></legend>
+            <ul class="meeting-list" id="class-exam-list" data-kind="exam"></ul>
+            <button type="button" class="text-button" id="add-class-exam">+ Add exam</button>
+          </fieldset>
           <ul class="form-errors" id="class-errors" role="alert"></ul>
           <div class="button-row">
             <button type="submit" class="primary-button" id="class-submit">Add class</button>
@@ -249,7 +254,7 @@
           </fieldset>
           <fieldset class="field">
             <legend>Events <small>(optional: one-time socials, workshops…)</small></legend>
-            <ul class="meeting-list" id="rso-event-list"></ul>
+            <ul class="meeting-list" id="rso-event-list" data-kind="event"></ul>
             <button type="button" class="text-button" id="add-rso-event">+ Add event</button>
           </fieldset>
           <ul class="form-errors" id="rso-errors" role="alert"></ul>
