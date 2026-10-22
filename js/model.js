@@ -316,6 +316,60 @@ const PlannerModel = (() => {
     return meetings.sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
+  // Data saved before exams existed has no exams list.
+  function examsOf(state) {
+    return (state.exams || []).filter((exam) => exam.semesterId === state.currentSemesterId);
+  }
+
+  // Returns a list of problems with an exam; empty means it is valid.
+  function validateExam(exam) {
+    const errors = [];
+    if (!exam.title.trim()) {
+      errors.push('Give the exam a name, like Midterm 1.');
+    }
+    if (!exam.classId) {
+      errors.push('Pick the class this exam is for.');
+    }
+    if (!isValidDateKey(exam.date)) {
+      errors.push('Pick the exam date.');
+    } else if ([0, 6].includes(parseDateKey(exam.date).getDay())) {
+      errors.push('The calendar shows Monday to Friday, so pick a weekday.');
+    }
+    if (!isValidTime(exam.startTime) || !isValidTime(exam.endTime)) {
+      errors.push('Pick a start and end time.');
+    } else if (exam.endTime <= exam.startTime) {
+      errors.push('The end time must be after the start time.');
+    }
+    return errors;
+  }
+
+  // Everything on the calendar for one date: class meetings and exams. An exam replaces
+  // its own class's meeting when they overlap (an in-class exam).
+  function calendarBlocksOn(state, date) {
+    const classesById = new Map(state.classes.map((plannerClass) => [plannerClass.id, plannerClass]));
+    const exams = examsOf(state)
+      .filter((exam) => exam.date === date && classesById.has(exam.classId))
+      .map((exam) => ({ kind: 'exam', exam, plannerClass: classesById.get(exam.classId), date, startTime: exam.startTime, endTime: exam.endTime, cancelled: false }));
+    const meetings = classMeetingsOn(state, date)
+      .filter((meeting) => !exams.some((exam) => exam.plannerClass.id === meeting.plannerClass.id && exam.startTime < meeting.endTime && meeting.startTime < exam.endTime))
+      .map((meeting) => ({ kind: 'meeting', ...meeting }));
+    return [...meetings, ...exams].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+
+  // Exams from now through the next two weeks, soonest first, with how many days away each is.
+  function upcomingExams(state, todayKey, nowTime) {
+    const lastDay = addDays(todayKey, 14);
+    return examsOf(state)
+      .filter((exam) => exam.date <= lastDay && (exam.date > todayKey || (exam.date === todayKey && exam.endTime > nowTime)))
+      .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
+      .map((exam) => ({
+        exam,
+        plannerClass: state.classes.find((plannerClass) => plannerClass.id === exam.classId),
+        daysUntil: Math.round((parseDateKey(exam.date) - parseDateKey(todayKey)) / (24 * 60 * 60 * 1000)),
+      }))
+      .filter((upcoming) => upcoming.plannerClass);
+  }
+
   // The Mon–Fri class schedule for one week, only on dates inside the current semester.
   // startHour and endHour cover 8 AM–6 PM, stretched to fit any earlier or later class.
   function buildCalendarWeek(state, weekStart) {
@@ -325,7 +379,7 @@ const PlannerModel = (() => {
     let endMinutes = DEFAULT_CALENDAR_HOURS.end * 60;
     const days = [0, 1, 2, 3, 4].map((offset) => {
       const date = addDays(weekStart, offset);
-      const blocks = classMeetingsOn(state, date);
+      const blocks = calendarBlocksOn(state, date);
       for (const block of blocks) {
         startMinutes = Math.min(startMinutes, timeToMinutes(block.startTime));
         endMinutes = Math.max(endMinutes, timeToMinutes(block.endTime));
@@ -341,12 +395,12 @@ const PlannerModel = (() => {
     };
   }
 
-  // The class happening now ({ status: 'now', ... }), or else the next one that isn't
-  // cancelled ({ status: 'next', ... }), looking up to two weeks ahead. null if none.
+  // The class or exam happening now ({ status: 'now', ... }), or else the next one that
+  // isn't cancelled ({ status: 'next', ... }), looking up to two weeks ahead. null if none.
   function nextClass(state, todayKey, nowTime) {
     for (let offset = 0; offset < 14; offset += 1) {
       const date = addDays(todayKey, offset);
-      const meetings = classMeetingsOn(state, date).filter((meeting) => !meeting.cancelled);
+      const meetings = calendarBlocksOn(state, date).filter((meeting) => !meeting.cancelled);
       if (offset === 0) {
         const happeningNow = meetings.find((meeting) => meeting.startTime <= nowTime && nowTime < meeting.endTime);
         if (happeningNow) {
@@ -444,6 +498,9 @@ const PlannerModel = (() => {
     timeToMinutes,
     validateMeeting,
     buildCalendarWeek,
+    validateExam,
+    calendarBlocksOn,
+    upcomingExams,
     nextClass,
     formatTimeRange,
     formatTime,

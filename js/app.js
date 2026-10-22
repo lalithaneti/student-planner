@@ -29,8 +29,9 @@
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
-  // Which part of the Add panel is showing: 'assignment' or 'class'.
+  // Which part of the Add panel is showing: 'assignment', 'class', or 'exam'.
   let drawerSection = 'assignment';
+  let editingExamId = null;
   let showLater = false;
   let showDone = false;
   let showMissed = false;
@@ -59,6 +60,13 @@
     classPanel: document.getElementById('class-panel'),
     assignmentPanel: document.getElementById('assignment-panel'),
     drawerHeading: document.getElementById('drawer-heading'),
+    examPanel: document.getElementById('exam-panel'),
+    examForm: document.getElementById('exam-form'),
+    examClass: document.getElementById('exam-class'),
+    examHeading: document.getElementById('exam-heading'),
+    examSubmit: document.getElementById('exam-submit'),
+    examCancel: document.getElementById('exam-cancel'),
+    examErrors: document.getElementById('exam-errors'),
     assignmentForm: document.getElementById('assignment-form'),
     assignmentClass: document.getElementById('assignment-class'),
     assignmentErrors: document.getElementById('assignment-errors'),
@@ -273,6 +281,15 @@
     elements.assignmentClass.innerHTML = options.join('');
     if (hadClasses && [...elements.assignmentClass.options].some((option) => option.value === selected)) {
       elements.assignmentClass.value = selected;
+    }
+    // Exams always belong to a class, so their list has no "No class" choice.
+    const selectedExamClass = elements.examClass.value;
+    elements.examClass.innerHTML =
+      currentClasses().length === 0
+        ? '<option value="">Add a class first (+ Add → Class)</option>'
+        : options.slice(0, -1).join('');
+    if ([...elements.examClass.options].some((option) => option.value === selectedExamClass)) {
+      elements.examClass.value = selectedExamClass;
     }
   }
 
@@ -529,12 +546,43 @@
     return ((model.timeToMinutes(time) - startHour * 60) / 60) * HOUR_HEIGHT;
   }
 
+  // Where a block sits on the grid: its height comes from its times, its width from overlaps.
+  function blockPlacement(block, startHour) {
+    const top = timeOffset(block.startTime, startHour);
+    const height = timeOffset(block.endTime, startHour) - top;
+    return {
+      height,
+      style: `top: ${top}px; height: ${height}px; left: ${(block.lane / block.laneCount) * 100}%; width: ${100 / block.laneCount}%`,
+    };
+  }
+
+  // An exam on the calendar, in its class's color and marked EXAM. Clicking it opens a
+  // menu to edit or delete it.
+  function renderExamBlock(block, startHour) {
+    const { exam, plannerClass } = block;
+    const { height, style } = blockPlacement(block, startHour);
+    const title = escapeHtml(exam.title);
+    const details = height >= HOUR_HEIGHT && exam.location ? `<span class="class-block-details">${escapeHtml(exam.location)}</span>` : '';
+    return `
+      <details class="row-menu class-block-slot" style="${style}">
+        <summary class="class-block is-exam" style="--class-color: ${plannerClass.color}"
+          title="${escapeHtml(plannerClass.name)} ${title}${exam.location ? ` · ${escapeHtml(exam.location)}` : ''}">
+          <span class="class-block-name"><span class="exam-tag">Exam</span> ${escapeHtml(plannerClass.name)} ${title}</span>
+          ${details}
+          <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+        </summary>
+        <div class="row-menu-items">
+          <button type="button" data-action="edit-exam" data-id="${exam.id}">Edit exam…</button>
+          <button type="button" class="danger" data-action="delete-exam" data-id="${exam.id}">Delete exam</button>
+        </div>
+      </details>`;
+  }
+
   // A class block on the calendar. Clicking it opens a menu to edit the class or cancel
   // (or restore) just this day's meeting.
   function renderClassBlock(block, startHour) {
-    const { plannerClass, meeting, lane, laneCount, date, cancelled } = block;
-    const top = timeOffset(block.startTime, startHour);
-    const height = timeOffset(block.endTime, startHour) - top;
+    const { plannerClass, meeting, date, cancelled } = block;
+    const { height, style } = blockPlacement(block, startHour);
     // Blocks under about an hour only have room for the name and time; the rest is in the hover text.
     const hasRoomForDetails = height >= HOUR_HEIGHT;
     const details = cancelled
@@ -548,7 +596,7 @@
       ? `<button type="button" data-action="restore-meeting" ${meetingData}>Restore class on ${model.formatDate(date)}</button>`
       : `<button type="button" class="danger" data-action="cancel-meeting" ${meetingData}>Cancel class on ${model.formatDate(date)}</button>`;
     return `
-      <details class="row-menu class-block-slot" style="top: ${top}px; height: ${height}px; left: ${(lane / laneCount) * 100}%; width: ${100 / laneCount}%">
+      <details class="row-menu class-block-slot" style="${style}">
         <summary class="class-block${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}"
           title="${name} ${describeMeeting(meeting)}${cancelled ? ' (cancelled)' : ''}">
           <span class="class-block-name">${name}</span>
@@ -568,19 +616,49 @@
     if (!upcoming) {
       return '<p class="next-class">No classes in the next two weeks.</p>';
     }
-    const { plannerClass, meeting, status, date } = upcoming;
-    const what = `<strong>${escapeHtml(plannerClass.name)}</strong>${meeting.label ? ` ${escapeHtml(meeting.label)}` : ''}`;
-    const where = meeting.location ? ` · ${escapeHtml(meeting.location)}` : '';
+    const { plannerClass, status, date, startTime, endTime } = upcoming;
+    // An exam reads "MATH 241 Midterm 1 (exam)"; a class meeting "MATH 241 Lecture".
+    const isExam = upcoming.kind === 'exam';
+    const label = isExam ? `${upcoming.exam.title} (exam)` : upcoming.meeting.label;
+    const location = isExam ? upcoming.exam.location : upcoming.meeting.location;
+    const what = `<strong>${escapeHtml(plannerClass.name)}</strong>${label ? ` ${escapeHtml(label)}` : ''}`;
+    const where = location ? ` · ${escapeHtml(location)}` : '';
     let text;
     if (status === 'now') {
-      text = `Now: ${what} until ${model.formatTime(meeting.endTime)}${where}`;
+      text = `Now: ${what} until ${model.formatTime(endTime)}${where}`;
     } else if (date === todayKey()) {
-      text = `Next: ${what} at ${model.formatTime(meeting.startTime)}${where}`;
+      text = `Next: ${what} at ${model.formatTime(startTime)}${where}`;
     } else {
       const day = date === model.addDays(todayKey(), 1) ? 'Tomorrow' : model.formatDate(date);
-      text = `Next: ${day} ${model.formatTime(meeting.startTime)} · ${what}${where}`;
+      text = `Next: ${day} ${model.formatTime(startTime)} · ${what}${where}`;
     }
     return `<p class="next-class" style="--class-color: ${plannerClass.color}"><span class="swatch" aria-hidden="true"></span>${text}</p>`;
+  }
+
+  function daysAwayText(days) {
+    if (days === 0) {
+      return 'today';
+    }
+    return days === 1 ? 'tomorrow' : `in ${days} days`;
+  }
+
+  // "★ Exams: MATH 241 Midterm 1 · Thu, Nov 5, 7:00 PM · in 5 days", for the next two weeks.
+  function renderExamCountdown() {
+    const exams = model.upcomingExams(state, todayKey(), currentTime());
+    if (exams.length === 0) {
+      return '';
+    }
+    const rows = exams
+      .map(
+        ({ exam, plannerClass, daysUntil }) => `
+          <li style="--class-color: ${plannerClass.color}">
+            <span class="swatch" aria-hidden="true"></span>
+            <span><strong>${escapeHtml(plannerClass.name)}</strong> ${escapeHtml(exam.title)} · ${model.formatDate(exam.date)}, ${model.formatTime(exam.startTime)}
+            · <span class="days-away">${daysAwayText(daysUntil)}</span></span>
+          </li>`,
+      )
+      .join('');
+    return `<div class="exam-countdown"><span class="exam-countdown-title">★ Exams</span><ul>${rows}</ul></div>`;
   }
 
   function renderCalendar() {
@@ -613,11 +691,15 @@
       .map((day) => {
         const showNow = day.date === today && nowTime >= `${String(week.startHour).padStart(2, '0')}:00` && model.timeToMinutes(nowTime) <= week.endHour * 60;
         const nowLine = showNow ? `<div class="now-line" style="top: ${timeOffset(nowTime, week.startHour)}px" aria-hidden="true"></div>` : '';
-        return `<div class="calendar-day${day.date === today ? ' is-today' : ''}">${day.blocks.map((block) => renderClassBlock(block, week.startHour)).join('')}${nowLine}</div>`;
+        const blocks = day.blocks
+          .map((block) => (block.kind === 'exam' ? renderExamBlock(block, week.startHour) : renderClassBlock(block, week.startHour)))
+          .join('');
+        return `<div class="calendar-day${day.date === today ? ' is-today' : ''}">${blocks}${nowLine}</div>`;
       })
       .join('');
     elements.calendar.innerHTML = `
       ${week.hasMeetings ? renderNextClass() : ''}
+      ${renderExamCountdown()}
       ${renderWeekNav()}
       ${notice}
       <div class="calendar">
@@ -637,13 +719,17 @@
 
   // The panel's title follows what it shows, e.g. "Classes" or "Edit assignment".
   function renderDrawerHeading() {
-    elements.drawerHeading.textContent = drawerSection === 'class' ? 'Classes' : elements.assignmentHeading.textContent;
+    const headings = { class: 'Classes', assignment: elements.assignmentHeading.textContent, exam: elements.examHeading.textContent };
+    elements.drawerHeading.textContent = headings[drawerSection];
   }
 
-  // Opens the Add panel showing one section ('assignment' or 'class'), or closes it.
+  // Opens the Add panel showing one section ('assignment', 'class', or 'exam'), or closes it.
   function setDrawerOpen(open, section = drawerSection) {
     if (!open && editingAssignment) {
       stopEditingAssignment();
+    }
+    if (!open && editingExamId) {
+      stopEditingExam();
     }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
@@ -652,9 +738,10 @@
       drawerSection = section;
       elements.classPanel.hidden = section !== 'class';
       elements.assignmentPanel.hidden = section !== 'assignment';
+      elements.examPanel.hidden = section !== 'exam';
       renderDrawerHeading();
-      const firstField = section === 'class' ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
-      firstField.focus();
+      const firstFields = { class: elements.classForm.elements.name, assignment: elements.assignmentForm.elements.title, exam: elements.examForm.elements.title };
+      firstFields[section].focus();
     }
   }
 
@@ -948,6 +1035,68 @@
     setDrawerOpen(false);
   }
 
+  // ---------- Exams ----------
+
+  function startEditingExam(id) {
+    const exam = state.exams.find((candidate) => candidate.id === id);
+    editingExamId = id;
+    const form = elements.examForm;
+    form.elements.title.value = exam.title;
+    form.elements.classId.value = exam.classId;
+    form.elements.date.value = exam.date;
+    form.elements.startTime.value = exam.startTime;
+    form.elements.endTime.value = exam.endTime;
+    form.elements.location.value = exam.location;
+    elements.examHeading.textContent = 'Edit exam';
+    elements.examSubmit.textContent = 'Save exam';
+    elements.examCancel.hidden = false;
+    showErrors(elements.examErrors, []);
+    setDrawerOpen(true, 'exam');
+  }
+
+  function stopEditingExam() {
+    editingExamId = null;
+    elements.examForm.reset();
+    elements.examHeading.textContent = 'Add exam';
+    elements.examSubmit.textContent = 'Add exam';
+    elements.examCancel.hidden = true;
+    showErrors(elements.examErrors, []);
+    renderClassOptions();
+    renderDrawerHeading();
+  }
+
+  function handleExamSubmit(event) {
+    event.preventDefault();
+    const form = elements.examForm;
+    const fields = {
+      title: form.elements.title.value.trim(),
+      classId: form.elements.classId.value || null,
+      date: form.elements.date.value,
+      startTime: form.elements.startTime.value,
+      endTime: form.elements.endTime.value,
+      location: form.elements.location.value.trim(),
+    };
+    const errors = model.validateExam(fields);
+    showErrors(elements.examErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    if (editingExamId) {
+      const exam = state.exams.find((candidate) => candidate.id === editingExamId);
+      applyChange(`Saved ${fields.title}.`, () => Object.assign(exam, fields));
+      setDrawerOpen(false);
+    } else {
+      applyChange(`Added ${fields.title} on ${model.formatDate(fields.date)}.`, () => {
+        state.exams = [...(state.exams || []), { id: newId('exam'), semesterId: state.currentSemesterId, ...fields }];
+      });
+      // Keep the class so adding several exams for one class is quick.
+      ['title', 'date', 'startTime', 'endTime', 'location'].forEach((name) => {
+        form.elements[name].value = '';
+      });
+      form.elements.title.focus();
+    }
+  }
+
   function startEditingClass(id) {
     const plannerClass = state.classes.find((candidate) => candidate.id === id);
     editingClassId = id;
@@ -1111,7 +1260,15 @@
     } else if (action === 'delete-class') {
       const plannerClass = state.classes.find((candidate) => candidate.id === id);
       const count = state.assignments.filter((candidate) => candidate.classId === id).length;
-      const warning = count > 0 ? ` This also deletes its ${count} assignment${count === 1 ? '' : 's'}.` : '';
+      const examCount = (state.exams || []).filter((exam) => exam.classId === id).length;
+      const parts = [];
+      if (count > 0) {
+        parts.push(`${count} assignment${count === 1 ? '' : 's'}`);
+      }
+      if (examCount > 0) {
+        parts.push(`${examCount} exam${examCount === 1 ? '' : 's'}`);
+      }
+      const warning = parts.length > 0 ? ` This also deletes its ${parts.join(' and ')}.` : '';
       if (await askToConfirm(`Delete ${plannerClass.name}?${warning}`, 'Delete class')) {
         if (editingClassId === id) {
           stopEditingClass();
@@ -1119,6 +1276,7 @@
         applyChange(`Deleted ${plannerClass.name}.`, () => {
           state.classes = state.classes.filter((candidate) => candidate.id !== id);
           state.assignments = state.assignments.filter((candidate) => candidate.classId !== id);
+          state.exams = (state.exams || []).filter((exam) => exam.classId !== id);
         });
       }
     } else if (action === 'edit-assignment') {
@@ -1132,9 +1290,19 @@
       if (scope) {
         startEditingAssignment(assignment, scope, date);
       }
+    } else if (action === 'edit-exam') {
+      startEditingExam(id);
+    } else if (action === 'delete-exam') {
+      const exam = state.exams.find((candidate) => candidate.id === id);
+      applyChange(`Deleted ${exam.title}.`, () => {
+        state.exams = state.exams.filter((candidate) => candidate.id !== id);
+      });
     } else if (action === 'open-drawer') {
       if (editingAssignment) {
         stopEditingAssignment();
+      }
+      if (editingExamId) {
+        stopEditingExam();
       }
       setDrawerOpen(true, target.dataset.section || 'assignment');
     } else if (action === 'set-view') {
@@ -1181,6 +1349,8 @@
     }
   });
   elements.classForm.addEventListener('submit', handleClassSubmit);
+  elements.examForm.addEventListener('submit', handleExamSubmit);
+  elements.examCancel.addEventListener('click', () => setDrawerOpen(false));
   elements.classCancel.addEventListener('click', stopEditingClass);
   elements.semesterButton.addEventListener('click', openSemesterDialog);
   elements.semesterForm.addEventListener('submit', handleSemesterSubmit);

@@ -22,6 +22,7 @@
           <div class="add-menu-items" role="menu" aria-label="Add">
             <button type="button" role="menuitem" data-action="open-drawer" data-section="assignment">Assignment</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="exam">Exam</button>
           </div>
         </details>
       </div>
@@ -150,6 +151,42 @@
           <div class="button-row">
             <button type="submit" class="primary-button" id="assignment-submit">Add assignment</button>
             <button type="button" class="text-button" id="assignment-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+      </section>
+      <section class="panel" id="exam-panel" aria-labelledby="exam-heading" hidden>
+        <h2 id="exam-heading">Add exam</h2>
+        <form id="exam-form" novalidate>
+          <label class="field">
+            <span>Name</span>
+            <input name="title" type="text" maxlength="80" placeholder="e.g. Midterm 1" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span>Class</span>
+            <select name="classId" id="exam-class"></select>
+          </label>
+          <label class="field">
+            <span>Date</span>
+            <input name="date" type="date" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Starts</span>
+              <input name="startTime" type="time" />
+            </label>
+            <label class="field">
+              <span>Ends</span>
+              <input name="endTime" type="time" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Room <small>(optional)</small></span>
+            <input name="location" type="text" maxlength="40" placeholder="e.g. Foellinger Auditorium" autocomplete="off" />
+          </label>
+          <ul class="form-errors" id="exam-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="exam-submit">Add exam</button>
+            <button type="button" class="text-button" id="exam-cancel" hidden>Cancel</button>
           </div>
         </form>
       </section>

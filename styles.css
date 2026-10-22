@@ -935,6 +935,62 @@ button:focus-visible {
   text-decoration: line-through;
 }
 
+/* Exams stand out from regular classes: a full outline in the class color and an EXAM tag. */
+.row-menu .class-block.is-exam {
+  border: 2px solid var(--class-color);
+  border-left-width: 6px;
+  background: color-mix(in srgb, var(--class-color) 35%, var(--surface));
+}
+
+.exam-tag {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--class-color);
+  color: #ffffff;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.exam-countdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--background));
+}
+
+.exam-countdown-title {
+  font-weight: 700;
+}
+
+.exam-countdown ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exam-countdown li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.exam-countdown .swatch {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.days-away {
+  font-weight: 700;
+}
+
 .next-class {
   display: flex;
   flex-wrap: wrap;
