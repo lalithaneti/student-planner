@@ -9,6 +9,10 @@
   <body>
     <header class="app-header">
       <h1>Planner</h1>
+      <nav class="tabs" role="tablist" aria-label="Planner sections">
+        <button type="button" role="tab" id="assignments-tab" data-action="set-tab" data-tab="assignments" aria-controls="assignments-panel" aria-selected="true">Assignments</button>
+        <button type="button" role="tab" id="calendar-tab" data-action="set-tab" data-tab="calendar" aria-controls="calendar-panel" aria-selected="false">Calendar</button>
+      </nav>
       <div class="header-actions">
         <button type="button" class="semester-button" id="semester-button" aria-haspopup="dialog">
           <span id="semester-label"></span> <span aria-hidden="true">✎</span>
@@ -20,7 +24,7 @@
     <p class="banner" id="banner" role="alert" hidden></p>
 
     <main class="layout" id="layout">
-      <section class="panel due-panel" aria-labelledby="due-heading">
+      <section class="panel due-panel" id="assignments-panel" role="tabpanel" aria-labelledby="assignments-tab">
         <div class="panel-header">
           <h2 id="due-heading">Assignments</h2>
           <div class="view-switch" role="group" aria-label="Display assignments as">
@@ -29,6 +33,13 @@
           </div>
         </div>
         <div id="due-list"></div>
+      </section>
+
+      <section class="panel" id="calendar-panel" role="tabpanel" aria-labelledby="calendar-tab" hidden>
+        <div class="panel-header">
+          <h2>Class schedule</h2>
+        </div>
+        <div id="calendar"></div>
       </section>
     </main>
 
@@ -48,6 +59,11 @@
           <fieldset class="field">
             <legend>Color</legend>
             <div class="color-picker" id="color-picker"></div>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Meeting times <small>(optional: lecture, discussion, lab…)</small></legend>
+            <ul class="meeting-list" id="meeting-list"></ul>
+            <button type="button" class="text-button" id="add-meeting">+ Add meeting time</button>
           </fieldset>
           <ul class="form-errors" id="class-errors" role="alert"></ul>
           <div class="button-row">

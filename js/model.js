@@ -206,11 +206,111 @@ const PlannerModel = (() => {
     };
   }
 
+  // ---------- Calendar ----------
+
+  // The hours the calendar shows unless a class starts earlier or ends later.
+  const DEFAULT_CALENDAR_HOURS = { start: 8, end: 18 };
+
+  function timeToMinutes(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  // Returns a list of problems with a class meeting time; empty means it is valid.
+  function validateMeeting(meeting) {
+    const errors = [];
+    if (meeting.days.length === 0) {
+      errors.push('Pick at least one day.');
+    }
+    if (!isValidTime(meeting.startTime) || !isValidTime(meeting.endTime)) {
+      errors.push('Pick a start and end time.');
+    } else if (meeting.endTime <= meeting.startTime) {
+      errors.push('The end time must be after the start time.');
+    }
+    return errors;
+  }
+
+  // Places one day's blocks so overlapping ones sit side by side. Each block gets a
+  // lane (0, 1, ...) and laneCount, the number of lanes in its group of overlapping blocks.
+  function assignLanes(blocks) {
+    blocks.sort((a, b) => a.startTime.localeCompare(b.startTime) || a.endTime.localeCompare(b.endTime));
+    let group = [];
+    let laneEnds = [];
+    let groupEnd = '';
+    const closeGroup = () => {
+      for (const block of group) {
+        block.laneCount = laneEnds.length;
+      }
+    };
+    for (const block of blocks) {
+      if (group.length > 0 && block.startTime >= groupEnd) {
+        closeGroup();
+        group = [];
+        laneEnds = [];
+      }
+      let lane = laneEnds.findIndex((end) => end <= block.startTime);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(block.endTime);
+      } else {
+        laneEnds[lane] = block.endTime;
+      }
+      block.lane = lane;
+      groupEnd = group.length === 0 || block.endTime > groupEnd ? block.endTime : groupEnd;
+      group.push(block);
+    }
+    closeGroup();
+    return blocks;
+  }
+
+  // The Mon–Fri class schedule for one week, only on dates inside the current semester.
+  // startHour and endHour cover 8 AM–6 PM, stretched to fit any earlier or later class.
+  function buildCalendarWeek(state, weekStart) {
+    const semester = state.semesters.find((candidate) => candidate.id === state.currentSemesterId);
+    const classes = state.classes.filter((plannerClass) => plannerClass.semesterId === state.currentSemesterId);
+    let startMinutes = DEFAULT_CALENDAR_HOURS.start * 60;
+    let endMinutes = DEFAULT_CALENDAR_HOURS.end * 60;
+    const days = [0, 1, 2, 3, 4].map((offset) => {
+      const date = addDays(weekStart, offset);
+      const weekday = parseDateKey(date).getDay();
+      const blocks = [];
+      if (date >= semester.startDate && date <= semester.endDate) {
+        for (const plannerClass of classes) {
+          for (const meeting of plannerClass.meetings || []) {
+            if (meeting.days.includes(weekday)) {
+              blocks.push({ plannerClass, meeting, startTime: meeting.startTime, endTime: meeting.endTime });
+            }
+          }
+        }
+      }
+      for (const block of blocks) {
+        startMinutes = Math.min(startMinutes, timeToMinutes(block.startTime));
+        endMinutes = Math.max(endMinutes, timeToMinutes(block.endTime));
+      }
+      return { date, label: WEEKDAY_NAMES[weekday], blocks: assignLanes(blocks) };
+    });
+    return {
+      days,
+      startHour: Math.floor(startMinutes / 60),
+      endHour: Math.ceil(endMinutes / 60),
+      hasMeetings: classes.some((plannerClass) => (plannerClass.meetings || []).length > 0),
+      outsideSemester: addDays(weekStart, 4) < semester.startDate || weekStart > semester.endDate,
+    };
+  }
+
   function formatTime(time) {
     const [hours, minutes] = time.split(':').map(Number);
     const suffix = hours < 12 ? 'AM' : 'PM';
     const displayHours = hours % 12 === 0 ? 12 : hours % 12;
     return `${displayHours}:${pad(minutes)} ${suffix}`;
+  }
+
+  // "10:00–10:50 AM" when both are in the morning (or afternoon), else "11:30 AM–12:20 PM".
+  function formatTimeRange(startTime, endTime) {
+    const start = formatTime(startTime);
+    const end = formatTime(endTime);
+    const sameHalfOfDay = start.slice(-2) === end.slice(-2);
+    return `${sameHalfOfDay ? start.slice(0, -3) : start}–${end}`;
   }
 
   function formatDate(dateKey) {
@@ -275,6 +375,10 @@ const PlannerModel = (() => {
     startOfWeek,
     buildWeek,
     detachOccurrence,
+    timeToMinutes,
+    validateMeeting,
+    buildCalendarWeek,
+    formatTimeRange,
     formatTime,
     formatDate,
     formatMonthDay,

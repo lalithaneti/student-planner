@@ -156,10 +156,42 @@ a {
   color: var(--accent-text);
 }
 
-/* Week view needs room for its columns. */
+/* Week view and the calendar need room for their columns. */
 body.week-view .layout,
-body.week-view .app-header {
+body.week-view .app-header,
+body.calendar-tab .layout,
+body.calendar-tab .app-header {
   max-width: 1240px;
+}
+
+/* ---------- Tabs ---------- */
+
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 16px;
+}
+
+.tabs button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.tabs button:hover {
+  color: var(--text);
 }
 
 .empty {
@@ -785,6 +817,154 @@ button:focus-visible {
   border-radius: 999px;
   background: var(--accent);
   transition: width 0.3s ease;
+}
+
+/* ---------- Calendar ---------- */
+
+.calendar-notice {
+  margin-bottom: 12px;
+}
+
+.calendar {
+  overflow-x: auto;
+}
+
+.calendar-row {
+  display: grid;
+  grid-template-columns: 52px repeat(5, minmax(120px, 1fr));
+  min-width: 652px;
+}
+
+.calendar-headings {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.calendar-day-heading {
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.calendar-day-heading.is-today .weekday {
+  color: var(--accent);
+}
+
+.calendar-body {
+  position: relative;
+}
+
+.hour-labels {
+  position: relative;
+}
+
+.hour-label {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.hour-label:first-child {
+  transform: none;
+}
+
+/* One line per hour, drawn as a repeating background. 56px must match HOUR_HEIGHT in app.js. */
+.calendar-day {
+  position: relative;
+  border-left: 1px solid var(--border);
+  background-image: linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 100% 56px;
+}
+
+.calendar-day.is-today {
+  background-color: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.class-block {
+  position: absolute;
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  padding: 4px 6px;
+  border: 1px solid var(--surface);
+  border-left: 4px solid var(--class-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--class-color) 22%, var(--surface));
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.class-block-name {
+  font-weight: 700;
+}
+
+.class-block-details,
+.class-block-time {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  height: 2px;
+  background: var(--danger);
+}
+
+.now-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* ---------- Meeting times in the class form ---------- */
+
+.meeting-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.meeting-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.meeting-row-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.meeting-row .field {
+  margin: 0;
+}
+
+.meeting-row input[type='text'] {
+  min-width: 0;
+}
+
+.class-meeting {
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }
 
 /* ---------- Add panel ---------- */

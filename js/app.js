@@ -17,6 +17,10 @@
   const NO_CLASS_COLOR = '#8b8d98';
   const TOAST_DURATION_MS = 6000;
   const VIEW_STORAGE_KEY = 'student-planner-view';
+  const TAB_STORAGE_KEY = 'student-planner-tab';
+  // Height of one hour on the calendar, in pixels.
+  const HOUR_HEIGHT = 56;
+  const MEETING_DAYS = [1, 2, 3, 4, 5];
 
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
@@ -28,7 +32,8 @@
   let showMissed = false;
   let toastTimer = null;
   let resolveChoice = null;
-  let currentView = loadSavedView();
+  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['list', 'week']);
+  let currentTab = loadSavedPreference(TAB_STORAGE_KEY, ['assignments', 'calendar']);
   let weekStart = model.startOfWeek(todayKey());
 
   const elements = {
@@ -40,6 +45,11 @@
     banner: document.getElementById('banner'),
     dueList: document.getElementById('due-list'),
     viewButtons: document.querySelectorAll('[data-action="set-view"]'),
+    tabButtons: document.querySelectorAll('[data-action="set-tab"]'),
+    assignmentsPanel: document.getElementById('assignments-panel'),
+    calendarPanel: document.getElementById('calendar-panel'),
+    calendar: document.getElementById('calendar'),
+    meetingList: document.getElementById('meeting-list'),
     assignmentForm: document.getElementById('assignment-form'),
     assignmentClass: document.getElementById('assignment-class'),
     assignmentErrors: document.getElementById('assignment-errors'),
@@ -81,20 +91,22 @@
       .replaceAll("'", '&#39;');
   }
 
-  // Remembers List or Week on this device. A display preference, so losing it is harmless.
-  function loadSavedView() {
+  // Display preferences (List or Week, which tab) are remembered on this device.
+  // Losing them is harmless, so failures fall back to the first option.
+  function loadSavedPreference(key, options) {
     try {
-      return localStorage.getItem(VIEW_STORAGE_KEY) === 'week' ? 'week' : 'list';
+      const saved = localStorage.getItem(key);
+      return options.includes(saved) ? saved : options[0];
     } catch {
-      return 'list';
+      return options[0];
     }
   }
 
-  function saveView(view) {
+  function savePreference(key, value) {
     try {
-      localStorage.setItem(VIEW_STORAGE_KEY, view);
+      localStorage.setItem(key, value);
     } catch {
-      // The view just won't be remembered next time.
+      // The preference just won't be remembered next time.
     }
   }
 
@@ -194,7 +206,16 @@
     renderSemester();
     renderClasses();
     renderClassOptions();
+    renderTabs();
     renderDueList();
+    renderCalendar();
+  }
+
+  function renderTabs() {
+    elements.tabButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === currentTab)));
+    elements.assignmentsPanel.hidden = currentTab !== 'assignments';
+    elements.calendarPanel.hidden = currentTab !== 'calendar';
+    document.body.classList.toggle('calendar-tab', currentTab === 'calendar');
   }
 
   function renderSemester() {
@@ -217,12 +238,19 @@
             <span class="class-info">
               <span class="class-name">${escapeHtml(plannerClass.name)}</span>
               <span class="class-count">${count} assignment${count === 1 ? '' : 's'}</span>
+              ${(plannerClass.meetings || []).map((meeting) => `<span class="class-meeting">${describeMeeting(meeting)}</span>`).join('')}
             </span>
             <button type="button" class="text-button" data-action="edit-class" data-id="${plannerClass.id}">Edit</button>
             <button type="button" class="text-button danger" data-action="delete-class" data-id="${plannerClass.id}">Delete</button>
           </li>`;
       })
       .join('');
+  }
+
+  function describeMeeting(meeting) {
+    const label = meeting.label ? `${escapeHtml(meeting.label)} ` : '';
+    const location = meeting.location ? ` · ${escapeHtml(meeting.location)}` : '';
+    return `${label}${model.formatDays(meeting.days)} ${model.formatTimeRange(meeting.startTime, meeting.endTime)}${location}`;
   }
 
   function renderClassOptions() {
@@ -442,7 +470,6 @@
   function renderWeekView(items) {
     const today = todayKey();
     const week = model.buildWeek(items, weekStart, today, currentTime());
-    const isCurrentWeek = weekStart === model.startOfWeek(today);
     let columns = '';
     if (week.overdue.length > 0) {
       columns += renderWeekColumn(
@@ -463,15 +490,93 @@
         isToday ? 'is-today' : '',
       );
     }
+    return `${renderWeekNav(renderProgress(week.progress))}<div class="week-grid">${columns}</div>`;
+  }
+
+  // ← week → navigation, shared by the assignments Week view and the calendar. extra goes at the end.
+  function renderWeekNav(extra = '') {
+    const isCurrentWeek = weekStart === model.startOfWeek(todayKey());
     return `
       <div class="week-nav">
         <button type="button" class="icon-button" data-action="previous-week" aria-label="Previous week">←</button>
         <span class="week-range">${weekRangeLabel(weekStart)}</span>
         <button type="button" class="icon-button" data-action="next-week" aria-label="Next week">→</button>
         ${isCurrentWeek ? '' : '<button type="button" class="text-button" data-action="this-week">This week</button>'}
-        ${renderProgress(week.progress)}
-      </div>
-      <div class="week-grid">${columns}</div>`;
+        ${extra}
+      </div>`;
+  }
+
+  // ---------- Calendar ----------
+
+  function hourLabel(hour) {
+    const suffix = hour < 12 ? 'AM' : 'PM';
+    return `${hour % 12 === 0 ? 12 : hour % 12} ${suffix}`;
+  }
+
+  // Pixels from the top of the calendar for a time like "10:30".
+  function timeOffset(time, startHour) {
+    return ((model.timeToMinutes(time) - startHour * 60) / 60) * HOUR_HEIGHT;
+  }
+
+  function renderClassBlock(block, startHour) {
+    const { plannerClass, meeting, lane, laneCount } = block;
+    const top = timeOffset(block.startTime, startHour);
+    const height = timeOffset(block.endTime, startHour) - top;
+    // Blocks under about an hour only have room for the name and time; the rest is in the hover text.
+    const hasRoomForDetails = height >= HOUR_HEIGHT;
+    const details = hasRoomForDetails ? [meeting.label, meeting.location].filter(Boolean).map(escapeHtml).join(' · ') : '';
+    return `
+      <div class="class-block" style="--class-color: ${plannerClass.color}; top: ${top}px; height: ${height}px; left: ${(lane / laneCount) * 100}%; width: ${100 / laneCount}%"
+        title="${escapeHtml(plannerClass.name)} ${describeMeeting(meeting)}">
+        <span class="class-block-name">${escapeHtml(plannerClass.name)}</span>
+        ${details ? `<span class="class-block-details">${details}</span>` : ''}
+        <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+      </div>`;
+  }
+
+  function renderCalendar() {
+    const week = model.buildCalendarWeek(state, weekStart);
+    const today = todayKey();
+    let notice = '';
+    if (!week.hasMeetings) {
+      notice = `
+        <div class="empty-state calendar-notice">
+          <p class="empty">Add meeting times to your classes to see them here.</p>
+          <button type="button" class="primary-button" data-action="open-drawer">Add meeting times</button>
+        </div>`;
+    } else if (week.outsideSemester) {
+      notice = `<p class="empty calendar-notice">This week is outside ${escapeHtml(currentSemester().name)}, so no classes meet.</p>`;
+    }
+    const hours = week.endHour - week.startHour;
+    const hourLabels = Array.from({ length: hours }, (_, index) => week.startHour + index)
+      .map((hour) => `<span class="hour-label" style="top: ${(hour - week.startHour) * HOUR_HEIGHT}px">${hourLabel(hour)}</span>`)
+      .join('');
+    const headers = week.days
+      .map(
+        (day) => `
+          <div class="calendar-day-heading${day.date === today ? ' is-today' : ''}">
+            <span class="weekday">${day.label}</span> <span class="day-number">${Number(day.date.slice(8))}</span>
+          </div>`,
+      )
+      .join('');
+    const nowTime = currentTime();
+    const columns = week.days
+      .map((day) => {
+        const showNow = day.date === today && nowTime >= `${String(week.startHour).padStart(2, '0')}:00` && model.timeToMinutes(nowTime) <= week.endHour * 60;
+        const nowLine = showNow ? `<div class="now-line" style="top: ${timeOffset(nowTime, week.startHour)}px" aria-hidden="true"></div>` : '';
+        return `<div class="calendar-day${day.date === today ? ' is-today' : ''}">${day.blocks.map((block) => renderClassBlock(block, week.startHour)).join('')}${nowLine}</div>`;
+      })
+      .join('');
+    elements.calendar.innerHTML = `
+      ${renderWeekNav()}
+      ${notice}
+      <div class="calendar">
+        <div class="calendar-row calendar-headings"><span></span>${headers}</div>
+        <div class="calendar-row calendar-body" style="height: ${hours * HOUR_HEIGHT}px">
+          <div class="hour-labels">${hourLabels}</div>
+          ${columns}
+        </div>
+      </div>`;
   }
 
   // ---------- Add panel ----------
@@ -490,7 +595,7 @@
     document.querySelectorAll('[data-action="open-drawer"]').forEach((button) => button.setAttribute('aria-expanded', String(open)));
     if (open) {
       // When editing, or once classes exist, start at the assignment name; otherwise at the class form.
-      const startAtClasses = !editingAssignment && currentClasses().length === 0;
+      const startAtClasses = !editingAssignment && (currentClasses().length === 0 || currentTab === 'calendar');
       const firstField = startAtClasses ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
       firstField.focus();
     }
@@ -512,6 +617,58 @@
     document.querySelectorAll('.row-menu[open]').forEach((menu) => {
       menu.open = false;
     });
+  }
+
+  // ---------- Meeting times in the class form ----------
+
+  function renderMeetingRows(meetings) {
+    elements.meetingList.innerHTML = meetings
+      .map(
+        (meeting, index) => `
+          <li class="meeting-row" data-meeting-id="${meeting.id}">
+            <div class="meeting-row-top">
+              <input class="meeting-label" type="text" maxlength="30" placeholder="Lecture, Lab…" value="${escapeHtml(meeting.label)}"
+                aria-label="Meeting ${index + 1} name" />
+              <button type="button" class="text-button danger" data-meeting-action="remove">Remove</button>
+            </div>
+            <div class="day-picker" role="group" aria-label="Meeting ${index + 1} days">
+              ${MEETING_DAYS.map(
+                (day) => `<label class="day-option"><input type="checkbox" class="meeting-day" value="${day}" ${meeting.days.includes(day) ? 'checked' : ''} /><span>${model.WEEKDAY_NAMES[day]}</span></label>`,
+              ).join('')}
+            </div>
+            <div class="field-row">
+              <label class="field"><span>Starts</span><input class="meeting-start" type="time" value="${meeting.startTime}" /></label>
+              <label class="field"><span>Ends</span><input class="meeting-end" type="time" value="${meeting.endTime}" /></label>
+            </div>
+            <input class="meeting-location" type="text" maxlength="40" placeholder="Room (optional)" value="${escapeHtml(meeting.location)}"
+              aria-label="Meeting ${index + 1} room" />
+          </li>`,
+      )
+      .join('');
+  }
+
+  function readMeetingRows() {
+    return [...elements.meetingList.querySelectorAll('.meeting-row')].map((row) => ({
+      id: row.dataset.meetingId,
+      label: row.querySelector('.meeting-label').value.trim(),
+      days: [...row.querySelectorAll('.meeting-day:checked')].map((input) => Number(input.value)),
+      startTime: row.querySelector('.meeting-start').value,
+      endTime: row.querySelector('.meeting-end').value,
+      location: row.querySelector('.meeting-location').value.trim(),
+    }));
+  }
+
+  function addMeetingRow() {
+    const meetings = readMeetingRows();
+    const isFirst = meetings.length === 0;
+    meetings.push({ id: newId('meeting'), label: isFirst ? 'Lecture' : '', days: [], startTime: '', endTime: '', location: '' });
+    renderMeetingRows(meetings);
+    elements.meetingList.querySelector('.meeting-row:last-child .meeting-label').focus();
+  }
+
+  function removeMeetingRow(row) {
+    const meetings = readMeetingRows().filter((meeting) => meeting.id !== row.dataset.meetingId);
+    renderMeetingRows(meetings);
   }
 
   // ---------- Forms ----------
@@ -662,7 +819,8 @@
     if (colorInput) {
       colorInput.checked = true;
     }
-    elements.classFormLabel.textContent = `Rename ${plannerClass.name}`;
+    renderMeetingRows(plannerClass.meetings || []);
+    elements.classFormLabel.textContent = `Edit ${plannerClass.name}`;
     elements.classSubmit.textContent = 'Save class';
     elements.classCancel.hidden = false;
     elements.classForm.elements.name.focus();
@@ -671,6 +829,7 @@
   function stopEditingClass() {
     editingClassId = null;
     elements.classForm.reset();
+    renderMeetingRows([]);
     elements.classFormLabel.textContent = 'New class';
     elements.classSubmit.textContent = 'Add class';
     elements.classCancel.hidden = true;
@@ -684,21 +843,28 @@
     const duplicate = currentClasses().some(
       (plannerClass) => plannerClass.id !== editingClassId && plannerClass.name.toLowerCase() === name.toLowerCase(),
     );
+    const meetings = readMeetingRows();
     const errors = [];
     if (!name) {
       errors.push('Give the class a name.');
     } else if (duplicate) {
       errors.push(`You already have a class called ${name}.`);
     }
+    meetings.forEach((meeting, index) => {
+      const which = meeting.label || `Meeting ${index + 1}`;
+      model.validateMeeting(meeting).forEach((error) => errors.push(`${which}: ${error}`));
+    });
     showErrors(elements.classErrors, errors);
     if (errors.length > 0) {
       return;
     }
     if (editingClassId) {
       const plannerClass = state.classes.find((candidate) => candidate.id === editingClassId);
-      applyChange(`Saved ${name}.`, () => Object.assign(plannerClass, { name, color }));
+      applyChange(`Saved ${name}.`, () => Object.assign(plannerClass, { name, color, meetings }));
     } else {
-      applyChange(`Added ${name}.`, () => state.classes.push({ id: newId('class'), semesterId: state.currentSemesterId, name, color }));
+      applyChange(`Added ${name}.`, () =>
+        state.classes.push({ id: newId('class'), semesterId: state.currentSemesterId, name, color, meetings }),
+      );
     }
     stopEditingClass();
   }
@@ -805,14 +971,20 @@
       setDrawerOpen(true);
     } else if (action === 'set-view') {
       currentView = target.dataset.view;
-      saveView(currentView);
+      savePreference(VIEW_STORAGE_KEY, currentView);
       renderDueList();
+    } else if (action === 'set-tab') {
+      currentTab = target.dataset.tab;
+      savePreference(TAB_STORAGE_KEY, currentTab);
+      renderTabs();
     } else if (action === 'previous-week' || action === 'next-week') {
       weekStart = model.addDays(weekStart, action === 'next-week' ? 7 : -7);
       renderDueList();
+      renderCalendar();
     } else if (action === 'this-week') {
       weekStart = model.startOfWeek(todayKey());
       renderDueList();
+      renderCalendar();
     } else if (action === 'toggle-later') {
       showLater = !showLater;
       renderDueList();
@@ -847,6 +1019,13 @@
   document.getElementById('semester-cancel').addEventListener('click', () => elements.semesterDialog.close());
   document.getElementById('drawer-close').addEventListener('click', () => setDrawerOpen(false));
   elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
+  document.getElementById('add-meeting').addEventListener('click', addMeetingRow);
+  elements.meetingList.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-meeting-action="remove"]');
+    if (removeButton) {
+      removeMeetingRow(removeButton.closest('.meeting-row'));
+    }
+  });
   elements.confirmChoices.addEventListener('click', (event) => {
     const button = event.target.closest('[data-choice]');
     if (button) {
@@ -862,6 +1041,7 @@
     if (!document.querySelector('.row-menu[open]')) {
       renderDueList();
     }
+    renderCalendar();
   }, 60 * 1000);
   // 'toggle' doesn't bubble, so listen during the capture phase to catch every ⋯ menu.
   document.addEventListener(
