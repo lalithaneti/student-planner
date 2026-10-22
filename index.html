@@ -17,7 +17,13 @@
         <button type="button" class="semester-button" id="semester-button" aria-haspopup="dialog">
           <span id="semester-label"></span> <span aria-hidden="true">✎</span>
         </button>
-        <button type="button" class="primary-button" data-action="open-drawer" aria-controls="add-drawer" aria-expanded="false">+ Add</button>
+        <details class="add-menu">
+          <summary class="primary-button">+ Add <span aria-hidden="true">▾</span></summary>
+          <div class="add-menu-items" role="menu" aria-label="Add">
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="assignment">Assignment</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
+          </div>
+        </details>
       </div>
     </header>
 
@@ -48,9 +54,8 @@
         <h2 id="drawer-heading">Add</h2>
         <button type="button" class="close-button" id="drawer-close" aria-label="Close">×</button>
       </div>
-      <section class="panel" aria-labelledby="classes-heading">
+      <section class="panel" id="class-panel" aria-labelledby="classes-heading">
         <h2 id="classes-heading">Classes</h2>
-        <ul class="class-list" id="class-list"></ul>
         <form id="class-form" novalidate>
           <label class="field">
             <span id="class-form-label">New class</span>
@@ -65,12 +70,20 @@
             <ul class="meeting-list" id="meeting-list"></ul>
             <button type="button" class="text-button" id="add-meeting">+ Add meeting time</button>
           </fieldset>
+          <fieldset class="field">
+            <legend>Recurring assignments <small>(optional: homework due every week…)</small></legend>
+            <div id="existing-recurring"></div>
+            <ul class="meeting-list" id="recurring-list"></ul>
+            <button type="button" class="text-button" id="add-recurring">+ Add recurring assignment</button>
+          </fieldset>
           <ul class="form-errors" id="class-errors" role="alert"></ul>
           <div class="button-row">
             <button type="submit" class="primary-button" id="class-submit">Add class</button>
             <button type="button" class="text-button" id="class-cancel" hidden>Cancel</button>
           </div>
         </form>
+        <h3 class="subheading">Your classes</h3>
+        <ul class="class-list" id="class-list"></ul>
       </section>
       <section class="panel" id="assignment-panel" aria-labelledby="add-assignment-heading">
         <h2 id="add-assignment-heading">Add assignment</h2>

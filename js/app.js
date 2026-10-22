@@ -21,12 +21,16 @@
   // Height of one hour on the calendar, in pixels.
   const HOUR_HEIGHT = 56;
   const MEETING_DAYS = [1, 2, 3, 4, 5];
+  // Week starts on Monday, the way most class schedules are written.
+  const ALL_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
+  // Which part of the Add panel is showing: 'assignment' or 'class'.
+  let drawerSection = 'assignment';
   let showLater = false;
   let showDone = false;
   let showMissed = false;
@@ -50,6 +54,11 @@
     calendarPanel: document.getElementById('calendar-panel'),
     calendar: document.getElementById('calendar'),
     meetingList: document.getElementById('meeting-list'),
+    recurringList: document.getElementById('recurring-list'),
+    existingRecurring: document.getElementById('existing-recurring'),
+    classPanel: document.getElementById('class-panel'),
+    assignmentPanel: document.getElementById('assignment-panel'),
+    drawerHeading: document.getElementById('drawer-heading'),
     assignmentForm: document.getElementById('assignment-form'),
     assignmentClass: document.getElementById('assignment-class'),
     assignmentErrors: document.getElementById('assignment-errors'),
@@ -226,7 +235,7 @@
   function renderClasses() {
     const classes = currentClasses();
     if (classes.length === 0) {
-      elements.classList.innerHTML = '<li class="empty">No classes yet. Add your first one below.</li>';
+      elements.classList.innerHTML = '<li class="empty">No classes yet. Add your first one above.</li>';
       return;
     }
     elements.classList.innerHTML = classes
@@ -318,7 +327,9 @@
     return `
       <div class="empty-state">
         <p class="empty">Nothing due yet. ${hasClasses ? 'Add an assignment to see it here.' : 'Start by adding a class, then add its assignments.'}</p>
-        <button type="button" class="primary-button" data-action="open-drawer">${hasClasses ? 'Add an assignment' : 'Add your first class'}</button>
+        <button type="button" class="primary-button" data-action="open-drawer" data-section="${hasClasses ? 'assignment' : 'class'}">${
+          hasClasses ? 'Add an assignment' : 'Add your first class'
+        }</button>
       </div>`;
   }
 
@@ -542,7 +553,7 @@
       notice = `
         <div class="empty-state calendar-notice">
           <p class="empty">Add meeting times to your classes to see them here.</p>
-          <button type="button" class="primary-button" data-action="open-drawer">Add meeting times</button>
+          <button type="button" class="primary-button" data-action="open-drawer" data-section="class">Add meeting times</button>
         </div>`;
     } else if (week.outsideSemester) {
       notice = `<p class="empty calendar-notice">This week is outside ${escapeHtml(currentSemester().name)}, so no classes meet.</p>`;
@@ -585,18 +596,25 @@
     return elements.drawer.classList.contains('is-open');
   }
 
-  function setDrawerOpen(open) {
+  // The panel's title follows what it shows, e.g. "Classes" or "Edit assignment".
+  function renderDrawerHeading() {
+    elements.drawerHeading.textContent = drawerSection === 'class' ? 'Classes' : elements.assignmentHeading.textContent;
+  }
+
+  // Opens the Add panel showing one section ('assignment' or 'class'), or closes it.
+  function setDrawerOpen(open, section = drawerSection) {
     if (!open && editingAssignment) {
       stopEditingAssignment();
     }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
     document.body.classList.toggle('drawer-open', open);
-    document.querySelectorAll('[data-action="open-drawer"]').forEach((button) => button.setAttribute('aria-expanded', String(open)));
     if (open) {
-      // When editing, or once classes exist, start at the assignment name; otherwise at the class form.
-      const startAtClasses = !editingAssignment && (currentClasses().length === 0 || currentTab === 'calendar');
-      const firstField = startAtClasses ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
+      drawerSection = section;
+      elements.classPanel.hidden = section !== 'class';
+      elements.assignmentPanel.hidden = section !== 'assignment';
+      renderDrawerHeading();
+      const firstField = section === 'class' ? elements.classForm.elements.name : elements.assignmentForm.elements.title;
       firstField.focus();
     }
   }
@@ -614,9 +632,25 @@
   }
 
   function closeMenus() {
-    document.querySelectorAll('.row-menu[open]').forEach((menu) => {
+    document.querySelectorAll('.row-menu[open], .add-menu[open]').forEach((menu) => {
       menu.open = false;
     });
+  }
+
+  // ---------- Day buttons ----------
+
+  // Mon, Tue, ... toggle buttons. inputAttributes names the checkboxes, e.g. 'name="days"'.
+  function renderDayOptions(days, selectedDays, inputAttributes) {
+    return days
+      .map(
+        (day) =>
+          `<label class="day-option"><input type="checkbox" ${inputAttributes} value="${day}" ${selectedDays.includes(day) ? 'checked' : ''} /><span>${model.WEEKDAY_NAMES[day]}</span></label>`,
+      )
+      .join('');
+  }
+
+  function checkedDays(container, selector) {
+    return [...container.querySelectorAll(`${selector}:checked`)].map((input) => Number(input.value));
   }
 
   // ---------- Meeting times in the class form ----------
@@ -632,9 +666,7 @@
               <button type="button" class="text-button danger" data-meeting-action="remove">Remove</button>
             </div>
             <div class="day-picker" role="group" aria-label="Meeting ${index + 1} days">
-              ${MEETING_DAYS.map(
-                (day) => `<label class="day-option"><input type="checkbox" class="meeting-day" value="${day}" ${meeting.days.includes(day) ? 'checked' : ''} /><span>${model.WEEKDAY_NAMES[day]}</span></label>`,
-              ).join('')}
+              ${renderDayOptions(MEETING_DAYS, meeting.days, 'class="meeting-day"')}
             </div>
             <div class="field-row">
               <label class="field"><span>Starts</span><input class="meeting-start" type="time" value="${meeting.startTime}" /></label>
@@ -651,7 +683,7 @@
     return [...elements.meetingList.querySelectorAll('.meeting-row')].map((row) => ({
       id: row.dataset.meetingId,
       label: row.querySelector('.meeting-label').value.trim(),
-      days: [...row.querySelectorAll('.meeting-day:checked')].map((input) => Number(input.value)),
+      days: checkedDays(row, '.meeting-day'),
       startTime: row.querySelector('.meeting-start').value,
       endTime: row.querySelector('.meeting-end').value,
       location: row.querySelector('.meeting-location').value.trim(),
@@ -671,6 +703,84 @@
     renderMeetingRows(meetings);
   }
 
+  // ---------- Recurring assignments in the class form ----------
+
+  function renderRecurringRows(rows) {
+    elements.recurringList.innerHTML = rows
+      .map(
+        (row, index) => `
+          <li class="meeting-row recurring-row" data-row-id="${row.rowId}">
+            <div class="meeting-row-top">
+              <input class="recurring-title" type="text" maxlength="120" placeholder="e.g. Math HW" value="${escapeHtml(row.title)}"
+                aria-label="Recurring assignment ${index + 1} name" />
+              <button type="button" class="text-button danger" data-recurring-action="remove">Remove</button>
+            </div>
+            <div class="day-picker" role="group" aria-label="Recurring assignment ${index + 1} due days">
+              ${renderDayOptions(ALL_DAYS, row.days, 'class="recurring-day"')}
+            </div>
+            <label class="field"><span>Due time</span><input class="recurring-time" type="time" value="${row.dueTime}" /></label>
+            <input class="recurring-link" type="url" placeholder="Link (optional): https://" value="${escapeHtml(row.link)}"
+              aria-label="Recurring assignment ${index + 1} link" />
+            <label class="checkbox-field">
+              <input class="recurring-late" type="checkbox" ${row.lateAllowed ? 'checked' : ''} />
+              <span>Late work allowed</span>
+            </label>
+          </li>`,
+      )
+      .join('');
+  }
+
+  function readRecurringRows() {
+    return [...elements.recurringList.querySelectorAll('.recurring-row')].map((row) => ({
+      rowId: row.dataset.rowId,
+      title: row.querySelector('.recurring-title').value.trim(),
+      days: checkedDays(row, '.recurring-day'),
+      dueTime: row.querySelector('.recurring-time').value,
+      link: row.querySelector('.recurring-link').value.trim(),
+      lateAllowed: row.querySelector('.recurring-late').checked,
+    }));
+  }
+
+  function addRecurringRow() {
+    const rows = readRecurringRows();
+    rows.push({ rowId: newId('row'), title: '', days: [], dueTime: '23:59', link: '', lateAllowed: true });
+    renderRecurringRows(rows);
+    elements.recurringList.querySelector('.recurring-row:last-child .recurring-title').focus();
+  }
+
+  function removeRecurringRow(row) {
+    renderRecurringRows(readRecurringRows().filter((candidate) => candidate.rowId !== row.dataset.rowId));
+  }
+
+  // When editing a class, lists the repeating assignments it already has.
+  function renderExistingRecurring(classId) {
+    const existing = state.assignments.filter((assignment) => assignment.classId === classId && assignment.kind === 'weekly');
+    elements.existingRecurring.innerHTML =
+      existing.length === 0
+        ? ''
+        : `<ul class="existing-recurring">${existing
+            .map((assignment) => `<li>${escapeHtml(assignment.title)} · every ${model.formatDays(assignment.days)} · ${model.formatTime(assignment.dueTime)}</li>`)
+            .join('')}</ul>
+           <p class="hint">To change these, use ⋯ → Edit… on them in your assignments.</p>`;
+  }
+
+  // Turns a filled-in row into a repeating assignment that runs from today to the end of the semester.
+  function recurringRowToAssignment(row, classId) {
+    // rowId only identifies the row in the form, so it isn't saved.
+    const { rowId, ...fields } = row;
+    return {
+      id: newId('assignment'),
+      semesterId: state.currentSemesterId,
+      classId,
+      kind: 'weekly',
+      ...fields,
+      startDate: todayKey(),
+      endDate: currentSemester().endDate,
+      skippedDates: [],
+      doneDates: [],
+    };
+  }
+
   // ---------- Forms ----------
 
   function setUpPickers() {
@@ -681,13 +791,7 @@
           <span class="swatch" aria-hidden="true"></span>
         </label>`,
     ).join('');
-    // Week starts on Monday, the way most class schedules are written.
-    const weekOrder = [1, 2, 3, 4, 5, 6, 0];
-    elements.dayPicker.innerHTML = weekOrder
-      .map(
-        (day) => `<label class="day-option"><input type="checkbox" name="days" value="${day}" /><span>${model.WEEKDAY_NAMES[day]}</span></label>`,
-      )
-      .join('');
+    elements.dayPicker.innerHTML = renderDayOptions(ALL_DAYS, [], 'name="days"');
   }
 
   function resetAssignmentDates() {
@@ -715,7 +819,7 @@
     if (kind === 'once') {
       fields.dueDate = form.elements.dueDate.value;
     } else {
-      fields.days = [...form.querySelectorAll('input[name="days"]:checked')].map((input) => Number(input.value));
+      fields.days = checkedDays(form, 'input[name="days"]');
       fields.startDate = form.elements.startDate.value;
       fields.endDate = form.elements.endDate.value;
     }
@@ -783,7 +887,7 @@
     elements.assignmentSubmit.textContent = 'Save changes';
     elements.assignmentCancel.hidden = false;
     showErrors(elements.assignmentErrors, []);
-    setDrawerOpen(true);
+    setDrawerOpen(true, 'assignment');
   }
 
   function stopEditingAssignment() {
@@ -795,6 +899,7 @@
     elements.assignmentForm.elements.lateAllowed.checked = true;
     clearAssignmentForm();
     updateKindFields();
+    renderDrawerHeading();
   }
 
   function saveAssignmentEdit(fields) {
@@ -820,6 +925,8 @@
       colorInput.checked = true;
     }
     renderMeetingRows(plannerClass.meetings || []);
+    renderRecurringRows([]);
+    renderExistingRecurring(id);
     elements.classFormLabel.textContent = `Edit ${plannerClass.name}`;
     elements.classSubmit.textContent = 'Save class';
     elements.classCancel.hidden = false;
@@ -830,6 +937,8 @@
     editingClassId = null;
     elements.classForm.reset();
     renderMeetingRows([]);
+    renderRecurringRows([]);
+    elements.existingRecurring.innerHTML = '';
     elements.classFormLabel.textContent = 'New class';
     elements.classSubmit.textContent = 'Add class';
     elements.classCancel.hidden = true;
@@ -854,18 +963,27 @@
       const which = meeting.label || `Meeting ${index + 1}`;
       model.validateMeeting(meeting).forEach((error) => errors.push(`${which}: ${error}`));
     });
+    const classId = editingClassId || newId('class');
+    const recurring = readRecurringRows().map((row) => recurringRowToAssignment(row, classId));
+    recurring.forEach((assignment, index) => {
+      const which = assignment.title || `Recurring assignment ${index + 1}`;
+      model.validateAssignment(assignment).forEach((error) => errors.push(`${which}: ${error}`));
+    });
     showErrors(elements.classErrors, errors);
     if (errors.length > 0) {
       return;
     }
-    if (editingClassId) {
-      const plannerClass = state.classes.find((candidate) => candidate.id === editingClassId);
-      applyChange(`Saved ${name}.`, () => Object.assign(plannerClass, { name, color, meetings }));
-    } else {
-      applyChange(`Added ${name}.`, () =>
-        state.classes.push({ id: newId('class'), semesterId: state.currentSemesterId, name, color, meetings }),
-      );
-    }
+    const verb = editingClassId ? 'Saved' : 'Added';
+    const extra = recurring.length > 0 ? ` and ${recurring.length} recurring assignment${recurring.length === 1 ? '' : 's'}` : '';
+    // One change, so a single Undo removes the class and its new assignments together.
+    applyChange(`${verb} ${name}${extra}.`, () => {
+      if (editingClassId) {
+        Object.assign(state.classes.find((candidate) => candidate.id === editingClassId), { name, color, meetings });
+      } else {
+        state.classes.push({ id: classId, semesterId: state.currentSemesterId, name, color, meetings });
+      }
+      state.assignments.push(...recurring);
+    });
     stopEditingClass();
   }
 
@@ -940,6 +1058,7 @@
       }
     } else if (action === 'edit-class') {
       startEditingClass(id);
+      elements.classForm.scrollIntoView({ block: 'start' });
     } else if (action === 'delete-class') {
       const plannerClass = state.classes.find((candidate) => candidate.id === id);
       const count = state.assignments.filter((candidate) => candidate.classId === id).length;
@@ -968,7 +1087,7 @@
       if (editingAssignment) {
         stopEditingAssignment();
       }
-      setDrawerOpen(true);
+      setDrawerOpen(true, target.dataset.section || 'assignment');
     } else if (action === 'set-view') {
       currentView = target.dataset.view;
       savePreference(VIEW_STORAGE_KEY, currentView);
@@ -1020,6 +1139,13 @@
   document.getElementById('drawer-close').addEventListener('click', () => setDrawerOpen(false));
   elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
   document.getElementById('add-meeting').addEventListener('click', addMeetingRow);
+  document.getElementById('add-recurring').addEventListener('click', addRecurringRow);
+  elements.recurringList.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-recurring-action="remove"]');
+    if (removeButton) {
+      removeRecurringRow(removeButton.closest('.recurring-row'));
+    }
+  });
   elements.meetingList.addEventListener('click', (event) => {
     const removeButton = event.target.closest('[data-meeting-action="remove"]');
     if (removeButton) {
@@ -1062,7 +1188,7 @@
     }
   });
   document.addEventListener('click', (event) => {
-    document.querySelectorAll('.row-menu[open]').forEach((menu) => {
+    document.querySelectorAll('.row-menu[open], .add-menu[open]').forEach((menu) => {
       if (!menu.contains(event.target) || event.target.closest('[data-action]')) {
         menu.open = false;
       }

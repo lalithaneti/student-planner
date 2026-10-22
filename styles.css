@@ -967,7 +967,76 @@ button:focus-visible {
   font-size: 0.8rem;
 }
 
+/* ---------- + Add dropdown ---------- */
+
+.add-menu {
+  position: relative;
+}
+
+.add-menu summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.add-menu-items {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 25;
+  display: grid;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 15%);
+}
+
+.add-menu-items button {
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-menu-items button:hover,
+.add-menu-items button:focus-visible {
+  background: var(--background);
+}
+
 /* ---------- Add panel ---------- */
+
+/* The panel's header already names the section, so each section's own title is hidden. */
+.drawer .panel > h2 {
+  display: none;
+}
+
+.subheading {
+  margin: 20px 0 8px;
+  font-size: 0.95rem;
+}
+
+.existing-recurring {
+  margin: 0 0 4px;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+.existing-recurring + .hint {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
 
 body {
   transition: padding-right 0.2s ease;
