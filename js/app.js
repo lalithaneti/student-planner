@@ -764,21 +764,14 @@
            <p class="hint">To change these, use ⋯ → Edit… on them in your assignments.</p>`;
   }
 
-  // Turns a filled-in row into a repeating assignment that runs from today to the end of the semester.
   function recurringRowToAssignment(row, classId) {
-    // rowId only identifies the row in the form, so it isn't saved.
-    const { rowId, ...fields } = row;
-    return {
+    return model.newRecurringAssignment(row, {
       id: newId('assignment'),
       semesterId: state.currentSemesterId,
       classId,
-      kind: 'weekly',
-      ...fields,
-      startDate: todayKey(),
-      endDate: currentSemester().endDate,
-      skippedDates: [],
-      doneDates: [],
-    };
+      todayKey: todayKey(),
+      semesterEndDate: currentSemester().endDate,
+    });
   }
 
   // ---------- Forms ----------

@@ -206,6 +206,26 @@ const PlannerModel = (() => {
     };
   }
 
+  // A repeating assignment made from the class form. It runs from today to the end of
+  // the semester; fields are the form's title, days, dueTime, link, and lateAllowed.
+  function newRecurringAssignment(fields, { id, semesterId, classId, todayKey, semesterEndDate }) {
+    return {
+      id,
+      semesterId,
+      classId,
+      kind: 'weekly',
+      title: fields.title,
+      days: fields.days,
+      dueTime: fields.dueTime,
+      link: fields.link,
+      lateAllowed: fields.lateAllowed,
+      startDate: todayKey,
+      endDate: semesterEndDate,
+      skippedDates: [],
+      doneDates: [],
+    };
+  }
+
   // ---------- Calendar ----------
 
   // The hours the calendar shows unless a class starts earlier or ends later.
@@ -375,6 +395,7 @@ const PlannerModel = (() => {
     startOfWeek,
     buildWeek,
     detachOccurrence,
+    newRecurringAssignment,
     timeToMinutes,
     validateMeeting,
     buildCalendarWeek,
