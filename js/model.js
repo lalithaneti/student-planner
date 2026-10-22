@@ -42,6 +42,47 @@ const PlannerModel = (() => {
     }
   }
 
+  // ---------- Colors ----------
+
+  // Classes (and their assignments) use pastels; RSOs and events use earthy, muted colors,
+  // so school and RSOs are easy to tell apart.
+  const CLASS_COLORS = [
+    { name: 'Rose', value: '#f4a6a6' },
+    { name: 'Peach', value: '#f8c4a0' },
+    { name: 'Butter', value: '#f3dd8c' },
+    { name: 'Mint', value: '#a8dfbf' },
+    { name: 'Aqua', value: '#9fdcd6' },
+    { name: 'Baby blue', value: '#a9c6f5' },
+    { name: 'Lavender', value: '#c9b3ec' },
+    { name: 'Blush', value: '#f2b3d6' },
+  ];
+  const RSO_COLORS = [
+    { name: 'Terracotta', value: '#b5654a' },
+    { name: 'Clay', value: '#c08a5b' },
+    { name: 'Mustard', value: '#b8962e' },
+    { name: 'Olive', value: '#7d8445' },
+    { name: 'Sage', value: '#8a9f7e' },
+    { name: 'Slate', value: '#5f7891' },
+    { name: 'Plum', value: '#7d5a73' },
+    { name: 'Dusty rose', value: '#b07f86' },
+  ];
+  // The bold colors used before 2026-10-22, in the same order as the lists above.
+  const OLD_BOLD_COLORS = ['#e5484d', '#f76b15', '#c99a06', '#30a46c', '#12a594', '#3e63dd', '#8e4ec6', '#d6409f'];
+
+  // Switches anything saved with an old bold color to its match in the new palettes.
+  function updateOldColors(state) {
+    const swap = (item, palette) => {
+      const index = OLD_BOLD_COLORS.indexOf(item.color);
+      if (index !== -1) {
+        item.color = palette[index].value;
+      }
+    };
+    state.classes.forEach((plannerClass) => swap(plannerClass, CLASS_COLORS));
+    (state.rsos || []).forEach((rso) => swap(rso, RSO_COLORS));
+    (state.events || []).forEach((standalone) => swap(standalone, RSO_COLORS));
+    return state;
+  }
+
   // A sensible starting semester based on today's date; the user can edit it.
   function defaultSemester(today) {
     const year = today.getFullYear();
@@ -289,11 +330,29 @@ const PlannerModel = (() => {
     return hours * 60 + minutes;
   }
 
-  // Returns a list of problems with a class meeting time; empty means it is valid.
+  // Whether a weekly meeting happens on a date's weekday. An every-other-week meeting
+  // (every: 2) also needs the date to be its first meeting or an even number of weeks after.
+  function meetsOn(meeting, date) {
+    if (!meeting.days.includes(parseDateKey(date).getDay())) {
+      return false;
+    }
+    if (meeting.every !== 2) {
+      return true;
+    }
+    const daysApart = Math.round((parseDateKey(startOfWeek(date)) - parseDateKey(startOfWeek(meeting.firstDate))) / (24 * 60 * 60 * 1000));
+    return date >= meeting.firstDate && (daysApart / 7) % 2 === 0;
+  }
+
+  // Returns a list of problems with a meeting time; empty means it is valid.
   function validateMeeting(meeting) {
     const errors = [];
     if (meeting.days.length === 0) {
       errors.push('Pick at least one day.');
+    }
+    if (meeting.every === 2 && !isValidDateKey(meeting.firstDate)) {
+      errors.push('Pick the date of the first meeting.');
+    } else if (meeting.every === 2 && !meeting.days.includes(parseDateKey(meeting.firstDate).getDay())) {
+      errors.push(`The first meeting is on a ${WEEKDAY_NAMES[parseDateKey(meeting.firstDate).getDay()]}, so pick that day too.`);
     }
     if (!isValidTime(meeting.startTime) || !isValidTime(meeting.endTime)) {
       errors.push('Pick a start and end time.');
@@ -396,8 +455,88 @@ const PlannerModel = (() => {
     return errors;
   }
 
-  // Everything on the calendar for one date: class meetings and exams. An exam replaces
-  // its own class's meeting when they overlap (an in-class exam).
+  // ---------- RSOs ----------
+
+  // The last day of the school year (fall + spring). Semesters saved before this setting
+  // existed use May 15 after a fall semester, or the semester's own end otherwise.
+  function schoolYearEnd(semester) {
+    if (semester.schoolYearEndDate) {
+      return semester.schoolYearEndDate;
+    }
+    const startYear = Number(semester.startDate.slice(0, 4));
+    return semester.startDate.slice(5, 7) >= '08' ? `${startYear + 1}-05-15` : semester.endDate;
+  }
+
+  // The dates an RSO meets: from the start of the semester it was added in to the end of
+  // that semester, or to the end of the school year if it lasts all year.
+  function rsoDateRange(state, rso) {
+    const semester = state.semesters.find((candidate) => candidate.id === rso.semesterId);
+    return { startDate: semester.startDate, endDate: rso.lasts === 'year' ? schoolYearEnd(semester) : semester.endDate };
+  }
+
+  // Data saved before RSOs existed has no RSO lists.
+  function rsosOf(state) {
+    return state.rsos || [];
+  }
+
+  // Every RSO meeting on one date (not on a break), including cancelled ones.
+  function rsoMeetingsOn(state, date) {
+    if (breakOn(state, date)) {
+      return [];
+    }
+    const meetings = [];
+    for (const rso of rsosOf(state)) {
+      const range = rsoDateRange(state, rso);
+      if (date < range.startDate || date > range.endDate) {
+        continue;
+      }
+      for (const meeting of rso.meetings) {
+        if (meetsOn(meeting, date)) {
+          meetings.push({ kind: 'rso-meeting', rso, meeting, date, startTime: meeting.startTime, endTime: meeting.endTime, cancelled: isMeetingCancelled(meeting, date) });
+        }
+      }
+    }
+    return meetings;
+  }
+
+  // One-time events on one date: each RSO's own events, then events that stand on their own
+  // (a concert, a career fair). They show even on break days, since they were added for that day.
+  function eventsOn(state, date) {
+    const blocks = [];
+    for (const rso of rsosOf(state)) {
+      for (const rsoEvent of rso.events || []) {
+        if (rsoEvent.date === date) {
+          blocks.push({ kind: 'rso-event', rso, event: rsoEvent, date, startTime: rsoEvent.startTime, endTime: rsoEvent.endTime, cancelled: false });
+        }
+      }
+    }
+    for (const standalone of state.events || []) {
+      if (standalone.date === date) {
+        blocks.push({ kind: 'event', event: standalone, date, startTime: standalone.startTime, endTime: standalone.endTime, cancelled: false });
+      }
+    }
+    return blocks;
+  }
+
+  // Returns a list of problems with a one-time event (an RSO's or a standalone one); empty means it is valid.
+  function validateEvent(event) {
+    const errors = [];
+    if (!event.title.trim()) {
+      errors.push('Give the event a name, like Fall social.');
+    }
+    if (!isValidDateKey(event.date)) {
+      errors.push('Pick the event date.');
+    }
+    if (!isValidTime(event.startTime) || !isValidTime(event.endTime)) {
+      errors.push('Pick a start and end time.');
+    } else if (event.endTime <= event.startTime) {
+      errors.push('The end time must be after the start time.');
+    }
+    return errors;
+  }
+
+  // Everything on the calendar for one date: class meetings, exams, RSO meetings, and
+  // events. An exam replaces its own class's meeting when they overlap (an in-class exam).
   function calendarBlocksOn(state, date) {
     const classesById = new Map(state.classes.map((plannerClass) => [plannerClass.id, plannerClass]));
     const exams = examsOf(state)
@@ -406,7 +545,7 @@ const PlannerModel = (() => {
     const meetings = classMeetingsOn(state, date)
       .filter((meeting) => !exams.some((exam) => exam.plannerClass.id === meeting.plannerClass.id && exam.startTime < meeting.endTime && meeting.startTime < exam.endTime))
       .map((meeting) => ({ kind: 'meeting', ...meeting }));
-    return [...meetings, ...exams].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return [...meetings, ...exams, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   // Exams from now through the next two weeks, soonest first, with how many days away each is.
@@ -423,37 +562,45 @@ const PlannerModel = (() => {
       .filter((upcoming) => upcoming.plannerClass);
   }
 
-  // The Mon–Fri class schedule for one week, only on dates inside the current semester.
-  // startHour and endHour cover 8 AM–6 PM, stretched to fit any earlier or later class.
+  // One week's schedule: Mon–Fri, plus Saturday and Sunday only when something is on them.
+  // startHour and endHour cover 8 AM–6 PM, stretched to fit anything earlier or later.
   function buildCalendarWeek(state, weekStart) {
     const semester = state.semesters.find((candidate) => candidate.id === state.currentSemesterId);
     const classes = state.classes.filter((plannerClass) => plannerClass.semesterId === state.currentSemesterId);
     let startMinutes = DEFAULT_CALENDAR_HOURS.start * 60;
     let endMinutes = DEFAULT_CALENDAR_HOURS.end * 60;
-    const days = [0, 1, 2, 3, 4].map((offset) => {
-      const date = addDays(weekStart, offset);
-      const blocks = calendarBlocksOn(state, date);
-      for (const block of blocks) {
+    const days = [0, 1, 2, 3, 4, 5, 6]
+      .map((offset) => {
+        const date = addDays(weekStart, offset);
+        return { date, label: WEEKDAY_NAMES[parseDateKey(date).getDay()], blocks: calendarBlocksOn(state, date) };
+      })
+      .filter((day, offset) => offset < 5 || day.blocks.length > 0);
+    for (const day of days) {
+      for (const block of day.blocks) {
         startMinutes = Math.min(startMinutes, timeToMinutes(block.startTime));
         endMinutes = Math.max(endMinutes, timeToMinutes(block.endTime));
       }
-      return { date, label: WEEKDAY_NAMES[parseDateKey(date).getDay()], blocks: assignLanes(blocks) };
-    });
+      assignLanes(day.blocks);
+    }
     return {
       days,
       startHour: Math.floor(startMinutes / 60),
       endHour: Math.ceil(endMinutes / 60),
-      hasMeetings: classes.some((plannerClass) => (plannerClass.meetings || []).length > 0),
+      hasMeetings:
+        classes.some((plannerClass) => (plannerClass.meetings || []).length > 0) ||
+        rsosOf(state).some((rso) => rso.meetings.length > 0 || (rso.events || []).length > 0) ||
+        (state.events || []).length > 0,
       outsideSemester: addDays(weekStart, 4) < semester.startDate || weekStart > semester.endDate,
     };
   }
 
   // The class or exam happening now ({ status: 'now', ... }), or else the next one that
   // isn't cancelled ({ status: 'next', ... }), looking up to two weeks ahead. null if none.
+  // RSOs aren't classes, so they don't count.
   function nextClass(state, todayKey, nowTime) {
     for (let offset = 0; offset < 14; offset += 1) {
       const date = addDays(todayKey, offset);
-      const meetings = calendarBlocksOn(state, date).filter((meeting) => !meeting.cancelled);
+      const meetings = calendarBlocksOn(state, date).filter((meeting) => !meeting.cancelled && (meeting.kind === 'meeting' || meeting.kind === 'exam'));
       if (offset === 0) {
         const happeningNow = meetings.find((meeting) => meeting.startTime <= nowTime && nowTime < meeting.endTime);
         if (happeningNow) {
@@ -532,6 +679,9 @@ const PlannerModel = (() => {
 
   return {
     WEEKDAY_NAMES,
+    CLASS_COLORS,
+    RSO_COLORS,
+    updateOldColors,
     toDateKey,
     parseDateKey,
     addDays,
@@ -557,6 +707,8 @@ const PlannerModel = (() => {
     validateMeeting,
     buildCalendarWeek,
     validateExam,
+    schoolYearEnd,
+    validateEvent,
     calendarBlocksOn,
     upcomingExams,
     nextClass,

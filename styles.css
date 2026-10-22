@@ -530,8 +530,8 @@ button:focus-visible {
 .class-tag {
   padding: 1px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--class-color) 18%, transparent);
-  color: color-mix(in srgb, var(--class-color) 70%, var(--text));
+  background: color-mix(in srgb, var(--class-color) 35%, transparent);
+  color: color-mix(in srgb, var(--class-color) 40%, var(--text));
   font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
@@ -997,8 +997,8 @@ button:focus-visible {
 
 .calendar-row {
   display: grid;
-  grid-template-columns: 52px repeat(5, minmax(120px, 1fr));
-  min-width: 652px;
+  grid-template-columns: 52px repeat(var(--day-count, 5), minmax(120px, 1fr));
+  min-width: calc(52px + var(--day-count, 5) * 120px);
 }
 
 .calendar-headings {
@@ -1065,7 +1065,7 @@ button:focus-visible {
   border: 1px solid var(--surface);
   border-left: 4px solid var(--class-color);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--class-color) 22%, var(--surface));
+  background: color-mix(in srgb, var(--class-color) 40%, var(--surface));
   font-size: 0.78rem;
   line-height: 1.25;
 }
@@ -1086,7 +1086,7 @@ button:focus-visible {
 
 .row-menu .class-block:hover,
 .row-menu[open] .class-block {
-  background: color-mix(in srgb, var(--class-color) 34%, var(--surface));
+  background: color-mix(in srgb, var(--class-color) 55%, var(--surface));
 }
 
 .class-block.is-cancelled {
@@ -1105,14 +1105,20 @@ button:focus-visible {
 .row-menu .class-block.is-exam {
   border: 2px solid var(--class-color);
   border-left-width: 6px;
-  background: color-mix(in srgb, var(--class-color) 35%, var(--surface));
+  background: color-mix(in srgb, var(--class-color) 55%, var(--surface));
+}
+
+/* One-time events: a dashed outline sets them apart from weekly meetings. */
+.row-menu .class-block.is-event {
+  border: 2px dashed var(--class-color);
+  border-left: 6px solid var(--class-color);
 }
 
 .exam-tag {
   padding: 0 5px;
   border-radius: 4px;
   background: var(--class-color);
-  color: #ffffff;
+  color: #1c2024; /* Dark text stays readable on the light pastel class colors. */
   font-size: 0.65rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1420,7 +1426,8 @@ dialog::backdrop {
   font-weight: 700;
 }
 
-.toast[hidden] {
+.toast[hidden],
+.field[hidden] {
   display: none;
 }
 

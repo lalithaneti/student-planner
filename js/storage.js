@@ -42,7 +42,7 @@ const PlannerStorage = (() => {
     try {
       const parsed = JSON.parse(saved);
       if (looksLikeState(parsed)) {
-        return { state: parsed, error: null };
+        return { state: PlannerModel.updateOldColors(parsed), error: null };
       }
     } catch {
       // Falls through to the backup below.

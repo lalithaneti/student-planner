@@ -24,6 +24,8 @@
             <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="exam">Exam</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="break">Break</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="rso">RSO</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="event">Event</button>
           </div>
         </details>
       </div>
@@ -45,7 +47,7 @@
 
       <section class="panel" id="calendar-panel" role="tabpanel" aria-labelledby="calendar-tab" hidden>
         <div class="panel-header">
-          <h2>Class schedule</h2>
+          <h2>Schedule</h2>
         </div>
         <div id="calendar"></div>
       </section>
@@ -222,6 +224,80 @@
         <h3 class="subheading">Your breaks</h3>
         <ul class="class-list" id="break-list"></ul>
       </section>
+      <section class="panel" id="rso-panel" aria-labelledby="rso-form-label" hidden>
+        <form id="rso-form" novalidate>
+          <label class="field">
+            <span id="rso-form-label">New RSO</span>
+            <input name="name" type="text" maxlength="60" placeholder="e.g. MedLaunch" autocomplete="off" />
+          </label>
+          <fieldset class="field">
+            <legend>Color <small>(used for all its meetings and events)</small></legend>
+            <div class="color-picker" id="rso-color-picker"></div>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Meets until</legend>
+            <div class="segmented">
+              <label><input type="radio" name="lasts" value="year" checked /> End of school year</label>
+              <label><input type="radio" name="lasts" value="semester" /> End of semester</label>
+            </div>
+            <p class="hint" id="rso-lasts-hint"></p>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Meeting times <small>(optional: general meeting, practice…)</small></legend>
+            <ul class="meeting-list" id="rso-meeting-list"></ul>
+            <button type="button" class="text-button" id="add-rso-meeting">+ Add meeting time</button>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Events <small>(optional: one-time socials, workshops…)</small></legend>
+            <ul class="meeting-list" id="rso-event-list"></ul>
+            <button type="button" class="text-button" id="add-rso-event">+ Add event</button>
+          </fieldset>
+          <ul class="form-errors" id="rso-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="rso-submit">Add RSO</button>
+            <button type="button" class="text-button" id="rso-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+        <h3 class="subheading">Your RSOs</h3>
+        <ul class="class-list" id="rso-list"></ul>
+      </section>
+      <section class="panel" id="event-panel" aria-labelledby="event-heading" hidden>
+        <h2 id="event-heading">Add event</h2>
+        <form id="event-form" novalidate>
+          <label class="field">
+            <span>Name</span>
+            <input name="title" type="text" maxlength="80" placeholder="e.g. Career fair" autocomplete="off" />
+          </label>
+          <fieldset class="field">
+            <legend>Color</legend>
+            <div class="color-picker" id="event-color-picker"></div>
+          </fieldset>
+          <label class="field">
+            <span>Date</span>
+            <input name="date" type="date" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Starts</span>
+              <input name="startTime" type="time" />
+            </label>
+            <label class="field">
+              <span>Ends</span>
+              <input name="endTime" type="time" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Place <small>(optional)</small></span>
+            <input name="location" type="text" maxlength="40" placeholder="e.g. Illini Union" autocomplete="off" />
+          </label>
+          <p class="hint">For an RSO's own events, add them in its form (+ Add → RSO) so they share its color.</p>
+          <ul class="form-errors" id="event-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="event-submit">Add event</button>
+            <button type="button" class="text-button" id="event-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+      </section>
     </aside>
 
     <dialog id="semester-dialog" aria-labelledby="semester-dialog-heading">
@@ -242,6 +318,10 @@
             <input name="endDate" type="date" />
           </label>
         </div>
+        <label class="field">
+          <span>School year ends <small>(for RSOs that meet all year)</small></span>
+          <input name="schoolYearEndDate" type="date" />
+        </label>
         <ul class="form-errors" id="semester-errors" role="alert"></ul>
         <div class="button-row">
           <button type="submit" class="primary-button" value="save">Save</button>

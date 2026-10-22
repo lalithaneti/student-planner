@@ -4,16 +4,6 @@
 (() => {
   const model = PlannerModel;
 
-  const CLASS_COLORS = [
-    { name: 'Red', value: '#e5484d' },
-    { name: 'Orange', value: '#f76b15' },
-    { name: 'Gold', value: '#c99a06' },
-    { name: 'Green', value: '#30a46c' },
-    { name: 'Teal', value: '#12a594' },
-    { name: 'Blue', value: '#3e63dd' },
-    { name: 'Purple', value: '#8e4ec6' },
-    { name: 'Pink', value: '#d6409f' },
-  ];
   const NO_CLASS_COLOR = '#8b8d98';
   // Pennant colors and decorations for each break banner theme.
   const BREAK_THEME_STYLES = {
@@ -72,10 +62,12 @@
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
-  // Which part of the Add panel is showing: 'assignment', 'class', 'exam', or 'break'.
+  // Which part of the Add panel is showing: 'assignment', 'class', 'exam', 'break', 'rso', or 'event'.
   let drawerSection = 'assignment';
   let editingExamId = null;
   let editingBreakId = null;
+  let editingRsoId = null;
+  let editingEventId = null;
   // Whether the break theme was picked by hand; until then it follows the first day's month.
   let breakThemeChosen = false;
   let showLater = false;
@@ -134,6 +126,24 @@
     classCancel: document.getElementById('class-cancel'),
     classErrors: document.getElementById('class-errors'),
     colorPicker: document.getElementById('color-picker'),
+    rsoPanel: document.getElementById('rso-panel'),
+    rsoForm: document.getElementById('rso-form'),
+    rsoFormLabel: document.getElementById('rso-form-label'),
+    rsoSubmit: document.getElementById('rso-submit'),
+    rsoCancel: document.getElementById('rso-cancel'),
+    rsoErrors: document.getElementById('rso-errors'),
+    rsoList: document.getElementById('rso-list'),
+    rsoColorPicker: document.getElementById('rso-color-picker'),
+    rsoMeetingList: document.getElementById('rso-meeting-list'),
+    rsoEventList: document.getElementById('rso-event-list'),
+    rsoLastsHint: document.getElementById('rso-lasts-hint'),
+    eventPanel: document.getElementById('event-panel'),
+    eventForm: document.getElementById('event-form'),
+    eventHeading: document.getElementById('event-heading'),
+    eventSubmit: document.getElementById('event-submit'),
+    eventCancel: document.getElementById('event-cancel'),
+    eventErrors: document.getElementById('event-errors'),
+    eventColorPicker: document.getElementById('event-color-picker'),
     toast: document.getElementById('toast'),
     toastMessage: document.getElementById('toast-message'),
     toastUndo: document.getElementById('toast-undo'),
@@ -277,6 +287,7 @@
     renderSemester();
     renderClasses();
     renderBreaks();
+    renderRsos();
     renderClassOptions();
     renderTabs();
     renderDueList();
@@ -293,6 +304,7 @@
   function renderSemester() {
     const semester = currentSemester();
     elements.semesterLabel.textContent = `${semester.name} · ${model.formatMonthDay(semester.startDate)} – ${model.formatMonthDay(semester.endDate)}`;
+    elements.rsoLastsHint.textContent = `This school year ends ${model.formatDate(model.schoolYearEnd(semester))}; ${semester.name} ends ${model.formatDate(semester.endDate)}. Change them with the semester button (✎).`;
   }
 
   function renderClasses() {
@@ -322,7 +334,8 @@
   function describeMeeting(meeting) {
     const label = meeting.label ? `${escapeHtml(meeting.label)} ` : '';
     const location = meeting.location ? ` · ${escapeHtml(meeting.location)}` : '';
-    return `${label}${model.formatDays(meeting.days)} ${model.formatTimeRange(meeting.startTime, meeting.endTime)}${location}`;
+    const every = meeting.every === 2 ? 'every other ' : '';
+    return `${label}${every}${model.formatDays(meeting.days)} ${model.formatTimeRange(meeting.startTime, meeting.endTime)}${location}`;
   }
 
   function renderClassOptions() {
@@ -730,10 +743,13 @@
       </details>`;
   }
 
-  // A class block on the calendar. Clicking it opens a menu to edit the class or cancel
-  // (or restore) just this day's meeting.
-  function renderClassBlock(block, startHour) {
-    const { plannerClass, meeting, date, cancelled } = block;
+  // A class or RSO meeting on the calendar. Clicking it opens a menu to edit the class (or
+  // RSO) or cancel (or restore) just this day's meeting.
+  function renderMeetingBlock(block, startHour) {
+    const { meeting, date, cancelled } = block;
+    const isRso = block.kind === 'rso-meeting';
+    const owner = isRso ? block.rso : block.plannerClass;
+    const ownerType = isRso ? 'RSO meeting' : 'class';
     const { height, style } = blockPlacement(block, startHour);
     // Blocks under about an hour only have room for the name and time; the rest is in the hover text.
     const hasRoomForDetails = height >= HOUR_HEIGHT;
@@ -742,22 +758,45 @@
       : hasRoomForDetails
         ? [meeting.label, meeting.location].filter(Boolean).map(escapeHtml).join(' · ')
         : '';
-    const name = escapeHtml(plannerClass.name);
-    const meetingData = `data-class-id="${plannerClass.id}" data-meeting-id="${meeting.id}" data-date="${date}"`;
+    const name = escapeHtml(owner.name);
+    const meetingData = `data-owner="${isRso ? 'rso' : 'class'}" data-owner-id="${owner.id}" data-meeting-id="${meeting.id}" data-date="${date}"`;
     const dayAction = cancelled
-      ? `<button type="button" data-action="restore-meeting" ${meetingData}>Restore class on ${model.formatDate(date)}</button>`
-      : `<button type="button" class="danger" data-action="cancel-meeting" ${meetingData}>Cancel class on ${model.formatDate(date)}</button>`;
+      ? `<button type="button" data-action="restore-meeting" ${meetingData}>Restore ${ownerType} on ${model.formatDate(date)}</button>`
+      : `<button type="button" class="danger" data-action="cancel-meeting" ${meetingData}>Cancel ${ownerType} on ${model.formatDate(date)}</button>`;
     return `
       <details class="row-menu class-block-slot" style="${style}">
-        <summary class="class-block${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}"
+        <summary class="class-block${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${owner.color}"
           title="${name} ${describeMeeting(meeting)}${cancelled ? ' (cancelled)' : ''}">
           <span class="class-block-name">${name}</span>
           ${details ? `<span class="class-block-details">${details}</span>` : ''}
           <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
         </summary>
         <div class="row-menu-items">
-          <button type="button" data-action="edit-class" data-id="${plannerClass.id}">Edit ${name}…</button>
+          <button type="button" data-action="${isRso ? 'edit-rso' : 'edit-class'}" data-id="${owner.id}">Edit ${name}…</button>
           ${dayAction}
+        </div>
+      </details>`;
+  }
+
+  // A one-time event on the calendar: an RSO's (in its color, named "MedLaunch: Fall social")
+  // or a standalone one in its own color. Clicking it opens a menu to edit or delete it.
+  function renderEventBlock(block, startHour) {
+    const { event, rso } = block;
+    const { height, style } = blockPlacement(block, startHour);
+    const name = rso ? `${escapeHtml(rso.name)}: ${escapeHtml(event.title)}` : escapeHtml(event.title);
+    const details = height >= HOUR_HEIGHT && event.location ? `<span class="class-block-details">${escapeHtml(event.location)}</span>` : '';
+    const eventData = rso ? `data-rso-id="${rso.id}" data-id="${event.id}"` : `data-id="${event.id}"`;
+    return `
+      <details class="row-menu class-block-slot" style="${style}">
+        <summary class="class-block is-event" style="--class-color: ${rso ? rso.color : event.color}"
+          title="${name}${event.location ? ` · ${escapeHtml(event.location)}` : ''}">
+          <span class="class-block-name">${name}</span>
+          ${details}
+          <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+        </summary>
+        <div class="row-menu-items">
+          <button type="button" data-action="${rso ? 'edit-rso' : 'edit-event'}" data-id="${rso ? rso.id : event.id}">Edit ${rso ? escapeHtml(rso.name) : 'event'}…</button>
+          <button type="button" class="danger" data-action="delete-event" ${eventData}>Delete event</button>
         </div>
       </details>`;
   }
@@ -820,7 +859,7 @@
     if (!week.hasMeetings) {
       notice = `
         <div class="empty-state calendar-notice">
-          <p class="empty">Add meeting times to your classes to see them here.</p>
+          <p class="empty">Add meeting times to your classes or RSOs to see them here.</p>
           <button type="button" class="primary-button" data-action="open-drawer" data-section="class">Add meeting times</button>
         </div>`;
     } else if (week.outsideSemester) {
@@ -844,19 +883,18 @@
       .map((day) => {
         const showNow = day.date === today && nowTime >= `${String(week.startHour).padStart(2, '0')}:00` && model.timeToMinutes(nowTime) <= week.endHour * 60;
         const nowLine = showNow ? `<div class="now-line" style="top: ${timeOffset(nowTime, week.startHour)}px" aria-hidden="true"></div>` : '';
-        const blocks = day.blocks
-          .map((block) => (block.kind === 'exam' ? renderExamBlock(block, week.startHour) : renderClassBlock(block, week.startHour)))
-          .join('');
+        const blockRenderers = { exam: renderExamBlock, 'rso-event': renderEventBlock, event: renderEventBlock };
+        const blocks = day.blocks.map((block) => (blockRenderers[block.kind] || renderMeetingBlock)(block, week.startHour)).join('');
         return `<div class="calendar-day${day.date === today ? ' is-today' : ''}">${blocks}${nowLine}</div>`;
       })
       .join('');
     elements.calendar.innerHTML = `
-      ${week.hasMeetings ? renderNextClass() : ''}
+      ${currentClasses().some((plannerClass) => (plannerClass.meetings || []).length > 0) ? renderNextClass() : ''}
       ${renderExamCountdown()}
       ${renderWeekNav()}
-      ${renderBreakBanners(weekDates(5))}
+      ${renderBreakBanners(week.days.map((day) => day.date))}
       ${notice}
-      <div class="calendar">
+      <div class="calendar" style="--day-count: ${week.days.length}">
         <div class="calendar-row calendar-headings"><span></span>${headers}</div>
         <div class="calendar-row calendar-body" style="height: ${hours * HOUR_HEIGHT}px">
           <div class="hour-labels">${hourLabels}</div>
@@ -878,11 +916,13 @@
       assignment: elements.assignmentHeading.textContent,
       exam: elements.examHeading.textContent,
       break: 'Breaks',
+      rso: 'RSOs',
+      event: elements.eventHeading.textContent,
     };
     elements.drawerHeading.textContent = headings[drawerSection];
   }
 
-  // Opens the Add panel showing one section ('assignment', 'class', 'exam', or 'break'), or closes it.
+  // Opens the Add panel showing one section ('assignment', 'class', 'exam', 'break', 'rso', or 'event'), or closes it.
   function setDrawerOpen(open, section = drawerSection) {
     if (!open && editingAssignment) {
       stopEditingAssignment();
@@ -893,6 +933,12 @@
     if (!open && editingBreakId) {
       stopEditingBreak();
     }
+    if (!open && editingRsoId) {
+      stopEditingRso();
+    }
+    if (!open && editingEventId) {
+      stopEditingEvent();
+    }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
     document.body.classList.toggle('drawer-open', open);
@@ -902,12 +948,16 @@
       elements.assignmentPanel.hidden = section !== 'assignment';
       elements.examPanel.hidden = section !== 'exam';
       elements.breakPanel.hidden = section !== 'break';
+      elements.rsoPanel.hidden = section !== 'rso';
+      elements.eventPanel.hidden = section !== 'event';
       renderDrawerHeading();
       const firstFields = {
         class: elements.classForm.elements.name,
         assignment: elements.assignmentForm.elements.title,
         exam: elements.examForm.elements.title,
         break: elements.breakForm.elements.name,
+        rso: elements.rsoForm.elements.name,
+        event: elements.eventForm.elements.title,
       };
       firstFields[section].focus();
     }
@@ -949,52 +999,126 @@
 
   // ---------- Meeting times in the class form ----------
 
-  function renderMeetingRows(meetings) {
-    elements.meetingList.innerHTML = meetings
+  // Meeting rows for a class (list = elements.meetingList, Mon–Fri) or an RSO (any day).
+  // RSO meetings can also repeat every other week, starting from a first meeting date.
+  function renderRepeatFields(meeting, index) {
+    const everyOther = meeting.every === 2;
+    return `
+      <label class="field"><span>Repeats</span>
+        <select class="meeting-every" aria-label="Meeting ${index + 1} repeats">
+          <option value="1" ${everyOther ? '' : 'selected'}>Every week</option>
+          <option value="2" ${everyOther ? 'selected' : ''}>Every other week</option>
+        </select>
+      </label>
+      <label class="field meeting-first-field" ${everyOther ? '' : 'hidden'}><span>First meeting</span>
+        <input class="meeting-first" type="date" value="${meeting.firstDate || ''}" />
+      </label>`;
+  }
+
+  function renderMeetingRows(list, meetings, days = MEETING_DAYS) {
+    const isRso = days !== MEETING_DAYS;
+    list.innerHTML = meetings
       .map(
         (meeting, index) => `
           <li class="meeting-row" data-meeting-id="${meeting.id}">
             <div class="meeting-row-top">
-              <input class="meeting-label" type="text" maxlength="30" placeholder="Lecture, Lab…" value="${escapeHtml(meeting.label)}"
+              <input class="meeting-label" type="text" maxlength="30" placeholder="${days === MEETING_DAYS ? 'Lecture, Lab…' : 'General meeting, Practice…'}" value="${escapeHtml(meeting.label)}"
                 aria-label="Meeting ${index + 1} name" />
               <button type="button" class="text-button danger" data-meeting-action="remove">Remove</button>
             </div>
             <div class="day-picker" role="group" aria-label="Meeting ${index + 1} days">
-              ${renderDayOptions(MEETING_DAYS, meeting.days, 'class="meeting-day"')}
+              ${renderDayOptions(days, meeting.days, 'class="meeting-day"')}
             </div>
+            ${isRso ? renderRepeatFields(meeting, index) : ''}
             <div class="field-row">
               <label class="field"><span>Starts</span><input class="meeting-start" type="time" value="${meeting.startTime}" /></label>
               <label class="field"><span>Ends</span><input class="meeting-end" type="time" value="${meeting.endTime}" /></label>
             </div>
-            <input class="meeting-location" type="text" maxlength="40" placeholder="Room (optional)" value="${escapeHtml(meeting.location)}"
+            <input class="meeting-location" type="text" maxlength="40" placeholder="${days === MEETING_DAYS ? 'Room' : 'Place'} (optional)" value="${escapeHtml(meeting.location)}"
               aria-label="Meeting ${index + 1} room" />
           </li>`,
       )
       .join('');
   }
 
-  function readMeetingRows() {
-    return [...elements.meetingList.querySelectorAll('.meeting-row')].map((row) => ({
+  function readMeetingRows(list) {
+    return [...list.querySelectorAll('.meeting-row')].map((row) => ({
       id: row.dataset.meetingId,
       label: row.querySelector('.meeting-label').value.trim(),
       days: checkedDays(row, '.meeting-day'),
       startTime: row.querySelector('.meeting-start').value,
       endTime: row.querySelector('.meeting-end').value,
       location: row.querySelector('.meeting-location').value.trim(),
+      ...readRepeatFields(row),
     }));
   }
 
-  function addMeetingRow() {
-    const meetings = readMeetingRows();
-    const isFirst = meetings.length === 0;
-    meetings.push({ id: newId('meeting'), label: isFirst ? 'Lecture' : '', days: [], startTime: '', endTime: '', location: '' });
-    renderMeetingRows(meetings);
-    elements.meetingList.querySelector('.meeting-row:last-child .meeting-label').focus();
+  // Only RSO meeting rows have repeat fields; class meetings are always weekly.
+  function readRepeatFields(row) {
+    const everySelect = row.querySelector('.meeting-every');
+    if (!everySelect || everySelect.value !== '2') {
+      return {};
+    }
+    return { every: 2, firstDate: row.querySelector('.meeting-first').value };
   }
 
-  function removeMeetingRow(row) {
-    const meetings = readMeetingRows().filter((meeting) => meeting.id !== row.dataset.meetingId);
-    renderMeetingRows(meetings);
+  // firstLabel names the first meeting, e.g. "Lecture" for a class.
+  function addMeetingRow(list, days, firstLabel) {
+    const meetings = readMeetingRows(list);
+    meetings.push({ id: newId('meeting'), label: meetings.length === 0 ? firstLabel : '', days: [], startTime: '', endTime: '', location: '' });
+    renderMeetingRows(list, meetings, days);
+    list.querySelector('.meeting-row:last-child .meeting-label').focus();
+  }
+
+  function removeMeetingRow(list, row, days) {
+    const meetings = readMeetingRows(list).filter((meeting) => meeting.id !== row.dataset.meetingId);
+    renderMeetingRows(list, meetings, days);
+  }
+
+  // ---------- Events in the RSO form ----------
+
+  function renderRsoEventRows(rows) {
+    elements.rsoEventList.innerHTML = rows
+      .map(
+        (row, index) => `
+          <li class="meeting-row rso-event-row" data-event-id="${row.id}">
+            <div class="meeting-row-top">
+              <input class="event-title" type="text" maxlength="80" placeholder="e.g. Fall social" value="${escapeHtml(row.title)}"
+                aria-label="Event ${index + 1} name" />
+              <button type="button" class="text-button danger" data-rso-event-action="remove">Remove</button>
+            </div>
+            <label class="field"><span>Date</span><input class="event-date" type="date" value="${row.date}" /></label>
+            <div class="field-row">
+              <label class="field"><span>Starts</span><input class="event-start" type="time" value="${row.startTime}" /></label>
+              <label class="field"><span>Ends</span><input class="event-end" type="time" value="${row.endTime}" /></label>
+            </div>
+            <input class="event-location" type="text" maxlength="40" placeholder="Place (optional)" value="${escapeHtml(row.location)}"
+              aria-label="Event ${index + 1} place" />
+          </li>`,
+      )
+      .join('');
+  }
+
+  function readRsoEventRows() {
+    return [...elements.rsoEventList.querySelectorAll('.rso-event-row')].map((row) => ({
+      id: row.dataset.eventId,
+      title: row.querySelector('.event-title').value.trim(),
+      date: row.querySelector('.event-date').value,
+      startTime: row.querySelector('.event-start').value,
+      endTime: row.querySelector('.event-end').value,
+      location: row.querySelector('.event-location').value.trim(),
+    }));
+  }
+
+  function addRsoEventRow() {
+    const rows = readRsoEventRows();
+    rows.push({ id: newId('event'), title: '', date: '', startTime: '', endTime: '', location: '' });
+    renderRsoEventRows(rows);
+    elements.rsoEventList.querySelector('.rso-event-row:last-child .event-title').focus();
+  }
+
+  function removeRsoEventRow(row) {
+    renderRsoEventRows(readRsoEventRows().filter((candidate) => candidate.id !== row.dataset.eventId));
   }
 
   // ---------- Recurring assignments in the class form ----------
@@ -1070,14 +1194,27 @@
 
   // ---------- Forms ----------
 
-  function setUpPickers() {
-    elements.colorPicker.innerHTML = CLASS_COLORS.map(
+  function renderColorOptions(palette) {
+    return palette.map(
       (color, index) => `
         <label class="color-option" style="--class-color: ${color.value}" title="${color.name}">
           <input type="radio" name="color" value="${color.value}" ${index === 0 ? 'checked' : ''} aria-label="${color.name}" />
           <span class="swatch" aria-hidden="true"></span>
         </label>`,
     ).join('');
+  }
+
+  function selectColor(form, color) {
+    const colorInput = [...form.elements.color].find((input) => input.value === color);
+    if (colorInput) {
+      colorInput.checked = true;
+    }
+  }
+
+  function setUpPickers() {
+    elements.colorPicker.innerHTML = renderColorOptions(model.CLASS_COLORS);
+    elements.rsoColorPicker.innerHTML = renderColorOptions(model.RSO_COLORS);
+    elements.eventColorPicker.innerHTML = renderColorOptions(model.RSO_COLORS);
     elements.dayPicker.innerHTML = renderDayOptions(ALL_DAYS, [], 'name="days"');
     elements.breakThemePicker.innerHTML = model.BREAK_THEMES.map(
       (theme, index) => `
@@ -1336,15 +1473,28 @@
     }
   }
 
+  // Reads a form's meeting rows. Each meeting keeps its cancelled dates; the form doesn't
+  // show them, so it can't carry them.
+  function readMeetingsKeepingCancellations(list, previousMeetings) {
+    return readMeetingRows(list).map((meeting) => ({
+      ...meeting,
+      cancelledDates: previousMeetings.find((previous) => previous.id === meeting.id)?.cancelledDates || [],
+    }));
+  }
+
+  function meetingErrors(meetings) {
+    return meetings.flatMap((meeting, index) => {
+      const which = meeting.label || `Meeting ${index + 1}`;
+      return model.validateMeeting(meeting).map((error) => `${which}: ${error}`);
+    });
+  }
+
   function startEditingClass(id) {
     const plannerClass = state.classes.find((candidate) => candidate.id === id);
     editingClassId = id;
     elements.classForm.elements.name.value = plannerClass.name;
-    const colorInput = [...elements.classForm.elements.color].find((input) => input.value === plannerClass.color);
-    if (colorInput) {
-      colorInput.checked = true;
-    }
-    renderMeetingRows(plannerClass.meetings || []);
+    selectColor(elements.classForm, plannerClass.color);
+    renderMeetingRows(elements.meetingList, plannerClass.meetings || []);
     renderRecurringRows([]);
     renderExistingRecurring(id);
     elements.classFormLabel.textContent = `Edit ${plannerClass.name}`;
@@ -1356,7 +1506,7 @@
   function stopEditingClass() {
     editingClassId = null;
     elements.classForm.reset();
-    renderMeetingRows([]);
+    renderMeetingRows(elements.meetingList, []);
     renderRecurringRows([]);
     elements.existingRecurring.innerHTML = '';
     elements.classFormLabel.textContent = 'New class';
@@ -1372,22 +1522,15 @@
     const duplicate = currentClasses().some(
       (plannerClass) => plannerClass.id !== editingClassId && plannerClass.name.toLowerCase() === name.toLowerCase(),
     );
-    // Keep each meeting's cancelled dates; the form doesn't show them, so it can't carry them.
     const previousMeetings = editingClassId ? state.classes.find((candidate) => candidate.id === editingClassId).meetings || [] : [];
-    const meetings = readMeetingRows().map((meeting) => ({
-      ...meeting,
-      cancelledDates: previousMeetings.find((previous) => previous.id === meeting.id)?.cancelledDates || [],
-    }));
+    const meetings = readMeetingsKeepingCancellations(elements.meetingList, previousMeetings);
     const errors = [];
     if (!name) {
       errors.push('Give the class a name.');
     } else if (duplicate) {
       errors.push(`You already have a class called ${name}.`);
     }
-    meetings.forEach((meeting, index) => {
-      const which = meeting.label || `Meeting ${index + 1}`;
-      model.validateMeeting(meeting).forEach((error) => errors.push(`${which}: ${error}`));
-    });
+    errors.push(...meetingErrors(meetings));
     const classId = editingClassId || newId('class');
     const recurring = readRecurringRows().map((row) => recurringRowToAssignment(row, classId));
     recurring.forEach((assignment, index) => {
@@ -1412,12 +1555,159 @@
     stopEditingClass();
   }
 
+  // ---------- RSOs ----------
+
+  function renderRsos() {
+    const rsos = state.rsos || [];
+    elements.rsoList.innerHTML =
+      rsos.length === 0
+        ? '<li class="empty">No RSOs yet. Add your first one above.</li>'
+        : rsos
+            .map((rso) => {
+              const eventCount = (rso.events || []).length;
+              return `
+                <li class="class-item" style="--class-color: ${rso.color}">
+                  <span class="swatch" aria-hidden="true"></span>
+                  <span class="class-info">
+                    <span class="class-name">${escapeHtml(rso.name)}</span>
+                    <span class="class-count">Until end of ${rso.lasts === 'year' ? 'school year' : 'semester'}${eventCount > 0 ? ` · ${eventCount} event${eventCount === 1 ? '' : 's'}` : ''}</span>
+                    ${rso.meetings.map((meeting) => `<span class="class-meeting">${describeMeeting(meeting)}</span>`).join('')}
+                  </span>
+                  <button type="button" class="text-button" data-action="edit-rso" data-id="${rso.id}">Edit</button>
+                  <button type="button" class="text-button danger" data-action="delete-rso" data-id="${rso.id}">Delete</button>
+                </li>`;
+            })
+            .join('');
+  }
+
+  function startEditingRso(id) {
+    const rso = state.rsos.find((candidate) => candidate.id === id);
+    editingRsoId = id;
+    const form = elements.rsoForm;
+    form.elements.name.value = rso.name;
+    selectColor(form, rso.color);
+    form.elements.lasts.value = rso.lasts;
+    renderMeetingRows(elements.rsoMeetingList, rso.meetings, ALL_DAYS);
+    renderRsoEventRows(rso.events || []);
+    elements.rsoFormLabel.textContent = `Edit ${rso.name}`;
+    elements.rsoSubmit.textContent = 'Save RSO';
+    elements.rsoCancel.hidden = false;
+    showErrors(elements.rsoErrors, []);
+    if (!isDrawerOpen() || drawerSection !== 'rso') {
+      setDrawerOpen(true, 'rso');
+    }
+    form.elements.name.focus();
+  }
+
+  function stopEditingRso() {
+    editingRsoId = null;
+    elements.rsoForm.reset();
+    renderMeetingRows(elements.rsoMeetingList, [], ALL_DAYS);
+    renderRsoEventRows([]);
+    elements.rsoFormLabel.textContent = 'New RSO';
+    elements.rsoSubmit.textContent = 'Add RSO';
+    elements.rsoCancel.hidden = true;
+    showErrors(elements.rsoErrors, []);
+  }
+
+  function handleRsoSubmit(event) {
+    event.preventDefault();
+    const form = elements.rsoForm;
+    const name = form.elements.name.value.trim();
+    const existing = editingRsoId ? state.rsos.find((candidate) => candidate.id === editingRsoId) : null;
+    const meetings = readMeetingsKeepingCancellations(elements.rsoMeetingList, existing ? existing.meetings : []);
+    const events = readRsoEventRows();
+    const errors = [];
+    if (!name) {
+      errors.push('Give the RSO a name.');
+    } else if ((state.rsos || []).some((rso) => rso.id !== editingRsoId && rso.name.toLowerCase() === name.toLowerCase())) {
+      errors.push(`You already have an RSO called ${name}.`);
+    }
+    errors.push(...meetingErrors(meetings));
+    events.forEach((rsoEvent, index) => {
+      const which = rsoEvent.title || `Event ${index + 1}`;
+      model.validateEvent(rsoEvent).forEach((error) => errors.push(`${which}: ${error}`));
+    });
+    showErrors(elements.rsoErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    const fields = { name, color: form.elements.color.value, lasts: form.elements.lasts.value, meetings, events };
+    if (existing) {
+      applyChange(`Saved ${name}.`, () => Object.assign(existing, fields));
+    } else {
+      applyChange(`Added ${name}.`, () => {
+        state.rsos = [...(state.rsos || []), { id: newId('rso'), semesterId: state.currentSemesterId, ...fields }];
+      });
+    }
+    stopEditingRso();
+  }
+
+  // ---------- Standalone events ----------
+
+  function startEditingEvent(id) {
+    const standalone = state.events.find((candidate) => candidate.id === id);
+    editingEventId = id;
+    const form = elements.eventForm;
+    ['title', 'date', 'startTime', 'endTime', 'location'].forEach((field) => {
+      form.elements[field].value = standalone[field];
+    });
+    selectColor(form, standalone.color);
+    elements.eventHeading.textContent = 'Edit event';
+    elements.eventSubmit.textContent = 'Save event';
+    elements.eventCancel.hidden = false;
+    showErrors(elements.eventErrors, []);
+    setDrawerOpen(true, 'event');
+  }
+
+  function stopEditingEvent() {
+    editingEventId = null;
+    elements.eventForm.reset();
+    elements.eventHeading.textContent = 'Add event';
+    elements.eventSubmit.textContent = 'Add event';
+    elements.eventCancel.hidden = true;
+    showErrors(elements.eventErrors, []);
+    renderDrawerHeading();
+  }
+
+  function handleEventSubmit(event) {
+    event.preventDefault();
+    const form = elements.eventForm;
+    const fields = {
+      title: form.elements.title.value.trim(),
+      color: form.elements.color.value,
+      date: form.elements.date.value,
+      startTime: form.elements.startTime.value,
+      endTime: form.elements.endTime.value,
+      location: form.elements.location.value.trim(),
+    };
+    const errors = model.validateEvent(fields);
+    showErrors(elements.eventErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    if (editingEventId) {
+      const standalone = state.events.find((candidate) => candidate.id === editingEventId);
+      applyChange(`Saved ${fields.title}.`, () => Object.assign(standalone, fields));
+      setDrawerOpen(false);
+    } else {
+      applyChange(`Added ${fields.title} on ${model.formatDate(fields.date)}.`, () => {
+        state.events = [...(state.events || []), { id: newId('event'), ...fields }];
+      });
+      ['title', 'date', 'startTime', 'endTime', 'location'].forEach((field) => {
+        form.elements[field].value = '';
+      });
+      form.elements.title.focus();
+    }
+  }
+
   function openSemesterDialog() {
     const semester = currentSemester();
     const form = elements.semesterForm;
     form.elements.name.value = semester.name;
     form.elements.startDate.value = semester.startDate;
     form.elements.endDate.value = semester.endDate;
+    form.elements.schoolYearEndDate.value = model.schoolYearEnd(semester);
     showErrors(elements.semesterErrors, []);
     elements.semesterDialog.showModal();
   }
@@ -1428,6 +1718,7 @@
     const name = form.elements.name.value.trim();
     const startDate = form.elements.startDate.value;
     const endDate = form.elements.endDate.value;
+    const schoolYearEndDate = form.elements.schoolYearEndDate.value;
     const errors = [];
     if (!name) {
       errors.push('Give the semester a name, like Fall 2026.');
@@ -1436,12 +1727,16 @@
       errors.push('Pick a start and end date.');
     } else if (startDate > endDate) {
       errors.push('The end date must be after the start date.');
+    } else if (!model.isValidDateKey(schoolYearEndDate)) {
+      errors.push('Pick when the school year ends.');
+    } else if (schoolYearEndDate < endDate) {
+      errors.push('The school year can’t end before the semester does.');
     }
     showErrors(elements.semesterErrors, errors);
     if (errors.length > 0) {
       return;
     }
-    applyChange('Semester saved.', () => Object.assign(currentSemester(), { name, startDate, endDate }));
+    applyChange('Semester saved.', () => Object.assign(currentSemester(), { name, startDate, endDate, schoolYearEndDate }));
     elements.semesterDialog.close();
     resetAssignmentDates();
   }
@@ -1489,10 +1784,11 @@
       startEditingClass(id);
       elements.classForm.scrollIntoView({ block: 'start' });
     } else if (action === 'cancel-meeting' || action === 'restore-meeting') {
-      const plannerClass = state.classes.find((candidate) => candidate.id === target.dataset.classId);
-      const meeting = plannerClass.meetings.find((candidate) => candidate.id === target.dataset.meetingId);
+      const owners = target.dataset.owner === 'rso' ? state.rsos : state.classes;
+      const owner = owners.find((candidate) => candidate.id === target.dataset.ownerId);
+      const meeting = owner.meetings.find((candidate) => candidate.id === target.dataset.meetingId);
       const cancelling = action === 'cancel-meeting';
-      applyChange(`${cancelling ? 'Cancelled' : 'Restored'} ${plannerClass.name} on ${model.formatDate(date)}.`, () => {
+      applyChange(`${cancelling ? 'Cancelled' : 'Restored'} ${owner.name} on ${model.formatDate(date)}.`, () => {
         const others = (meeting.cancelledDates || []).filter((cancelledDate) => cancelledDate !== date);
         meeting.cancelledDates = cancelling ? [...others, date] : others;
       });
@@ -1539,6 +1835,37 @@
       applyChange(`Deleted ${schoolBreak.name}.`, () => {
         state.breaks = state.breaks.filter((candidate) => candidate.id !== id);
       });
+    } else if (action === 'edit-rso') {
+      startEditingRso(id);
+      elements.rsoForm.scrollIntoView({ block: 'start' });
+    } else if (action === 'delete-rso') {
+      const rso = state.rsos.find((candidate) => candidate.id === id);
+      const eventCount = (rso.events || []).length;
+      const warning = eventCount > 0 ? ` This also deletes its ${eventCount} event${eventCount === 1 ? '' : 's'}.` : '';
+      if (await askToConfirm(`Delete ${rso.name}?${warning}`, 'Delete RSO')) {
+        if (editingRsoId === id) {
+          stopEditingRso();
+        }
+        applyChange(`Deleted ${rso.name}.`, () => {
+          state.rsos = state.rsos.filter((candidate) => candidate.id !== id);
+        });
+      }
+    } else if (action === 'edit-event') {
+      startEditingEvent(id);
+    } else if (action === 'delete-event') {
+      const rso = target.dataset.rsoId ? state.rsos.find((candidate) => candidate.id === target.dataset.rsoId) : null;
+      const events = rso ? rso.events : state.events;
+      const doomed = events.find((candidate) => candidate.id === id);
+      if (editingRsoId === rso?.id) {
+        stopEditingRso();
+      }
+      applyChange(`Deleted ${doomed.title}.`, () => {
+        if (rso) {
+          rso.events = rso.events.filter((candidate) => candidate.id !== id);
+        } else {
+          state.events = state.events.filter((candidate) => candidate.id !== id);
+        }
+      });
     } else if (action === 'edit-exam') {
       startEditingExam(id);
     } else if (action === 'delete-exam') {
@@ -1555,6 +1882,9 @@
       }
       if (editingBreakId) {
         stopEditingBreak();
+      }
+      if (editingEventId) {
+        stopEditingEvent();
       }
       setDrawerOpen(true, target.dataset.section || 'assignment');
     } else if (action === 'set-view') {
@@ -1618,7 +1948,28 @@
   document.getElementById('semester-cancel').addEventListener('click', () => elements.semesterDialog.close());
   document.getElementById('drawer-close').addEventListener('click', () => setDrawerOpen(false));
   elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
-  document.getElementById('add-meeting').addEventListener('click', addMeetingRow);
+  document.getElementById('add-meeting').addEventListener('click', () => addMeetingRow(elements.meetingList, MEETING_DAYS, 'Lecture'));
+  document.getElementById('add-rso-meeting').addEventListener('click', () => addMeetingRow(elements.rsoMeetingList, ALL_DAYS, 'General meeting'));
+  document.getElementById('add-rso-event').addEventListener('click', addRsoEventRow);
+  elements.rsoForm.addEventListener('submit', handleRsoSubmit);
+  elements.rsoCancel.addEventListener('click', stopEditingRso);
+  elements.eventForm.addEventListener('submit', handleEventSubmit);
+  elements.eventCancel.addEventListener('click', () => setDrawerOpen(false));
+  elements.rsoMeetingList.addEventListener('change', (event) => {
+    if (event.target.matches('.meeting-every')) {
+      const firstField = event.target.closest('.meeting-row').querySelector('.meeting-first-field');
+      firstField.hidden = event.target.value !== '2';
+      if (!firstField.hidden) {
+        firstField.querySelector('input').focus();
+      }
+    }
+  });
+  elements.rsoEventList.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-rso-event-action="remove"]');
+    if (removeButton) {
+      removeRsoEventRow(removeButton.closest('.rso-event-row'));
+    }
+  });
   document.getElementById('add-recurring').addEventListener('click', addRecurringRow);
   elements.recurringList.addEventListener('click', (event) => {
     const removeButton = event.target.closest('[data-recurring-action="remove"]');
@@ -1626,11 +1977,16 @@
       removeRecurringRow(removeButton.closest('.recurring-row'));
     }
   });
-  elements.meetingList.addEventListener('click', (event) => {
-    const removeButton = event.target.closest('[data-meeting-action="remove"]');
-    if (removeButton) {
-      removeMeetingRow(removeButton.closest('.meeting-row'));
-    }
+  [
+    [elements.meetingList, MEETING_DAYS],
+    [elements.rsoMeetingList, ALL_DAYS],
+  ].forEach(([list, days]) => {
+    list.addEventListener('click', (event) => {
+      const removeButton = event.target.closest('[data-meeting-action="remove"]');
+      if (removeButton) {
+        removeMeetingRow(list, removeButton.closest('.meeting-row'), days);
+      }
+    });
   });
   elements.confirmChoices.addEventListener('click', (event) => {
     const button = event.target.closest('[data-choice]');
