@@ -883,8 +883,14 @@ button:focus-visible {
   background-color: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
+/* Each block is a clickable menu (see .row-menu); the slot holds its position on the grid. */
+.row-menu.class-block-slot {
+  position: absolute;
+}
+
 .class-block {
   position: absolute;
+  inset: 0;
   overflow: hidden;
   display: grid;
   align-content: start;
@@ -900,6 +906,49 @@ button:focus-visible {
 
 .class-block-name {
   font-weight: 700;
+}
+
+/* Undo the small ⋯ button styles that .row-menu summary applies. */
+.row-menu .class-block {
+  width: auto;
+  height: auto;
+  place-items: initial;
+  color: var(--text);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.row-menu .class-block:hover,
+.row-menu[open] .class-block {
+  background: color-mix(in srgb, var(--class-color) 34%, var(--surface));
+}
+
+.class-block.is-cancelled {
+  opacity: 0.55;
+  background: var(--surface);
+  border-style: dashed;
+  border-left-style: solid;
+}
+
+.class-block.is-cancelled .class-block-name,
+.class-block.is-cancelled .class-block-time {
+  text-decoration: line-through;
+}
+
+.next-class {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--background);
+}
+
+.next-class .swatch {
+  width: 10px;
+  height: 10px;
 }
 
 .class-block-details,

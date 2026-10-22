@@ -283,6 +283,39 @@ const PlannerModel = (() => {
     return blocks;
   }
 
+  function isMeetingCancelled(meeting, date) {
+    return (meeting.cancelledDates || []).includes(date);
+  }
+
+  // Every class meeting on one date (only inside the current semester), including
+  // cancelled ones, which are marked so the calendar can show them faded.
+  function classMeetingsOn(state, date) {
+    const semester = state.semesters.find((candidate) => candidate.id === state.currentSemesterId);
+    if (date < semester.startDate || date > semester.endDate) {
+      return [];
+    }
+    const weekday = parseDateKey(date).getDay();
+    const meetings = [];
+    for (const plannerClass of state.classes) {
+      if (plannerClass.semesterId !== state.currentSemesterId) {
+        continue;
+      }
+      for (const meeting of plannerClass.meetings || []) {
+        if (meeting.days.includes(weekday)) {
+          meetings.push({
+            plannerClass,
+            meeting,
+            date,
+            startTime: meeting.startTime,
+            endTime: meeting.endTime,
+            cancelled: isMeetingCancelled(meeting, date),
+          });
+        }
+      }
+    }
+    return meetings.sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+
   // The Mon–Fri class schedule for one week, only on dates inside the current semester.
   // startHour and endHour cover 8 AM–6 PM, stretched to fit any earlier or later class.
   function buildCalendarWeek(state, weekStart) {
@@ -292,22 +325,12 @@ const PlannerModel = (() => {
     let endMinutes = DEFAULT_CALENDAR_HOURS.end * 60;
     const days = [0, 1, 2, 3, 4].map((offset) => {
       const date = addDays(weekStart, offset);
-      const weekday = parseDateKey(date).getDay();
-      const blocks = [];
-      if (date >= semester.startDate && date <= semester.endDate) {
-        for (const plannerClass of classes) {
-          for (const meeting of plannerClass.meetings || []) {
-            if (meeting.days.includes(weekday)) {
-              blocks.push({ plannerClass, meeting, startTime: meeting.startTime, endTime: meeting.endTime });
-            }
-          }
-        }
-      }
+      const blocks = classMeetingsOn(state, date);
       for (const block of blocks) {
         startMinutes = Math.min(startMinutes, timeToMinutes(block.startTime));
         endMinutes = Math.max(endMinutes, timeToMinutes(block.endTime));
       }
-      return { date, label: WEEKDAY_NAMES[weekday], blocks: assignLanes(blocks) };
+      return { date, label: WEEKDAY_NAMES[parseDateKey(date).getDay()], blocks: assignLanes(blocks) };
     });
     return {
       days,
@@ -316,6 +339,28 @@ const PlannerModel = (() => {
       hasMeetings: classes.some((plannerClass) => (plannerClass.meetings || []).length > 0),
       outsideSemester: addDays(weekStart, 4) < semester.startDate || weekStart > semester.endDate,
     };
+  }
+
+  // The class happening now ({ status: 'now', ... }), or else the next one that isn't
+  // cancelled ({ status: 'next', ... }), looking up to two weeks ahead. null if none.
+  function nextClass(state, todayKey, nowTime) {
+    for (let offset = 0; offset < 14; offset += 1) {
+      const date = addDays(todayKey, offset);
+      const meetings = classMeetingsOn(state, date).filter((meeting) => !meeting.cancelled);
+      if (offset === 0) {
+        const happeningNow = meetings.find((meeting) => meeting.startTime <= nowTime && nowTime < meeting.endTime);
+        if (happeningNow) {
+          return { status: 'now', ...happeningNow };
+        }
+        const laterToday = meetings.find((meeting) => meeting.startTime > nowTime);
+        if (laterToday) {
+          return { status: 'next', ...laterToday };
+        }
+      } else if (meetings.length > 0) {
+        return { status: 'next', ...meetings[0] };
+      }
+    }
+    return null;
   }
 
   function formatTime(time) {
@@ -399,6 +444,7 @@ const PlannerModel = (() => {
     timeToMinutes,
     validateMeeting,
     buildCalendarWeek,
+    nextClass,
     formatTimeRange,
     formatTime,
     formatDate,

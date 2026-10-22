@@ -529,20 +529,58 @@
     return ((model.timeToMinutes(time) - startHour * 60) / 60) * HOUR_HEIGHT;
   }
 
+  // A class block on the calendar. Clicking it opens a menu to edit the class or cancel
+  // (or restore) just this day's meeting.
   function renderClassBlock(block, startHour) {
-    const { plannerClass, meeting, lane, laneCount } = block;
+    const { plannerClass, meeting, lane, laneCount, date, cancelled } = block;
     const top = timeOffset(block.startTime, startHour);
     const height = timeOffset(block.endTime, startHour) - top;
     // Blocks under about an hour only have room for the name and time; the rest is in the hover text.
     const hasRoomForDetails = height >= HOUR_HEIGHT;
-    const details = hasRoomForDetails ? [meeting.label, meeting.location].filter(Boolean).map(escapeHtml).join(' · ') : '';
+    const details = cancelled
+      ? 'Cancelled'
+      : hasRoomForDetails
+        ? [meeting.label, meeting.location].filter(Boolean).map(escapeHtml).join(' · ')
+        : '';
+    const name = escapeHtml(plannerClass.name);
+    const meetingData = `data-class-id="${plannerClass.id}" data-meeting-id="${meeting.id}" data-date="${date}"`;
+    const dayAction = cancelled
+      ? `<button type="button" data-action="restore-meeting" ${meetingData}>Restore class on ${model.formatDate(date)}</button>`
+      : `<button type="button" class="danger" data-action="cancel-meeting" ${meetingData}>Cancel class on ${model.formatDate(date)}</button>`;
     return `
-      <div class="class-block" style="--class-color: ${plannerClass.color}; top: ${top}px; height: ${height}px; left: ${(lane / laneCount) * 100}%; width: ${100 / laneCount}%"
-        title="${escapeHtml(plannerClass.name)} ${describeMeeting(meeting)}">
-        <span class="class-block-name">${escapeHtml(plannerClass.name)}</span>
-        ${details ? `<span class="class-block-details">${details}</span>` : ''}
-        <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
-      </div>`;
+      <details class="row-menu class-block-slot" style="top: ${top}px; height: ${height}px; left: ${(lane / laneCount) * 100}%; width: ${100 / laneCount}%">
+        <summary class="class-block${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}"
+          title="${name} ${describeMeeting(meeting)}${cancelled ? ' (cancelled)' : ''}">
+          <span class="class-block-name">${name}</span>
+          ${details ? `<span class="class-block-details">${details}</span>` : ''}
+          <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+        </summary>
+        <div class="row-menu-items">
+          <button type="button" data-action="edit-class" data-id="${plannerClass.id}">Edit ${name}…</button>
+          ${dayAction}
+        </div>
+      </details>`;
+  }
+
+  // "Now: MATH 241 Lecture until 10:50 AM · Altgeld 314", or the next class coming up.
+  function renderNextClass() {
+    const upcoming = model.nextClass(state, todayKey(), currentTime());
+    if (!upcoming) {
+      return '<p class="next-class">No classes in the next two weeks.</p>';
+    }
+    const { plannerClass, meeting, status, date } = upcoming;
+    const what = `<strong>${escapeHtml(plannerClass.name)}</strong>${meeting.label ? ` ${escapeHtml(meeting.label)}` : ''}`;
+    const where = meeting.location ? ` · ${escapeHtml(meeting.location)}` : '';
+    let text;
+    if (status === 'now') {
+      text = `Now: ${what} until ${model.formatTime(meeting.endTime)}${where}`;
+    } else if (date === todayKey()) {
+      text = `Next: ${what} at ${model.formatTime(meeting.startTime)}${where}`;
+    } else {
+      const day = date === model.addDays(todayKey(), 1) ? 'Tomorrow' : model.formatDate(date);
+      text = `Next: ${day} ${model.formatTime(meeting.startTime)} · ${what}${where}`;
+    }
+    return `<p class="next-class" style="--class-color: ${plannerClass.color}"><span class="swatch" aria-hidden="true"></span>${text}</p>`;
   }
 
   function renderCalendar() {
@@ -579,6 +617,7 @@
       })
       .join('');
     elements.calendar.innerHTML = `
+      ${week.hasMeetings ? renderNextClass() : ''}
       ${renderWeekNav()}
       ${notice}
       <div class="calendar">
@@ -945,7 +984,12 @@
     const duplicate = currentClasses().some(
       (plannerClass) => plannerClass.id !== editingClassId && plannerClass.name.toLowerCase() === name.toLowerCase(),
     );
-    const meetings = readMeetingRows();
+    // Keep each meeting's cancelled dates; the form doesn't show them, so it can't carry them.
+    const previousMeetings = editingClassId ? state.classes.find((candidate) => candidate.id === editingClassId).meetings || [] : [];
+    const meetings = readMeetingRows().map((meeting) => ({
+      ...meeting,
+      cancelledDates: previousMeetings.find((previous) => previous.id === meeting.id)?.cancelledDates || [],
+    }));
     const errors = [];
     if (!name) {
       errors.push('Give the class a name.');
@@ -1050,8 +1094,20 @@
         });
       }
     } else if (action === 'edit-class') {
+      // From the calendar, the Add panel may be closed or showing assignments.
+      if (!isDrawerOpen() || drawerSection !== 'class') {
+        setDrawerOpen(true, 'class');
+      }
       startEditingClass(id);
       elements.classForm.scrollIntoView({ block: 'start' });
+    } else if (action === 'cancel-meeting' || action === 'restore-meeting') {
+      const plannerClass = state.classes.find((candidate) => candidate.id === target.dataset.classId);
+      const meeting = plannerClass.meetings.find((candidate) => candidate.id === target.dataset.meetingId);
+      const cancelling = action === 'cancel-meeting';
+      applyChange(`${cancelling ? 'Cancelled' : 'Restored'} ${plannerClass.name} on ${model.formatDate(date)}.`, () => {
+        const others = (meeting.cancelledDates || []).filter((cancelledDate) => cancelledDate !== date);
+        meeting.cancelledDates = cancelling ? [...others, date] : others;
+      });
     } else if (action === 'delete-class') {
       const plannerClass = state.classes.find((candidate) => candidate.id === id);
       const count = state.assignments.filter((candidate) => candidate.classId === id).length;
@@ -1154,13 +1210,14 @@
   // Escape closes the box; treat that as Cancel.
   elements.confirmDialog.addEventListener('cancel', () => finishChoice(null));
   elements.confirmDialog.addEventListener('close', () => finishChoice(null));
-  // Redraw each minute so items turn overdue or missed when their due time passes,
-  // unless a ⋯ menu is open (redrawing would close it).
+  // Redraw each minute so items turn overdue or missed when their due time passes and
+  // the calendar's "now" line and next class stay current, unless a menu is open
+  // (redrawing would close it).
   setInterval(() => {
     if (!document.querySelector('.row-menu[open]')) {
       renderDueList();
+      renderCalendar();
     }
-    renderCalendar();
   }, 60 * 1000);
   // 'toggle' doesn't bubble, so listen during the capture phase to catch every ⋯ menu.
   document.addEventListener(
