@@ -1922,3 +1922,40 @@ dialog::backdrop {
     color: var(--text-muted);
   }
 }
+
+/* ---------- Semesters ---------- */
+
+.viewing-notice {
+  width: min(728px, calc(100% - 32px));
+  margin: 0 auto 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--background));
+}
+
+.viewing-notice[hidden] {
+  display: none;
+}
+
+.current-tag {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.new-semester-button {
+  margin-top: 12px;
+}
+
+.rso-checklist {
+  display: grid;
+  gap: 6px;
+}
+
+.rso-checklist .swatch {
+  vertical-align: -1px;
+}
+
+.rso-checklist small {
+  color: var(--text-muted);
+}

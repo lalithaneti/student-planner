@@ -89,6 +89,13 @@
     semesterLabel: document.getElementById('semester-label'),
     semesterButton: document.getElementById('semester-button'),
     semesterDialog: document.getElementById('semester-dialog'),
+    semesterList: document.getElementById('semester-list'),
+    viewingNotice: document.getElementById('viewing-notice'),
+    newSemesterDialog: document.getElementById('new-semester-dialog'),
+    newSemesterForm: document.getElementById('new-semester-form'),
+    newSemesterRsos: document.getElementById('new-semester-rsos'),
+    newSemesterRsosField: document.getElementById('new-semester-rsos-field'),
+    newSemesterErrors: document.getElementById('new-semester-errors'),
     semesterForm: document.getElementById('semester-form'),
     semesterErrors: document.getElementById('semester-errors'),
     banner: document.getElementById('banner'),
@@ -317,6 +324,30 @@
     const semester = currentSemester();
     elements.semesterLabel.textContent = `${semester.name} · ${model.formatMonthDay(semester.startDate)} – ${model.formatMonthDay(semester.endDate)}`;
     elements.rsoLastsHint.textContent = `This school year ends ${model.formatDate(model.schoolYearEnd(semester))}; ${semester.name} ends ${model.formatDate(semester.endDate)}. Change them with the semester button (✎).`;
+    // Looking back at an older semester: say so, with a way back.
+    const latest = model.latestSemester(state);
+    elements.viewingNotice.hidden = latest.id === semester.id;
+    elements.viewingNotice.innerHTML =
+      latest.id === semester.id
+        ? ''
+        : `You’re looking back at <strong>${escapeHtml(semester.name)}</strong>. <button type="button" class="text-button" data-action="switch-semester" data-id="${latest.id}">Back to ${escapeHtml(latest.name)}</button>`;
+    const semesters = [...state.semesters].sort((a, b) => b.startDate.localeCompare(a.startDate));
+    elements.semesterList.innerHTML = semesters
+      .map(
+        (candidate) => `
+          <li class="class-item">
+            <span class="class-info">
+              <span class="class-name">${escapeHtml(candidate.name)}</span>
+              <span class="class-count">${model.formatMonthDay(candidate.startDate)} – ${model.formatMonthDay(candidate.endDate)}</span>
+            </span>
+            ${
+              candidate.id === semester.id
+                ? '<span class="current-tag">Viewing</span>'
+                : `<button type="button" class="text-button" data-action="switch-semester" data-id="${candidate.id}">Switch to ${escapeHtml(candidate.name)}</button>`
+            }
+          </li>`,
+      )
+      .join('');
   }
 
   function renderClasses() {
@@ -1809,7 +1840,7 @@
   // ---------- RSOs ----------
 
   function renderRsos() {
-    const rsos = state.rsos || [];
+    const rsos = model.currentRsos(state);
     elements.rsoList.innerHTML =
       rsos.length === 0
         ? '<li class="empty">No RSOs yet. Add your first one above.</li>'
@@ -1888,7 +1919,8 @@
       applyChange(`Saved ${name}.`, () => Object.assign(existing, fields));
     } else {
       applyChange(`Added ${name}.`, () => {
-        state.rsos = [...(state.rsos || []), { id: newId('rso'), semesterId: state.currentSemesterId, ...fields }];
+        const semesterId = state.currentSemesterId;
+        state.rsos = [...(state.rsos || []), { id: newId('rso'), semesterId, semesterIds: [semesterId], ...fields }];
       });
     }
     stopEditingRso();
@@ -1970,17 +2002,11 @@
     const startDate = form.elements.startDate.value;
     const endDate = form.elements.endDate.value;
     const schoolYearEndDate = form.elements.schoolYearEndDate.value;
-    const errors = [];
-    if (!name) {
-      errors.push('Give the semester a name, like Fall 2026.');
-    }
-    if (!model.isValidDateKey(startDate) || !model.isValidDateKey(endDate)) {
-      errors.push('Pick a start and end date.');
-    } else if (startDate > endDate) {
-      errors.push('The end date must be after the start date.');
-    } else if (!model.isValidDateKey(schoolYearEndDate)) {
+    const errors = model.validateSemester({ name, startDate, endDate });
+    // The school year end is only checked once the semester's own dates are right.
+    if (errors.length === 0 && !model.isValidDateKey(schoolYearEndDate)) {
       errors.push('Pick when the school year ends.');
-    } else if (schoolYearEndDate < endDate) {
+    } else if (errors.length === 0 && schoolYearEndDate < endDate) {
       errors.push('The school year can’t end before the semester does.');
     }
     showErrors(elements.semesterErrors, errors);
@@ -1990,6 +2016,85 @@
     applyChange('Semester saved.', () => Object.assign(currentSemester(), { name, startDate, endDate, schoolYearEndDate }));
     elements.semesterDialog.close();
     resetAssignmentDates();
+  }
+
+  // ---------- Starting and switching semesters ----------
+
+  function openNewSemesterDialog() {
+    const guess = model.nextSemesterGuess(currentSemester());
+    const form = elements.newSemesterForm;
+    form.elements.name.value = guess.name;
+    form.elements.startDate.value = guess.startDate;
+    form.elements.endDate.value = guess.endDate;
+    // Year-long RSOs start checked, semester-only ones unchecked.
+    const rsos = model.currentRsos(state);
+    elements.newSemesterRsosField.hidden = rsos.length === 0;
+    elements.newSemesterRsos.innerHTML = rsos
+      .map(
+        (rso) => `
+          <label class="checkbox-field" style="--class-color: ${rso.color}">
+            <input type="checkbox" name="keepRso" value="${rso.id}" ${rso.lasts === 'year' ? 'checked' : ''} />
+            <span><span class="swatch" aria-hidden="true"></span> ${escapeHtml(rso.name)} <small>${rso.lasts === 'year' ? 'all year' : 'this semester only'}</small></span>
+          </label>`,
+      )
+      .join('');
+    showErrors(elements.newSemesterErrors, []);
+    elements.semesterDialog.close();
+    elements.newSemesterDialog.showModal();
+  }
+
+  // Shows the week a semester is happening in: this week if it's on now, else its last
+  // week if it's over, or its first week if it hasn't started.
+  function jumpToSemesterWeek(semester) {
+    const today = todayKey();
+    const shownDate = today < semester.startDate ? semester.startDate : today > semester.endDate ? semester.endDate : today;
+    weekStart = model.startOfWeek(shownDate);
+  }
+
+  // Forms open for the semester being left would save into the wrong one.
+  function leaveSemester() {
+    if (editingClassId) {
+      stopEditingClass();
+    }
+    if (editingRsoId) {
+      stopEditingRso();
+    }
+    setDrawerOpen(false);
+  }
+
+  function handleNewSemesterSubmit(event) {
+    event.preventDefault();
+    const form = elements.newSemesterForm;
+    const fields = { name: form.elements.name.value.trim(), startDate: form.elements.startDate.value, endDate: form.elements.endDate.value };
+    const errors = model.validateSemester(fields);
+    if (state.semesters.some((semester) => semester.name.toLowerCase() === fields.name.toLowerCase())) {
+      errors.push(`You already have a semester called ${fields.name}.`);
+    }
+    showErrors(elements.newSemesterErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    const keepRsoIds = [...form.querySelectorAll('input[name="keepRso"]:checked')].map((input) => input.value);
+    leaveSemester();
+    applyChange(`Started ${fields.name}! Add your classes with + Add → Class.`, () => model.startNewSemester(state, fields, keepRsoIds, newId('semester')));
+    jumpToSemesterWeek(currentSemester());
+    resetAssignmentDates();
+    render();
+    elements.newSemesterDialog.close();
+  }
+
+  function switchSemester(id) {
+    const semester = state.semesters.find((candidate) => candidate.id === id);
+    leaveSemester();
+    applyChange(`Switched to ${semester.name}.`, () => {
+      state.currentSemesterId = id;
+    });
+    jumpToSemesterWeek(semester);
+    resetAssignmentDates();
+    render();
+    if (elements.semesterDialog.open) {
+      elements.semesterDialog.close();
+    }
   }
 
   // ---------- Clicks in lists ----------
@@ -2156,6 +2261,10 @@
       weekStart = model.startOfWeek(todayKey());
       renderDueList();
       renderCalendar();
+    } else if (action === 'open-new-semester') {
+      openNewSemesterDialog();
+    } else if (action === 'switch-semester') {
+      switchSemester(id);
     } else if (action === 'retry-weather') {
       loadWeather();
     } else if (action === 'toggle-later') {
@@ -2201,6 +2310,8 @@
   elements.semesterButton.addEventListener('click', openSemesterDialog);
   elements.semesterForm.addEventListener('submit', handleSemesterSubmit);
   document.getElementById('semester-cancel').addEventListener('click', () => elements.semesterDialog.close());
+  elements.newSemesterForm.addEventListener('submit', handleNewSemesterSubmit);
+  document.getElementById('new-semester-cancel').addEventListener('click', () => elements.newSemesterDialog.close());
   document.getElementById('drawer-close').addEventListener('click', () => setDrawerOpen(false));
   elements.assignmentCancel.addEventListener('click', () => setDrawerOpen(false));
   document.getElementById('add-meeting').addEventListener('click', () => addMeetingRow(elements.meetingList, MEETING_DAYS, 'Lecture'));

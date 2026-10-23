@@ -33,6 +33,7 @@
     </header>
 
     <p class="banner" id="banner" role="alert" hidden></p>
+    <p class="viewing-notice" id="viewing-notice" hidden></p>
 
     <main class="layout" id="layout">
       <section class="panel" id="home-panel" role="tabpanel" aria-labelledby="home-tab">
@@ -336,6 +337,39 @@
         <div class="button-row">
           <button type="submit" class="primary-button" value="save">Save</button>
           <button type="button" class="text-button" id="semester-cancel">Cancel</button>
+        </div>
+      </form>
+      <h3 class="subheading">Your semesters</h3>
+      <ul class="class-list" id="semester-list"></ul>
+      <button type="button" class="secondary-button new-semester-button" data-action="open-new-semester">+ Start new semester…</button>
+    </dialog>
+
+    <dialog id="new-semester-dialog" aria-labelledby="new-semester-heading">
+      <form id="new-semester-form" novalidate>
+        <h2 id="new-semester-heading">Start a new semester</h2>
+        <p class="hint">Your current semester's classes, assignments, exams, and breaks are kept, just hidden. Switch back to them anytime from the semester button.</p>
+        <label class="field">
+          <span>Name</span>
+          <input name="name" type="text" maxlength="40" />
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Starts</span>
+            <input name="startDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Ends</span>
+            <input name="endDate" type="date" />
+          </label>
+        </div>
+        <fieldset class="field" id="new-semester-rsos-field">
+          <legend>Which RSOs continue?</legend>
+          <div class="rso-checklist" id="new-semester-rsos"></div>
+        </fieldset>
+        <ul class="form-errors" id="new-semester-errors" role="alert"></ul>
+        <div class="button-row">
+          <button type="submit" class="primary-button">Start semester</button>
+          <button type="button" class="text-button" id="new-semester-cancel">Cancel</button>
         </div>
       </form>
     </dialog>

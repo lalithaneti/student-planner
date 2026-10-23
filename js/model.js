@@ -88,6 +88,53 @@ const PlannerModel = (() => {
     return state;
   }
 
+  // ---------- Semesters ----------
+
+  // A guess at the semester after this one: Spring after Fall, Fall after Spring (or Summer).
+  function nextSemesterGuess(semester) {
+    const year = Number(semester.startDate.slice(0, 4));
+    const startsInFall = semester.startDate.slice(5, 7) >= '08';
+    return startsInFall ? defaultSemester(new Date(year + 1, 0, 1)) : defaultSemester(new Date(year, 8, 1));
+  }
+
+  function validateSemester(semester) {
+    const errors = [];
+    if (!semester.name.trim()) {
+      errors.push('Give the semester a name, like Spring 2027.');
+    }
+    if (!isValidDateKey(semester.startDate) || !isValidDateKey(semester.endDate)) {
+      errors.push('Pick a start and end date.');
+    } else if (semester.startDate > semester.endDate) {
+      errors.push('The end date must be after the start date.');
+    }
+    return errors;
+  }
+
+  // Adds a semester and switches to it. Everything from the old semester stays saved but
+  // hidden. The RSOs in keepRsoIds carry over; the rest end with the old semester.
+  // Spring keeps the old semester's school year end; a semester starting after it gets its own.
+  function startNewSemester(state, fields, keepRsoIds, newSemesterId) {
+    const previous = state.semesters.find((semester) => semester.id === state.currentSemesterId);
+    const previousYearEnd = schoolYearEnd(previous);
+    const semester = { id: newSemesterId, ...fields };
+    semester.schoolYearEndDate = fields.startDate <= previousYearEnd ? previousYearEnd : schoolYearEnd(semester);
+    state.semesters.push(semester);
+    for (const rso of currentRsos(state)) {
+      if (keepRsoIds.includes(rso.id)) {
+        rso.semesterIds = [...rsoSemesterIds(rso), newSemesterId];
+      } else {
+        rso.lasts = 'semester';
+      }
+    }
+    state.currentSemesterId = newSemesterId;
+    return state;
+  }
+
+  // The semester with the latest start: the one you're in, unless you're looking back.
+  function latestSemester(state) {
+    return [...state.semesters].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+  }
+
   // A sensible starting semester based on today's date; the user can edit it.
   function defaultSemester(today) {
     const year = today.getFullYear();
@@ -486,16 +533,34 @@ const PlannerModel = (() => {
     return semester.startDate.slice(5, 7) >= '08' ? `${startYear + 1}-05-15` : semester.endDate;
   }
 
-  // The dates an RSO meets: from the start of the semester it was added in to the end of
-  // that semester, or to the end of the school year if it lasts all year.
-  function rsoDateRange(state, rso) {
-    const semester = state.semesters.find((candidate) => candidate.id === rso.semesterId);
-    return { startDate: semester.startDate, endDate: rso.lasts === 'year' ? schoolYearEnd(semester) : semester.endDate };
+  // The semesters an RSO belongs to: the one it was added in, plus any it was carried
+  // into. RSOs saved before carrying over existed only have semesterId.
+  function rsoSemesterIds(rso) {
+    return rso.semesterIds || [rso.semesterId];
+  }
+
+  // Whether an RSO meets around a date: during any of its semesters, and if it lasts all
+  // year, on through the end of its latest semester's school year.
+  function rsoActiveOn(state, rso, date) {
+    const semesters = rsoSemesterIds(rso)
+      .map((id) => state.semesters.find((semester) => semester.id === id))
+      .filter(Boolean)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate));
+    return semesters.some((semester, index) => {
+      const isLatest = index === semesters.length - 1;
+      const endDate = isLatest && rso.lasts === 'year' ? schoolYearEnd(semester) : semester.endDate;
+      return semester.startDate <= date && date <= endDate;
+    });
   }
 
   // Data saved before RSOs existed has no RSO lists.
   function rsosOf(state) {
     return state.rsos || [];
+  }
+
+  // The RSOs that belong to the semester being viewed, for lists and forms.
+  function currentRsos(state) {
+    return rsosOf(state).filter((rso) => rsoSemesterIds(rso).includes(state.currentSemesterId));
   }
 
   // Every RSO meeting on one date (not on a break), including cancelled ones.
@@ -505,8 +570,7 @@ const PlannerModel = (() => {
     }
     const meetings = [];
     for (const rso of rsosOf(state)) {
-      const range = rsoDateRange(state, rso);
-      if (date < range.startDate || date > range.endDate) {
+      if (!rsoActiveOn(state, rso, date)) {
         continue;
       }
       for (const meeting of rso.meetings) {
@@ -777,6 +841,11 @@ const PlannerModel = (() => {
     validateExam,
     schoolYearEnd,
     validateEvent,
+    currentRsos,
+    nextSemesterGuess,
+    validateSemester,
+    startNewSemester,
+    latestSemester,
     calendarBlocksOn,
     upcomingExams,
     nextClass,
