@@ -3,6 +3,7 @@
 
 (() => {
   const model = PlannerModel;
+  const themes = PlannerThemes;
 
   const NO_CLASS_COLOR = '#8b8d98';
   // Pennant colors and decorations for each break banner theme.
@@ -90,7 +91,6 @@
     semesterButton: document.getElementById('semester-button'),
     semesterDialog: document.getElementById('semester-dialog'),
     semesterList: document.getElementById('semester-list'),
-    viewingNotice: document.getElementById('viewing-notice'),
     newSemesterDialog: document.getElementById('new-semester-dialog'),
     newSemesterForm: document.getElementById('new-semester-form'),
     newSemesterRsos: document.getElementById('new-semester-rsos'),
@@ -324,13 +324,6 @@
     const semester = currentSemester();
     elements.semesterLabel.textContent = `${semester.name} · ${model.formatMonthDay(semester.startDate)} – ${model.formatMonthDay(semester.endDate)}`;
     elements.rsoLastsHint.textContent = `This school year ends ${model.formatDate(model.schoolYearEnd(semester))}; ${semester.name} ends ${model.formatDate(semester.endDate)}. Change them with the semester button (✎).`;
-    // Looking back at an older semester: say so, with a way back.
-    const latest = model.latestSemester(state);
-    elements.viewingNotice.hidden = latest.id === semester.id;
-    elements.viewingNotice.innerHTML =
-      latest.id === semester.id
-        ? ''
-        : `You’re looking back at <strong>${escapeHtml(semester.name)}</strong>. <button type="button" class="text-button" data-action="switch-semester" data-id="${latest.id}">Back to ${escapeHtml(latest.name)}</button>`;
     const semesters = [...state.semesters].sort((a, b) => b.startDate.localeCompare(a.startDate));
     elements.semesterList.innerHTML = semesters
       .map(
@@ -2279,6 +2272,84 @@
     }
   }
 
+  // ---------- Themes ----------
+
+  const themeMenu = document.querySelector('.theme-menu');
+  const themeOptions = document.getElementById('theme-options');
+  const decoratedThemeOptions = document.getElementById('decorated-theme-options');
+
+  // A small preview of a palette: its background with a card and an accent dot on it.
+  // Decorated themes show their background pattern, and their heading icon on the card.
+  function renderThemePreview(palette, art) {
+    const artwork = art ? ThemeArt.cssVariables(art) : null;
+    const pattern = artwork ? `<span class="theme-preview-pattern" style="${escapeHtml(`background-image: ${artwork['--decor-pattern']}`)}"></span>` : '';
+    const cardStyle = `background: ${artwork ? `${artwork['--decor-icon']} 4px center / 16px no-repeat,` : ''} ${palette.surface}; border-color: ${palette.border}`;
+    return `<span class="theme-preview" aria-hidden="true" style="background: ${palette.background}; border-color: ${palette.border}">
+      ${pattern}
+      <span class="theme-preview-card" style="${escapeHtml(cardStyle)}"></span>
+      <span class="theme-preview-dot" style="background: ${palette.accent}"></span>
+    </span>`;
+  }
+
+  function renderThemeButton(theme, dark) {
+    return `<button type="button" class="color-theme-option" data-theme="${theme.id}">${renderThemePreview(dark ? theme.dark : theme.light, theme.art)}<span>${escapeHtml(theme.name)}</span></button>`;
+  }
+
+  // Previews show each theme in the current mode, so they're redrawn when the mode changes.
+  function renderThemeOptions() {
+    const choice = themes.getChoice();
+    const dark = document.documentElement.classList.contains('dark');
+    decoratedThemeOptions.innerHTML = themes.DECORATED.map((theme) => renderThemeButton(theme, dark)).join('');
+    const customPalette = themes.customPalette(choice.customColor, dark);
+    themeOptions.innerHTML = `${themes.PRESETS.map((theme) => renderThemeButton(theme, dark)).join('')}
+      <label class="color-theme-option" data-theme="custom">
+        ${renderThemePreview(customPalette)}
+        <span>Your color</span>
+        <input type="color" class="custom-theme-color" value="${choice.customColor}" aria-label="Pick your own theme color" />
+      </label>`;
+    updateThemeSelection();
+  }
+
+  function updateThemeSelection() {
+    const choice = themes.getChoice();
+    themeMenu.querySelectorAll('[data-mode]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.mode === choice.mode));
+    });
+    themeMenu.querySelectorAll('[data-theme]').forEach((option) => {
+      const selected = option.dataset.theme === choice.theme;
+      option.classList.toggle('is-selected', selected);
+      if (option.tagName === 'BUTTON') {
+        option.setAttribute('aria-pressed', String(selected));
+      }
+    });
+  }
+
+  function handleThemeClick(event) {
+    const modeButton = event.target.closest('button[data-mode]');
+    // The 'Your color' tile is a label, so clicking it also opens the color picker.
+    const themeButton = event.target.closest('[data-theme]');
+    if (modeButton) {
+      themes.setChoice({ mode: modeButton.dataset.mode });
+      renderThemeOptions();
+    } else if (themeButton) {
+      themes.setChoice({ theme: themeButton.dataset.theme });
+      updateThemeSelection();
+    }
+  }
+
+  // Dragging in the color picker re-themes the app live. Only the custom preview is redrawn,
+  // because rebuilding the picker while it's open would close it.
+  function handleCustomColor(event) {
+    if (!event.target.classList.contains('custom-theme-color')) {
+      return;
+    }
+    const choice = themes.setChoice({ theme: 'custom', customColor: event.target.value });
+    const dark = document.documentElement.classList.contains('dark');
+    const preview = themeOptions.querySelector('[data-theme="custom"] .theme-preview');
+    preview.outerHTML = renderThemePreview(themes.customPalette(choice.customColor, dark));
+    updateThemeSelection();
+  }
+
   // ---------- Start ----------
 
   setUpPickers();
@@ -2416,6 +2487,18 @@
     }
   });
 
+  themeMenu.addEventListener('click', handleThemeClick);
+  themeOptions.addEventListener('input', handleCustomColor);
+  // In Auto mode the computer can switch between light and dark while the menu is open.
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderThemeOptions);
+  // The theme menu stays open while trying themes, and closes on a click anywhere else.
+  document.addEventListener('click', (event) => {
+    if (themeMenu.open && !themeMenu.contains(event.target)) {
+      themeMenu.open = false;
+    }
+  });
+
+  renderThemeOptions();
   render();
   loadWeather();
   setInterval(loadWeather, WEATHER_REFRESH_MS);

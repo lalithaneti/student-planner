@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Student Planner</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="js/theme-art.js"></script>
+    <script src="js/themes.js"></script>
   </head>
   <body>
     <header class="app-header">
@@ -18,6 +20,21 @@
         <button type="button" class="semester-button" id="semester-button" aria-haspopup="dialog">
           <span id="semester-label"></span> <span aria-hidden="true">✎</span>
         </button>
+        <details class="theme-menu">
+          <summary class="icon-button" aria-label="Theme" title="Theme"><span aria-hidden="true">🎨</span></summary>
+          <div class="theme-menu-panel" role="group" aria-label="Theme">
+            <p class="theme-menu-label" id="mode-label">Mode</p>
+            <div class="mode-switch" role="group" aria-labelledby="mode-label">
+              <button type="button" data-mode="light">☀️ Light</button>
+              <button type="button" data-mode="dark">🌙 Dark</button>
+              <button type="button" data-mode="auto">Auto</button>
+            </div>
+            <p class="theme-menu-label" id="decorated-theme-label">Decorated</p>
+            <div class="color-theme-options" id="decorated-theme-options" role="group" aria-labelledby="decorated-theme-label"></div>
+            <p class="theme-menu-label" id="theme-label">Plain colors</p>
+            <div class="color-theme-options" id="theme-options" role="group" aria-labelledby="theme-label"></div>
+          </div>
+        </details>
         <details class="add-menu">
           <summary class="primary-button">+ Add <span aria-hidden="true">▾</span></summary>
           <div class="add-menu-items" role="menu" aria-label="Add">
@@ -33,7 +50,6 @@
     </header>
 
     <p class="banner" id="banner" role="alert" hidden></p>
-    <p class="viewing-notice" id="viewing-notice" hidden></p>
 
     <main class="layout" id="layout">
       <section class="panel" id="home-panel" role="tabpanel" aria-labelledby="home-tab">

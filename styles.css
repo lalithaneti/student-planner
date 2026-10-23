@@ -12,19 +12,11 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #111113;
-    --surface: #1c1c1f;
-    --text: #edeef0;
-    --text-muted: #a0a3ab;
-    --border: #2e3035;
-    --accent: #7b9bff;
-    --accent-text: #111113;
-    --danger: #ff8589;
-    --overdue: #ff8589;
-    color-scheme: dark;
-  }
+/* Background, surface, text, border, and accent colors come from the chosen theme (js/themes.js),
+   which also adds the .dark class in dark mode. */
+:root.dark {
+  --danger: #ff8589;
+  --overdue: #ff8589;
 }
 
 * {
@@ -63,11 +55,12 @@ a {
   margin: 0 auto;
 }
 
+/* The buttons stay on one line; on a narrow phone the semester name is cut short instead. */
 .header-actions {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .app-header h1 {
@@ -83,6 +76,10 @@ a {
   font: inherit;
   font-size: 0.9rem;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .banner {
@@ -1652,10 +1649,251 @@ button:focus-visible {
   font-size: 0.8rem;
 }
 
+/* ---------- Theme menu ---------- */
+
+.theme-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.theme-menu summary {
+  list-style: none;
+}
+
+.theme-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.theme-menu[open] .icon-button {
+  border-color: var(--accent);
+}
+
+.theme-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 25;
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 15%);
+}
+
+.theme-menu-label {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.mode-switch button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mode-switch button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.color-theme-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.color-theme-options:last-child {
+  margin-bottom: 0;
+}
+
+.color-theme-option {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.color-theme-option.is-selected {
+  border-color: var(--accent);
+}
+
+.color-theme-option.is-selected > span:last-of-type::after {
+  content: ' ✓';
+  color: var(--accent);
+}
+
+.theme-preview {
+  position: relative;
+  display: block;
+  height: 40px;
+  border: 1px solid;
+  border-radius: 6px;
+}
+
+/* Faint like the page's own pattern, so the preview matches what the theme looks like. */
+.theme-preview-pattern {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: center / 120px;
+  opacity: 0.45;
+}
+
+:root.dark .theme-preview-pattern {
+  opacity: 0.2;
+}
+
+.theme-preview-card {
+  position: absolute;
+  inset: 8px 30px 8px 8px;
+  border: 1px solid;
+  border-radius: 4px;
+}
+
+.theme-preview-dot {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+/* On a phone the panel lines up with the header's edges instead of the button, so it fits on screen. */
+@media (max-width: 520px) {
+  .app-header {
+    position: relative;
+  }
+
+  .theme-menu {
+    position: static;
+  }
+
+  .theme-menu-panel {
+    top: calc(100% - 8px);
+    right: 16px;
+  }
+}
+
+/* The color input covers the whole "Your color" tile invisibly, so a click anywhere opens it. */
+.custom-theme-color {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ---------- Decorated themes ---------- */
+
+/* The artwork (js/theme-art.js) sits behind everything: a faint pattern over the whole page
+   and sprays in the two bottom corners. Cards stay solid, so text never sits on the artwork.
+   It is fainter in dark mode so it doesn't glow against the dark background. */
+:root[data-decor] body::before,
+:root[data-decor] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+:root[data-decor] body::before {
+  background: var(--decor-pattern) top left / 240px;
+  opacity: 0.4;
+}
+
+:root[data-decor] body::after {
+  background:
+    var(--decor-corner-left) left bottom / min(240px, 38vw) no-repeat,
+    var(--decor-corner-right) right bottom / min(240px, 38vw) no-repeat;
+  opacity: 0.9;
+}
+
+:root.dark[data-decor] body::before {
+  opacity: 0.16;
+}
+
+:root.dark[data-decor] body::after {
+  opacity: 0.55;
+}
+
+/* A garland strung across the top of the page, above the header. */
+:root[data-decor] body {
+  background: var(--decor-garland) top center / 160px 40px repeat-x, var(--background);
+}
+
+:root[data-decor] .app-header {
+  padding-top: 48px;
+}
+
+/* Card touches: the theme's motif before each section heading, and a band of accent on top. */
+:root[data-decor] .panel-header h2::before,
+:root[data-decor] #home-homework-heading::before,
+:root[data-decor] #home-schedule-heading::before {
+  content: '';
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 6px;
+  vertical-align: -0.15em;
+  background: var(--decor-icon) center / contain no-repeat;
+}
+
+:root[data-decor] .panel {
+  border-top: 3px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
 /* ---------- + Add dropdown ---------- */
 
 .add-menu {
   position: relative;
+  flex-shrink: 0;
 }
 
 .add-menu summary {
@@ -1851,91 +2089,77 @@ dialog::backdrop {
 /* Dark mode: a light tint of a color turns muddy on a dark background, so colored blocks,
    tags, and dots use mostly their color with dark text on top. --bright-color lifts darker
    colors (the earthy RSO ones) to at least this lightness; pastels are already above it. */
-@media (prefers-color-scheme: dark) {
-  /* Browsers that can't compute it skip this, and everything below falls back to --class-color. */
-  @supports (color: oklch(from red max(l, 0.5) c h)) {
-    [style*='--class-color'] {
-      --bright-color: oklch(from var(--class-color) max(l, 0.74) c h);
-    }
+/* Browsers that can't compute it skip this, and everything below falls back to --class-color. */
+@supports (color: oklch(from red max(l, 0.5) c h)) {
+  .dark [style*='--class-color'] {
+    --bright-color: oklch(from var(--class-color) max(l, 0.74) c h);
   }
+}
 
-  .swatch,
-  .countdowns .swatch,
-  .next-class .swatch {
-    background: var(--bright-color, var(--class-color));
-  }
+.dark .swatch,
+.dark .countdowns .swatch,
+.dark .next-class .swatch {
+  background: var(--bright-color, var(--class-color));
+}
 
-  .class-tag {
-    background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, transparent);
-    color: #1c2024;
-  }
+.dark .class-tag {
+  background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, transparent);
+  color: #1c2024;
+}
 
-  .due-item.week-item,
-  .schedule-item {
-    border-left-color: var(--bright-color, var(--class-color));
-  }
+.dark .due-item.week-item,
+.dark .schedule-item {
+  border-left-color: var(--bright-color, var(--class-color));
+}
 
-  .row-menu .class-block {
-    border-left-color: var(--bright-color, var(--class-color));
-    background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, var(--surface));
-    color: #1c2024;
-  }
+.dark .row-menu .class-block {
+  border-left-color: var(--bright-color, var(--class-color));
+  background: color-mix(in srgb, var(--bright-color, var(--class-color)) 85%, var(--surface));
+  color: #1c2024;
+}
 
-  .row-menu .class-block:hover,
-  .row-menu[open] .class-block {
-    background: var(--bright-color, var(--class-color));
-  }
+.dark .row-menu .class-block:hover,
+.dark .row-menu[open] .class-block {
+  background: var(--bright-color, var(--class-color));
+}
 
-  .class-block .class-block-details,
-  .class-block .class-block-time {
-    color: rgb(28 32 36 / 75%);
-  }
+.dark .class-block .class-block-details,
+.dark .class-block .class-block-time {
+  color: rgb(28 32 36 / 75%);
+}
 
-  .row-menu .class-block.is-exam {
-    border-color: var(--bright-color, var(--class-color));
-  }
+.dark .row-menu .class-block.is-exam {
+  border-color: var(--bright-color, var(--class-color));
+}
 
-  /* A light dashed outline still marks one-time events against their bright fill. */
-  .row-menu .class-block.is-event {
-    border-color: rgb(255 255 255 / 75%);
-    border-left-color: var(--bright-color, var(--class-color));
-  }
+/* A light dashed outline still marks one-time events against their bright fill. */
+.dark .row-menu .class-block.is-event {
+  border-color: rgb(255 255 255 / 75%);
+  border-left-color: var(--bright-color, var(--class-color));
+}
 
-  .row-menu .class-block.is-exam {
-    background: var(--bright-color, var(--class-color));
-    box-shadow: 0 0 0 2px var(--surface);
-  }
+.dark .row-menu .class-block.is-exam {
+  background: var(--bright-color, var(--class-color));
+  box-shadow: 0 0 0 2px var(--surface);
+}
 
-  .exam-tag {
-    background: #1c2024;
-    color: var(--bright-color, var(--class-color));
-  }
+.dark .exam-tag {
+  background: #1c2024;
+  color: var(--bright-color, var(--class-color));
+}
 
-  /* Cancelled blocks stay dark and faded, so they still read as "not happening". */
-  .row-menu .class-block.is-cancelled {
-    background: var(--surface);
-    color: var(--text);
-  }
+/* Cancelled blocks stay dark and faded, so they still read as "not happening". */
+.dark .row-menu .class-block.is-cancelled {
+  background: var(--surface);
+  color: var(--text);
+}
 
-  .class-block.is-cancelled .class-block-details,
-  .class-block.is-cancelled .class-block-time {
-    color: var(--text-muted);
-  }
+.dark .class-block.is-cancelled .class-block-details,
+.dark .class-block.is-cancelled .class-block-time {
+  color: var(--text-muted);
 }
 
 /* ---------- Semesters ---------- */
-
-.viewing-notice {
-  width: min(728px, calc(100% - 32px));
-  margin: 0 auto 12px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--background));
-}
-
-.viewing-notice[hidden] {
-  display: none;
-}
 
 .current-tag {
   color: var(--text-muted);

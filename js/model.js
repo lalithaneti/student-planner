@@ -130,11 +130,6 @@ const PlannerModel = (() => {
     return state;
   }
 
-  // The semester with the latest start: the one you're in, unless you're looking back.
-  function latestSemester(state) {
-    return [...state.semesters].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
-  }
-
   // A sensible starting semester based on today's date; the user can edit it.
   function defaultSemester(today) {
     const year = today.getFullYear();
@@ -845,7 +840,6 @@ const PlannerModel = (() => {
     nextSemesterGuess,
     validateSemester,
     startNewSemester,
-    latestSemester,
     calendarBlocksOn,
     upcomingExams,
     nextClass,
