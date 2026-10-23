@@ -894,7 +894,7 @@
     return days === 1 ? 'tomorrow' : `in ${days} days`;
   }
 
-  // "★ Exams: MATH 241 Midterm 1 · Thu, Nov 5, 7:00 PM · in 5 days", for the next two weeks.
+  // "★ Exams: MATH 241 Midterm 1 · Thu, Nov 5, 7:00 PM · in 5 days", for the next 30 days.
   function renderExamCountdown() {
     const exams = model.upcomingExams(state, todayKey(), currentTime());
     if (exams.length === 0) {

@@ -626,9 +626,12 @@ const PlannerModel = (() => {
     return [...meetings, ...exams, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
-  // Exams from now through the next two weeks, soonest first, with how many days away each is.
+  // How far ahead the exam countdown looks.
+  const EXAM_COUNTDOWN_DAYS = 30;
+
+  // Exams from now through the next 30 days, soonest first, with how many days away each is.
   function upcomingExams(state, todayKey, nowTime) {
-    const lastDay = addDays(todayKey, 14);
+    const lastDay = addDays(todayKey, EXAM_COUNTDOWN_DAYS);
     return examsOf(state)
       .filter((exam) => exam.date <= lastDay && (exam.date > todayKey || (exam.date === todayKey && exam.endTime > nowTime)))
       .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
