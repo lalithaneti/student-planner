@@ -49,6 +49,8 @@
   // How many decorations drift down behind each banner.
   const BANNER_DECORATION_COUNT = 12;
   const TOAST_DURATION_MS = 6000;
+  const WEATHER_REFRESH_MS = 30 * 60 * 1000;
+  const LOCATION_TIMEOUT_MS = 15 * 1000;
   const VIEW_STORAGE_KEY = 'student-planner-view';
   // Height of one hour on the calendar, in pixels.
   const HOUR_HEIGHT = 56;
@@ -73,6 +75,8 @@
   let showDone = false;
   let showMissed = false;
   let toastTimer = null;
+  // Weather for Home: { status: 'loading' | 'ready' | 'denied' | 'unavailable', ...readWeather's fields }.
+  let weather = { status: 'loading' };
   // The greeting slides in once when the app opens, not again at each minute's redraw.
   let greetingHasArrived = false;
   let resolveChoice = null;
@@ -923,6 +927,57 @@
     return `<span class="sky-sun">☀️</span>${clouds}${renderSkyFlyer(period)}`;
   }
 
+  // ---------- Weather ----------
+
+  function renderWeather() {
+    switch (weather.status) {
+      case 'ready':
+        return `<span aria-hidden="true">${weather.icon}</span> <strong>${weather.temperature}°F</strong> · ${weather.label} · H ${weather.high}° L ${weather.low}°`;
+      case 'denied':
+        // Once location is blocked, browsers don't ask again until it's allowed in the site settings.
+        return 'Allow location to see the weather (in your browser’s settings for this site). <button type="button" class="sky-button" data-action="retry-weather">Try again</button>';
+      case 'unavailable':
+        return 'Weather unavailable right now. <button type="button" class="sky-button" data-action="retry-weather">Try again</button>';
+      default:
+        return 'Checking the weather…';
+    }
+  }
+
+  // Updates just the weather line, so a redraw doesn't close any open ⋯ menu.
+  function showWeather(next) {
+    weather = next;
+    const line = document.getElementById('sky-weather');
+    if (line) {
+      line.innerHTML = renderWeather();
+    }
+  }
+
+  async function fetchWeather(position) {
+    try {
+      const response = await fetch(model.weatherUrl(position.coords.latitude, position.coords.longitude));
+      const reading = response.ok ? model.readWeather(await response.json()) : null;
+      showWeather(reading ? { status: 'ready', ...reading } : { status: 'unavailable' });
+    } catch {
+      showWeather({ status: 'unavailable' });
+    }
+  }
+
+  // Asks the browser where we are (it asks the person the first time), then gets the weather there.
+  function loadWeather() {
+    if (!('geolocation' in navigator)) {
+      showWeather({ status: 'unavailable' });
+      return;
+    }
+    if (weather.status !== 'ready') {
+      showWeather({ status: 'loading' });
+    }
+    navigator.geolocation.getCurrentPosition(
+      fetchWeather,
+      (error) => showWeather({ status: error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable' }),
+      { timeout: LOCATION_TIMEOUT_MS, maximumAge: WEATHER_REFRESH_MS },
+    );
+  }
+
   function renderGreeting(now, nowTime) {
     const period = skyPeriod(now.getHours());
     const html = `
@@ -932,6 +987,7 @@
           <span aria-hidden="true">${renderWavingText(period.greeting)}</span>
         </h2>
         <p class="sky-date">${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${model.formatTime(nowTime)}</p>
+        <p class="sky-weather" id="sky-weather" aria-live="polite">${renderWeather()}</p>
       </div>`;
     greetingHasArrived = true;
     return html;
@@ -2100,6 +2156,8 @@
       weekStart = model.startOfWeek(todayKey());
       renderDueList();
       renderCalendar();
+    } else if (action === 'retry-weather') {
+      loadWeather();
     } else if (action === 'toggle-later') {
       showLater = !showLater;
       renderDueList();
@@ -2248,4 +2306,6 @@
   });
 
   render();
+  loadWeather();
+  setInterval(loadWeather, WEATHER_REFRESH_MS);
 })();

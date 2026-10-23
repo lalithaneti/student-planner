@@ -636,6 +636,54 @@ const PlannerModel = (() => {
     return null;
   }
 
+  // ---------- Weather ----------
+
+  // Open-Meteo reports conditions as WMO weather codes. Each range gets an icon and words;
+  // clear skies show a moon at night.
+  const WEATHER_CODES = [
+    { codes: [0], day: '☀️', night: '🌙', label: 'Clear' },
+    { codes: [1], day: '🌤️', night: '🌙', label: 'Mostly clear' },
+    { codes: [2], day: '⛅', night: '☁️', label: 'Partly cloudy' },
+    { codes: [3], day: '☁️', night: '☁️', label: 'Cloudy' },
+    { codes: [45, 48], day: '🌫️', night: '🌫️', label: 'Foggy' },
+    { codes: [51, 53, 55, 56, 57], day: '🌦️', night: '🌧️', label: 'Drizzle' },
+    { codes: [61, 63, 65, 66, 67, 80, 81, 82], day: '🌧️', night: '🌧️', label: 'Rain' },
+    { codes: [71, 73, 75, 77, 85, 86], day: '🌨️', night: '🌨️', label: 'Snow' },
+    { codes: [95, 96, 99], day: '⛈️', night: '⛈️', label: 'Thunderstorms' },
+  ];
+
+  function describeWeather(code, isDay) {
+    const match = WEATHER_CODES.find((entry) => entry.codes.includes(code));
+    if (!match) {
+      return { icon: '🌡️', label: 'Weather' };
+    }
+    return { icon: isDay ? match.day : match.night, label: match.label };
+  }
+
+  // Locations are rounded to 2 decimal places (about a kilometer) before being sent,
+  // which is plenty for weather and doesn't share an exact address.
+  function weatherUrl(latitude, longitude) {
+    const round = (value) => (Math.round(value * 100) / 100).toFixed(2);
+    return (
+      `https://api.open-meteo.com/v1/forecast?latitude=${round(latitude)}&longitude=${round(longitude)}` +
+      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min' +
+      '&temperature_unit=fahrenheit&timezone=auto&forecast_days=1'
+    );
+  }
+
+  // Turns Open-Meteo's answer into { temperature, high, low, icon, label }, or null if
+  // it's missing anything.
+  function readWeather(response) {
+    const current = response && response.current;
+    const daily = response && response.daily;
+    const numbers = [current?.temperature_2m, daily?.temperature_2m_max?.[0], daily?.temperature_2m_min?.[0]];
+    if (!current || !numbers.every((value) => typeof value === 'number')) {
+      return null;
+    }
+    const [temperature, high, low] = numbers.map(Math.round);
+    return { temperature, high, low, ...describeWeather(current.weather_code, current.is_day === 1) };
+  }
+
   function formatTime(time) {
     const [hours, minutes] = time.split(':').map(Number);
     const suffix = hours < 12 ? 'AM' : 'PM';
@@ -733,6 +781,9 @@ const PlannerModel = (() => {
     upcomingExams,
     nextClass,
     formatTimeRange,
+    describeWeather,
+    weatherUrl,
+    readWeather,
     formatTime,
     formatDate,
     formatMonthDay,
