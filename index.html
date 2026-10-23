@@ -327,6 +327,38 @@
       </section>
     </aside>
 
+    <dialog id="quick-add-dialog" aria-labelledby="quick-add-heading">
+      <form id="quick-add-form" novalidate>
+        <h2 id="quick-add-heading">Add homework</h2>
+        <label class="field">
+          <span>What’s due?</span>
+          <input name="title" type="text" maxlength="100" placeholder="e.g. Problem set 5" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Class</span>
+          <select name="classId" id="quick-add-class"></select>
+        </label>
+        <fieldset class="field">
+          <legend>Due</legend>
+          <div class="day-picker" id="quick-add-days"></div>
+        </fieldset>
+        <div class="field-row">
+          <label class="field">
+            <span>Or pick a date</span>
+            <input name="dueDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Time</span>
+            <input name="dueTime" type="time" />
+          </label>
+        </div>
+        <ul class="form-errors" id="quick-add-errors" role="alert"></ul>
+        <div class="button-row">
+          <button type="submit" class="primary-button">Add</button>
+          <button type="button" class="text-button" id="quick-add-cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
     <dialog id="semester-dialog" aria-labelledby="semester-dialog-heading">
       <form id="semester-form" method="dialog" novalidate>
         <h2 id="semester-dialog-heading">Semester</h2>
@@ -358,6 +390,16 @@
       <h3 class="subheading">Your semesters</h3>
       <ul class="class-list" id="semester-list"></ul>
       <button type="button" class="secondary-button new-semester-button" data-action="open-new-semester">+ Start new semester…</button>
+      <h3 class="subheading">Backup</h3>
+      <p class="hint">Saves everything (every semester’s classes, assignments, checkmarks, exams, breaks, RSOs, events, and your theme) to a file. Restore it here or in another browser.</p>
+      <div class="button-row backup-buttons">
+        <button type="button" class="secondary-button" id="download-backup">Download backup</button>
+        <label class="secondary-button file-button">
+          Restore from backup…
+          <input type="file" id="restore-backup" accept=".json,application/json" />
+        </label>
+      </div>
+      <p class="backup-status" id="backup-status" role="status"></p>
     </dialog>
 
     <dialog id="new-semester-dialog" aria-labelledby="new-semester-heading">

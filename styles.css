@@ -877,6 +877,24 @@ button:focus-visible {
   margin-top: 0;
 }
 
+/* Home's "Due today" heading with + Add homework on the right. */
+.home-box-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-bottom: 6px;
+}
+
+.home-box-heading .due-heading {
+  margin: 0;
+}
+
+.home-box-heading .text-button {
+  font-weight: 600;
+}
+
 .due-heading.overdue {
   color: var(--overdue);
 }
@@ -2169,6 +2187,39 @@ dialog::backdrop {
 
 .new-semester-button {
   margin-top: 12px;
+}
+
+/* "Restore from backup…" looks like a button; the file picker inside it is hidden. */
+.backup-buttons {
+  flex-wrap: wrap;
+}
+
+.file-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.file-button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.backup-status {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.backup-status:empty {
+  display: none;
 }
 
 .rso-checklist {

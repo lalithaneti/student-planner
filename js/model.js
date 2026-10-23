@@ -775,6 +775,24 @@ const PlannerModel = (() => {
   }
 
   // Returns a list of problems with a new assignment; empty means it is valid.
+  // Quick add's day buttons: Today, Tomorrow, then the next five days by weekday name.
+  function quickAddDays(today) {
+    return Array.from({ length: 7 }, (_, offset) => {
+      const date = addDays(today, offset);
+      const label = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : WEEKDAY_NAMES[parseDateKey(date).getDay()];
+      return { date, label };
+    });
+  }
+
+  // The time a class's homework is usually due: the due time of its newest repeating
+  // assignment this semester, or 11:59 PM if it has none.
+  function usualDueTime(state, classId) {
+    const repeating = state.assignments.filter(
+      (assignment) => assignment.semesterId === state.currentSemesterId && assignment.classId === classId && assignment.kind === 'weekly',
+    );
+    return repeating.length > 0 ? repeating[repeating.length - 1].dueTime : '23:59';
+  }
+
   function validateAssignment(assignment) {
     const errors = [];
     if (!assignment.title.trim()) {
@@ -830,6 +848,8 @@ const PlannerModel = (() => {
     buildWeek,
     detachOccurrence,
     newRecurringAssignment,
+    quickAddDays,
+    usualDueTime,
     timeToMinutes,
     validateMeeting,
     buildCalendarWeek,

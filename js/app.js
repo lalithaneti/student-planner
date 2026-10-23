@@ -87,6 +87,12 @@
   let weekStart = model.startOfWeek(todayKey());
 
   const elements = {
+    backupStatus: document.getElementById('backup-status'),
+    restoreBackupInput: document.getElementById('restore-backup'),
+    quickAddDialog: document.getElementById('quick-add-dialog'),
+    quickAddForm: document.getElementById('quick-add-form'),
+    quickAddDays: document.getElementById('quick-add-days'),
+    quickAddErrors: document.getElementById('quick-add-errors'),
     semesterLabel: document.getElementById('semester-label'),
     semesterButton: document.getElementById('semester-button'),
     semesterDialog: document.getElementById('semester-dialog'),
@@ -1093,7 +1099,10 @@
       ${renderBreakCountdown()}
       <div class="home-columns">
         <section class="home-box" aria-labelledby="home-homework-heading">
-          <h3 class="due-heading" id="home-homework-heading">Due today ${dueToday.length > 0 ? `<span class="count">${doneCount} of ${dueToday.length} done</span>` : ''}</h3>
+          <div class="home-box-heading">
+            <h3 class="due-heading" id="home-homework-heading">Due today ${dueToday.length > 0 ? `<span class="count">${doneCount} of ${dueToday.length} done</span>` : ''}</h3>
+            <button type="button" class="text-button" data-action="open-quick-add">+ Add homework</button>
+          </div>
           ${homework}
         </section>
         <section class="home-box" aria-labelledby="home-schedule-heading">
@@ -1985,6 +1994,7 @@
     form.elements.endDate.value = semester.endDate;
     form.elements.schoolYearEndDate.value = model.schoolYearEnd(semester);
     showErrors(elements.semesterErrors, []);
+    elements.backupStatus.textContent = '';
     elements.semesterDialog.showModal();
   }
 
@@ -2009,6 +2019,123 @@
     applyChange('Semester saved.', () => Object.assign(currentSemester(), { name, startDate, endDate, schoolYearEndDate }));
     elements.semesterDialog.close();
     resetAssignmentDates();
+  }
+
+  // ---------- Quick add ----------
+
+  // A short form on Home for homework mentioned in class: name, class, and day. It's a pop-up box
+  // instead of part of Home, because Home redraws every minute and would wipe what's typed.
+  function openQuickAdd() {
+    const form = elements.quickAddForm;
+    const classes = currentClasses();
+    form.elements.classId.innerHTML = [
+      ...classes.map((plannerClass) => `<option value="${plannerClass.id}">${escapeHtml(plannerClass.name)}</option>`),
+      '<option value="">No class</option>',
+    ].join('');
+    form.elements.title.value = '';
+    elements.quickAddDays.innerHTML = model
+      .quickAddDays(todayKey())
+      .map(({ date, label }) => `<label class="day-option"><input type="radio" name="quickDay" value="${date}" /><span>${label}</span></label>`)
+      .join('');
+    setQuickAddDate(todayKey());
+    form.elements.dueTime.value = model.usualDueTime(state, form.elements.classId.value || null);
+    showErrors(elements.quickAddErrors, []);
+    elements.quickAddDialog.showModal();
+    form.elements.title.focus();
+  }
+
+  // The date box is the one answer; the day buttons fill it in, and a matching button lights up.
+  function setQuickAddDate(date) {
+    const form = elements.quickAddForm;
+    form.elements.dueDate.value = date;
+    elements.quickAddDays.querySelectorAll('input').forEach((input) => {
+      input.checked = input.value === date;
+    });
+  }
+
+  function handleQuickAddChange(event) {
+    const form = elements.quickAddForm;
+    if (event.target.name === 'quickDay' || event.target.name === 'dueDate') {
+      setQuickAddDate(event.target.value);
+    } else if (event.target.name === 'classId') {
+      form.elements.dueTime.value = model.usualDueTime(state, event.target.value || null);
+    }
+  }
+
+  function handleQuickAddSubmit(event) {
+    event.preventDefault();
+    const form = elements.quickAddForm;
+    const fields = {
+      classId: form.elements.classId.value || null,
+      title: form.elements.title.value.trim(),
+      link: '',
+      dueTime: form.elements.dueTime.value,
+      lateAllowed: true,
+      dueDate: form.elements.dueDate.value,
+    };
+    const errors = model.validateAssignment({ kind: 'once', ...fields });
+    showErrors(elements.quickAddErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    const assignment = { id: newId('assignment'), semesterId: state.currentSemesterId, kind: 'once', ...fields, done: false };
+    elements.quickAddDialog.close();
+    applyChange(`Added “${assignment.title}” for ${model.formatDate(assignment.dueDate)}.`, () => state.assignments.push(assignment));
+  }
+
+  // ---------- Backup ----------
+
+  // Saves the planner to a file in the browser's Downloads, named with today's date.
+  function downloadBackup() {
+    const fileName = `planner-backup-${todayKey()}.json`;
+    const file = new Blob([PlannerStorage.createBackup(state, themes.getChoice(), new Date())], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(file);
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    elements.backupStatus.textContent = `Downloaded ${fileName}. Keep it somewhere safe, like your cloud drive.`;
+  }
+
+  function describeBackup(planner) {
+    const count = (number, singular, plural) => `${number} ${number === 1 ? singular : plural}`;
+    return [
+      count(planner.classes.length, 'class', 'classes'),
+      count(planner.assignments.length, 'assignment', 'assignments'),
+      count(planner.semesters.length, 'semester', 'semesters'),
+    ].join(', ');
+  }
+
+  // Replaces the whole planner with a backup file, after asking. Undo puts the old planner back.
+  async function restoreBackup() {
+    const input = elements.restoreBackupInput;
+    const file = input.files[0];
+    input.value = ''; // So choosing the same file again still counts as a change.
+    if (!file) {
+      return;
+    }
+    const { backup, error } = PlannerStorage.readBackup(await file.text());
+    if (error) {
+      elements.backupStatus.textContent = error;
+      return;
+    }
+    elements.backupStatus.textContent = '';
+    elements.semesterDialog.close();
+    const from = backup.savedAt ? ` from ${model.formatDate(model.toDateKey(backup.savedAt))}` : '';
+    const confirmed = await askToConfirm(
+      `Replace everything in this planner with the backup${from}? It has ${describeBackup(backup.planner)}.`,
+      'Restore',
+    );
+    if (!confirmed) {
+      return;
+    }
+    applyChange(`Restored the backup${from}.`, () => {
+      state = backup.planner;
+    });
+    if (backup.theme) {
+      themes.setChoice(backup.theme);
+      renderThemeOptions();
+    }
   }
 
   // ---------- Starting and switching semesters ----------
@@ -2254,6 +2381,8 @@
       weekStart = model.startOfWeek(todayKey());
       renderDueList();
       renderCalendar();
+    } else if (action === 'open-quick-add') {
+      openQuickAdd();
     } else if (action === 'open-new-semester') {
       openNewSemesterDialog();
     } else if (action === 'switch-semester') {
@@ -2379,6 +2508,11 @@
   elements.examCancel.addEventListener('click', () => setDrawerOpen(false));
   elements.classCancel.addEventListener('click', stopEditingClass);
   elements.semesterButton.addEventListener('click', openSemesterDialog);
+  elements.quickAddForm.addEventListener('submit', handleQuickAddSubmit);
+  elements.quickAddForm.addEventListener('change', handleQuickAddChange);
+  document.getElementById('quick-add-cancel').addEventListener('click', () => elements.quickAddDialog.close());
+  document.getElementById('download-backup').addEventListener('click', downloadBackup);
+  elements.restoreBackupInput.addEventListener('change', restoreBackup);
   elements.semesterForm.addEventListener('submit', handleSemesterSubmit);
   document.getElementById('semester-cancel').addEventListener('click', () => elements.semesterDialog.close());
   elements.newSemesterForm.addEventListener('submit', handleNewSemesterSubmit);

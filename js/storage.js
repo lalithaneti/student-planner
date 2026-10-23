@@ -65,5 +65,37 @@ const PlannerStorage = (() => {
     }
   }
 
-  return { createEmptyState, load, save };
+  const BACKUP_APP = 'student-planner-backup';
+
+  // A backup file holds the whole planner plus the theme, with a label so restoring can
+  // tell it apart from any other file.
+  function createBackup(state, theme, now) {
+    return JSON.stringify({ app: BACKUP_APP, savedAt: now.toISOString(), planner: state, theme }, null, 2);
+  }
+
+  // Returns { backup } with the planner, theme, and when it was saved, or { error } explaining what's wrong.
+  function readBackup(text) {
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { error: 'That file isn’t a planner backup. Choose a file made with “Download backup”.' };
+    }
+    if (parsed === null || typeof parsed !== 'object' || parsed.app !== BACKUP_APP) {
+      return { error: 'That file isn’t a planner backup. Choose a file made with “Download backup”.' };
+    }
+    if (!looksLikeState(parsed.planner)) {
+      return { error: 'That backup is damaged or from a newer version of the planner, so it can’t be restored.' };
+    }
+    const savedAt = new Date(parsed.savedAt);
+    return {
+      backup: {
+        planner: PlannerModel.updateOldColors(parsed.planner),
+        theme: parsed.theme ?? null,
+        savedAt: Number.isNaN(savedAt.getTime()) ? null : savedAt,
+      },
+    };
+  }
+
+  return { createEmptyState, load, save, createBackup, readBackup };
 })();
