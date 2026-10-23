@@ -599,6 +599,21 @@ body.home-tab .app-header {
   color: var(--text);
 }
 
+/* On a phone the four tabs share one full-width row. */
+@media (max-width: 520px) {
+  .tabs {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
+  .tabs button {
+    padding: 8px 4px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+}
+
 .empty {
   color: var(--text-muted);
   margin: 8px 0;
@@ -2233,4 +2248,309 @@ dialog::backdrop {
 
 .rso-checklist small {
   color: var(--text-muted);
+}
+
+/* ---------- Study Buddy ---------- */
+
+.buddy-muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.is-gain {
+  color: #18794e;
+}
+
+.is-loss {
+  color: var(--danger);
+}
+
+:root.dark .is-gain {
+  color: #3dd68c;
+}
+
+.buddy-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+/* The buddy gently squishes, blinks, and (as an egg) wobbles. */
+.buddy-body {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: buddy-squish 3.2s ease-in-out infinite;
+}
+
+.buddy-egg {
+  animation: buddy-wobble 3.6s ease-in-out infinite;
+}
+
+.buddy-eyes {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: buddy-blink 4.5s infinite;
+}
+
+.buddy-zzz {
+  animation: buddy-zzz 3s ease-in-out infinite;
+}
+
+.buddy-sparkle {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: buddy-twinkle 2.8s ease-in-out infinite;
+}
+
+@keyframes buddy-squish {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.04, 0.95);
+  }
+}
+
+@keyframes buddy-wobble {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  70% {
+    transform: rotate(-5deg);
+  }
+  80% {
+    transform: rotate(5deg);
+  }
+  90% {
+    transform: rotate(-2deg);
+  }
+}
+
+@keyframes buddy-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes buddy-zzz {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 4px);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate(4px, -6px);
+  }
+}
+
+@keyframes buddy-twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-body,
+  .buddy-eyes,
+  .buddy-zzz,
+  .buddy-sparkle {
+    animation: none;
+  }
+}
+
+/* Home: a card that opens the Study Buddy tab. */
+.buddy-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.buddy-card:hover {
+  border-color: var(--accent);
+}
+
+.buddy-card-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.buddy-card-points {
+  font-weight: 600;
+}
+
+.buddy-card-arrow {
+  color: var(--text-muted);
+  font-size: 1.6rem;
+}
+
+.buddy-progress {
+  width: 100%;
+  max-width: 240px;
+}
+
+.buddy-progress .progress-fill {
+  background: linear-gradient(90deg, #ff9ebd, #c9a7ff);
+}
+
+.buddy-progress.is-wide {
+  max-width: 320px;
+  height: 12px;
+  margin: 0 auto;
+}
+
+/* The Study Buddy tab. */
+.buddy-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 820px) {
+  .buddy-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.buddy-home {
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
+  text-align: center;
+}
+
+.buddy-big {
+  width: min(240px, 70%);
+  margin: 0 auto;
+}
+
+.buddy-name-form {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.buddy-name-form .field {
+  margin: 0;
+  text-align: left;
+}
+
+.buddy-big-points {
+  margin: 12px 0 8px;
+  font-size: 1.1rem;
+}
+
+.buddy-big-points strong {
+  font-size: 1.8rem;
+}
+
+.buddy-side {
+  display: grid;
+  gap: 14px;
+}
+
+.buddy-rules {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.buddy-rules li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.buddy-stages {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.buddy-stage-item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.buddy-stage-item .buddy-art {
+  width: 56px;
+}
+
+/* Stages not reached yet are mystery silhouettes, in gray that shows in light and dark mode. */
+.buddy-stage-item.is-locked .buddy-art {
+  filter: contrast(0);
+  opacity: 0.4;
+}
+
+.buddy-stage-item .buddy-art * {
+  animation: none;
+}
+
+.buddy-log {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buddy-log-item {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr);
+  column-gap: 8px;
+  padding: 6px 10px;
+  border-left: 4px solid var(--class-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--class-color) 10%, var(--surface));
+}
+
+.buddy-log-points {
+  grid-row: span 2;
+  align-self: center;
+  font-weight: 700;
+}
+
+.buddy-log-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

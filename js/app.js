@@ -4,6 +4,7 @@
 (() => {
   const model = PlannerModel;
   const themes = PlannerThemes;
+  const buddy = PlannerBuddy;
 
   const NO_CLASS_COLOR = '#8b8d98';
   // Pennant colors and decorations for each break banner theme.
@@ -61,6 +62,11 @@
 
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
+  // Planners from before the Study Buddy get one that starts counting today.
+  if (!state.buddy) {
+    state.buddy = buddy.newBuddy(model.toDateKey(new Date()));
+    PlannerStorage.save(state);
+  }
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
@@ -113,6 +119,8 @@
     assignmentsPanel: document.getElementById('assignments-panel'),
     calendarPanel: document.getElementById('calendar-panel'),
     calendar: document.getElementById('calendar'),
+    buddyPanel: document.getElementById('buddy-panel'),
+    buddy: document.getElementById('buddy'),
     meetingList: document.getElementById('meeting-list'),
     recurringList: document.getElementById('recurring-list'),
     existingRecurring: document.getElementById('existing-recurring'),
@@ -242,14 +250,15 @@
     listElement.innerHTML = errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('');
   }
 
-  // Applies a change, saves it, redraws, and shows a message with Undo.
+  // Applies a change, saves it, redraws, and shows a message with Undo. The message can
+  // be a function, for messages that depend on the result of the change.
   function applyChange(message, change) {
     const before = JSON.stringify(state);
     change();
     if (!PlannerStorage.save(state)) {
       showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
     } else {
-      showToast(message, before);
+      showToast(typeof message === 'function' ? message() : message, before);
     }
     render();
   }
@@ -315,6 +324,7 @@
     renderDueList();
     renderCalendar();
     renderHome();
+    renderBuddy();
   }
 
   function renderTabs() {
@@ -322,6 +332,7 @@
     elements.homePanel.hidden = currentTab !== 'home';
     elements.assignmentsPanel.hidden = currentTab !== 'assignments';
     elements.calendarPanel.hidden = currentTab !== 'calendar';
+    elements.buddyPanel.hidden = currentTab !== 'buddy';
     document.body.classList.toggle('calendar-tab', currentTab === 'calendar');
     document.body.classList.toggle('home-tab', currentTab === 'home');
   }
@@ -1097,6 +1108,7 @@
     elements.home.innerHTML = `
       ${renderGreeting(now, nowTime)}
       ${renderBreakCountdown()}
+      ${renderBuddyCard()}
       <div class="home-columns">
         <section class="home-box" aria-labelledby="home-homework-heading">
           <div class="home-box-heading">
@@ -2131,11 +2143,143 @@
     }
     applyChange(`Restored the backup${from}.`, () => {
       state = backup.planner;
+      if (!state.buddy) {
+        state.buddy = buddy.newBuddy(todayKey());
+      }
     });
     if (backup.theme) {
       themes.setChoice(backup.theme);
       renderThemeOptions();
     }
+  }
+
+  // ---------- Study Buddy ----------
+
+  function buddyPoints() {
+    return buddy.totalPoints(buddy.pointsLog(state, todayKey(), currentTime()));
+  }
+
+  const GROWN_MESSAGES = ['', 'hatched! 🐣', 'grew little ears! 🐾', 'is all grown up! 🌼'];
+
+  // " +10 ✨" after a check-off, plus news when the buddy reaches a new stage.
+  function describePointsChange(pointsBefore) {
+    const pointsAfter = buddyPoints();
+    const change = pointsAfter - pointsBefore;
+    if (change === 0) {
+      return '';
+    }
+    const stageBefore = buddy.stageFor(pointsBefore).index;
+    const stageAfter = buddy.stageFor(pointsAfter).index;
+    const grown = stageAfter > stageBefore ? ` ${buddy.displayName(state.buddy)} ${GROWN_MESSAGES[stageAfter]}` : '';
+    return change > 0 ? ` +${change} ✨${grown}` : ` (−${-change} points)`;
+  }
+
+  function growHint(where) {
+    if (!where.next) {
+      return 'All grown up! Keep it happy by finishing your work.';
+    }
+    const plural = where.pointsToNext === 1 ? '' : 's';
+    return `${where.pointsToNext} more point${plural} to ${where.stage.growVerb}`;
+  }
+
+  function renderBuddyProgress(where, className = '') {
+    const percent = Math.round(where.progress * 100);
+    return `<span class="progress-bar buddy-progress ${className}" role="progressbar" aria-label="Growth" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+        <span class="progress-fill" style="width: ${percent}%"></span>
+      </span>`;
+  }
+
+  function renderBuddyCard() {
+    const points = buddyPoints();
+    const where = buddy.stageFor(points);
+    return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
+        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress)}</span>
+        <span class="buddy-card-text">
+          <span><strong>${escapeHtml(buddy.displayName(state.buddy))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
+          <span class="buddy-card-points">${points} point${points === 1 ? '' : 's'}</span>
+          ${renderBuddyProgress(where)}
+          <span class="buddy-muted">${growHint(where)}</span>
+        </span>
+        <span class="buddy-card-arrow" aria-hidden="true">›</span>
+      </button>`;
+  }
+
+  function renderPointsEntry({ item, points, reason }) {
+    const sign = points > 0 ? `+${points}` : `−${-points}`;
+    return `<li class="buddy-log-item" style="--class-color: ${itemColor(item)}">
+        <span class="buddy-log-points ${points > 0 ? 'is-gain' : 'is-loss'}">${sign}</span>
+        <span class="buddy-log-title">${escapeHtml(item.assignment.title)}</span>
+        <span class="buddy-muted">${renderClassTag(item)} · ${model.formatDate(item.date)}${reason === 'done' ? '' : ` · ${reason}`}</span>
+      </li>`;
+  }
+
+  function renderBuddyStages(where) {
+    return buddy.STAGES.map((stage, index) => {
+      const reached = index <= where.index;
+      return `<li class="buddy-stage-item ${reached ? 'is-reached' : 'is-locked'}">
+          ${buddy.drawBuddy(index)}
+          <span>${reached ? stage.name : '???'}</span>
+          <span class="buddy-muted">${stage.minPoints} pts</span>
+        </li>`;
+    }).join('');
+  }
+
+  const RECENT_POINTS_COUNT = 8;
+
+  function renderBuddy() {
+    const log = buddy.pointsLog(state, todayKey(), currentTime());
+    const points = buddy.totalPoints(log);
+    const where = buddy.stageFor(points);
+    const recent =
+      log.length === 0
+        ? '<p class="empty">Check off an assignment to earn your first points!</p>'
+        : `<ul class="buddy-log">${log.slice(0, RECENT_POINTS_COUNT).map(renderPointsEntry).join('')}</ul>`;
+    elements.buddy.innerHTML = `
+      <div class="buddy-layout">
+        <section class="buddy-home">
+          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress)}</div>
+          <form class="buddy-name-form" id="buddy-name-form">
+            <label class="field">
+              <span>Name</span>
+              <input type="text" name="name" maxlength="20" autocomplete="off" placeholder="Give your buddy a name" value="${escapeHtml(state.buddy.name)}" />
+            </label>
+            <button type="submit" class="secondary-button">Save</button>
+          </form>
+          <ul class="form-errors" id="buddy-name-errors" role="alert"></ul>
+          <p class="buddy-big-points"><strong>${points}</strong> point${points === 1 ? '' : 's'} · ${where.stage.name}</p>
+          ${renderBuddyProgress(where, 'is-wide')}
+          <p class="buddy-muted">${growHint(where)}</p>
+        </section>
+        <div class="buddy-side">
+          <section class="home-box">
+            <h3 class="due-heading">How your buddy grows</h3>
+            <ul class="buddy-rules">
+              <li><span>Check off work on time</span> <strong class="is-gain">+${buddy.ON_TIME_POINTS}</strong></li>
+              <li><span>Check it off late</span> <strong class="is-gain">+${buddy.LATE_POINTS}</strong></li>
+              <li><span>Missed (no late work allowed)</span> <strong class="is-loss">−${-buddy.MISSED_POINTS}</strong></li>
+            </ul>
+            <p class="buddy-muted">Counts work due from ${model.formatDate(state.buddy.startDate)} on.</p>
+            <ol class="buddy-stages">${renderBuddyStages(where)}</ol>
+          </section>
+          <section class="home-box">
+            <h3 class="due-heading">Recent points</h3>
+            ${recent}
+          </section>
+        </div>
+      </div>`;
+  }
+
+  function handleBuddyNameSubmit(event) {
+    event.preventDefault();
+    const name = new FormData(event.target).get('name').trim();
+    const errors = buddy.validateName(name);
+    showErrors(document.getElementById('buddy-name-errors'), errors);
+    if (errors.length > 0) {
+      return;
+    }
+    applyChange(name ? `Named your buddy ${name} 💕` : 'Cleared your buddy’s name.', () => {
+      state.buddy.name = name;
+    });
   }
 
   // ---------- Starting and switching semesters ----------
@@ -2226,7 +2370,11 @@
 
     if (action === 'toggle-done') {
       const nowDone = target.checked;
-      applyChange(nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`, () => {
+      const item = { assignment, date, time: assignment.dueTime };
+      const pointsBefore = buddyPoints();
+      const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
+      applyChange(() => message + describePointsChange(pointsBefore), () => {
+        buddy.recordCheckOff(state.buddy, item, nowDone, todayKey(), currentTime());
         if (assignment.kind === 'once') {
           assignment.done = nowDone;
         } else if (nowDone) {
@@ -2580,6 +2728,10 @@
       renderDueList();
       renderCalendar();
       renderHome();
+      // Redrawing would wipe out a name being typed.
+      if (!elements.buddy.contains(document.activeElement)) {
+        renderBuddy();
+      }
     }
   }
   setTimeout(() => {
@@ -2620,6 +2772,8 @@
       handleListAction(event.target);
     }
   });
+
+  elements.buddy.addEventListener('submit', handleBuddyNameSubmit);
 
   themeMenu.addEventListener('click', handleThemeClick);
   themeOptions.addEventListener('input', handleCustomColor);

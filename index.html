@@ -15,6 +15,7 @@
         <button type="button" role="tab" id="home-tab" data-action="set-tab" data-tab="home" aria-controls="home-panel" aria-selected="true">Home</button>
         <button type="button" role="tab" id="assignments-tab" data-action="set-tab" data-tab="assignments" aria-controls="assignments-panel" aria-selected="false">Assignments</button>
         <button type="button" role="tab" id="calendar-tab" data-action="set-tab" data-tab="calendar" aria-controls="calendar-panel" aria-selected="false">Calendar</button>
+        <button type="button" role="tab" id="buddy-tab" data-action="set-tab" data-tab="buddy" aria-controls="buddy-panel" aria-selected="false">Study Buddy</button>
       </nav>
       <div class="header-actions">
         <button type="button" class="semester-button" id="semester-button" aria-haspopup="dialog">
@@ -72,6 +73,13 @@
           <h2>Schedule</h2>
         </div>
         <div id="calendar"></div>
+      </section>
+
+      <section class="panel" id="buddy-panel" role="tabpanel" aria-labelledby="buddy-tab" hidden>
+        <div class="panel-header">
+          <h2>Study Buddy</h2>
+        </div>
+        <div id="buddy"></div>
       </section>
     </main>
 
@@ -446,6 +454,7 @@
 
     <script src="js/model.js"></script>
     <script src="js/storage.js"></script>
+    <script src="js/buddy.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>
