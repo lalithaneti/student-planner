@@ -7,6 +7,15 @@ const PlannerBuddy = (() => {
   const LATE_POINTS = 5;
   const MISSED_POINTS = -5;
   const NAME_MAX_LENGTH = 20;
+  // Bonus points for finishing everything on time this many days in a row. After the
+  // last one, every further LAST_MILESTONE days earns its bonus again.
+  const STREAK_MILESTONES = [
+    { days: 3, points: 10 },
+    { days: 7, points: 25 },
+    { days: 14, points: 50 },
+    { days: 30, points: 100 },
+  ];
+  const LAST_MILESTONE = STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
 
   // Each stage starts at a number of points; growVerb finishes "N more points to …".
   const STAGES = [
@@ -31,27 +40,101 @@ const PlannerBuddy = (() => {
     return state.semesters.flatMap((semester) => PlannerModel.buildDueList({ ...state, currentSemesterId: semester.id }));
   }
 
-  // The points each counted assignment date earned or lost, newest due date first.
+  // Assignment dates since the buddy started, oldest first.
+  function countedItems(state) {
+    return allItems(state)
+      .filter((item) => item.date >= state.buddy.startDate)
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
+
+  function wasDoneLate(buddy, item) {
+    return buddy.lateDone.includes(occurrenceKey(item.assignment.id, item.date));
+  }
+
+  // The bonus for reaching a streak length, or 0 if it isn't a milestone.
+  function streakBonus(days) {
+    const milestone = STREAK_MILESTONES.find((candidate) => candidate.days === days);
+    if (milestone) {
+      return milestone.points;
+    }
+    return days > LAST_MILESTONE.days && days % LAST_MILESTONE.days === 0 ? LAST_MILESTONE.points : 0;
+  }
+
+  // How each day since the buddy started went: 'kept' (everything due was checked off
+  // on time, or nothing was due), 'broken' (something was late or went past due
+  // unchecked), or 'pending' (today, with work still to do before it's due).
+  function streakDays(state, items, todayKey, nowTime) {
+    const days = [];
+    for (let date = state.buddy.startDate; date <= todayKey; date = PlannerModel.addDays(date, 1)) {
+      const dueThatDay = items.filter((item) => item.date === date);
+      const broken = dueThatDay.some((item) =>
+        item.done ? wasDoneLate(state.buddy, item) : isPastDue(item, todayKey, nowTime),
+      );
+      const allDone = dueThatDay.every((item) => item.done);
+      days.push({ date, result: broken ? 'broken' : allDone ? 'kept' : 'pending' });
+    }
+    return days;
+  }
+
+  // The current and best streaks, and the bonuses earned along the way. A pending
+  // today doesn't add to the streak or break it.
+  function streakSummary(state, items, todayKey, nowTime) {
+    let current = 0;
+    let best = 0;
+    const bonuses = [];
+    for (const { date, result } of streakDays(state, items, todayKey, nowTime)) {
+      if (result === 'broken') {
+        current = 0;
+      } else if (result === 'kept') {
+        current += 1;
+        best = Math.max(best, current);
+        const bonus = streakBonus(current);
+        if (bonus > 0) {
+          bonuses.push({ date, days: current, points: bonus });
+        }
+      }
+    }
+    return { current, best, bonuses };
+  }
+
+  // The streak now, the best one, and the next bonus to reach.
+  function streakFor(state, todayKey, nowTime) {
+    if (!state.buddy) {
+      return { current: 0, best: 0, next: STREAK_MILESTONES[0] };
+    }
+    const { current, best } = streakSummary(state, countedItems(state), todayKey, nowTime);
+    let nextDays = current + 1;
+    while (streakBonus(nextDays) === 0) {
+      nextDays += 1;
+    }
+    // How many milestones the current streak has passed (0 to 4), for the flame's size.
+    const level = STREAK_MILESTONES.filter((milestone) => current >= milestone.days).length;
+    return { current, best, level, next: { days: nextDays, points: streakBonus(nextDays) } };
+  }
+
+  // The points each counted assignment date and streak bonus earned or lost, newest first.
   function pointsLog(state, todayKey, nowTime) {
-    const buddy = state.buddy;
-    if (!buddy) {
+    if (!state.buddy) {
       return [];
     }
-    const lateDone = new Set(buddy.lateDone);
+    const items = countedItems(state);
     const entries = [];
-    for (const item of allItems(state)) {
-      if (item.date < buddy.startDate) {
-        continue;
-      }
+    for (const item of items) {
       const status = PlannerModel.itemStatus(item, todayKey, nowTime);
+      const when = item.date + item.time;
       if (status === 'done') {
-        const late = lateDone.has(occurrenceKey(item.assignment.id, item.date));
-        entries.push({ item, points: late ? LATE_POINTS : ON_TIME_POINTS, reason: late ? 'done late' : 'done' });
+        const late = wasDoneLate(state.buddy, item);
+        entries.push({ when, item, points: late ? LATE_POINTS : ON_TIME_POINTS, reason: late ? 'done late' : 'done' });
       } else if (status === 'missed') {
-        entries.push({ item, points: MISSED_POINTS, reason: 'missed' });
+        entries.push({ when, item, points: MISSED_POINTS, reason: 'missed' });
       }
     }
-    return entries.reverse();
+    // A streak bonus comes after that day's work.
+    for (const bonus of streakSummary(state, items, todayKey, nowTime).bonuses) {
+      entries.push({ when: `${bonus.date}~`, item: null, points: bonus.points, reason: 'streak', streakDays: bonus.days });
+    }
+    // Plain character order (not localeCompare, which ranks "~" before digits).
+    return entries.sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0));
   }
 
   // Points never go below 0.
@@ -232,7 +315,9 @@ const PlannerBuddy = (() => {
     LATE_POINTS,
     MISSED_POINTS,
     STAGES,
+    STREAK_MILESTONES,
     newBuddy,
+    streakFor,
     pointsLog,
     totalPoints,
     pointsForCheckingOff,

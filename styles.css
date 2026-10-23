@@ -2412,6 +2412,7 @@ dialog::backdrop {
 }
 
 .buddy-progress {
+  display: block;
   width: 100%;
   max-width: 240px;
 }
@@ -2553,4 +2554,94 @@ dialog::backdrop {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Streaks: a flame on the buddy's picture that grows at each milestone. */
+.buddy-card-art,
+.buddy-big {
+  position: relative;
+}
+
+.buddy-flame {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  font-size: 18px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.2));
+}
+
+.buddy-big .buddy-flame {
+  top: 0;
+  right: 0;
+  font-size: 30px;
+}
+
+.flame-level-1 {
+  font-size: 22px;
+}
+
+.flame-level-2 {
+  font-size: 26px;
+}
+
+.flame-level-3,
+.flame-level-4 {
+  font-size: 30px;
+}
+
+.buddy-big .flame-level-1 {
+  font-size: 38px;
+}
+
+.buddy-big .flame-level-2 {
+  font-size: 46px;
+}
+
+.buddy-big .flame-level-3,
+.buddy-big .flame-level-4 {
+  font-size: 54px;
+}
+
+.buddy-streak {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.buddy-streak-box {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.buddy-streak-box p {
+  margin: 2px 0;
+}
+
+.buddy-streak-now {
+  font-weight: 600;
+}
+
+.buddy-log-item.is-streak {
+  border-left-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+}
+
+.buddy-rules .buddy-rule-streaks {
+  flex-direction: column;
+}
+
+.buddy-milestones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.buddy-milestones span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 14%, var(--surface));
+  font-size: 0.85rem;
 }

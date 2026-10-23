@@ -2161,6 +2161,40 @@
 
   const GROWN_MESSAGES = ['', 'hatched! 🐣', 'grew little ears! 🐾', 'is all grown up! 🌼'];
 
+  function buddyStreak() {
+    return buddy.streakFor(state, todayKey(), currentTime());
+  }
+
+  function dayCount(days) {
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+
+  // " 🔥 3-day streak!" when a check-off finishes the day.
+  function describeStreakChange(streakBefore) {
+    const streakAfter = buddyStreak().current;
+    return streakAfter > streakBefore ? ` 🔥 ${streakAfter}-day streak!` : '';
+  }
+
+  // A flame on the buddy's picture that grows at each streak milestone.
+  function renderStreakFlame(streak) {
+    if (streak.current === 0) {
+      return '';
+    }
+    return `<span class="buddy-flame flame-level-${streak.level}" aria-hidden="true">🔥</span>`;
+  }
+
+  function streakText(streak) {
+    if (streak.current === 0) {
+      return 'Finish everything due today on time to start a streak';
+    }
+    return `🔥 ${streak.current}-day streak`;
+  }
+
+  function nextBonusText(streak) {
+    const daysLeft = streak.next.days - streak.current;
+    return `${dayCount(daysLeft)} more for +${streak.next.points}`;
+  }
+
   // " +10 ✨" after a check-off, plus news when the buddy reaches a new stage.
   function describePointsChange(pointsBefore) {
     const pointsAfter = buddyPoints();
@@ -2192,11 +2226,12 @@
   function renderBuddyCard() {
     const points = buddyPoints();
     const where = buddy.stageFor(points);
+    const streak = buddyStreak();
     return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
-        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress)}</span>
+        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress)}${renderStreakFlame(streak)}</span>
         <span class="buddy-card-text">
           <span><strong>${escapeHtml(buddy.displayName(state.buddy))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
-          <span class="buddy-card-points">${points} point${points === 1 ? '' : 's'}</span>
+          <span class="buddy-card-points">${points} point${points === 1 ? '' : 's'} ${streak.current > 0 ? `<span class="buddy-streak">${streakText(streak)}</span>` : ''}</span>
           ${renderBuddyProgress(where)}
           <span class="buddy-muted">${growHint(where)}</span>
         </span>
@@ -2204,8 +2239,15 @@
       </button>`;
   }
 
-  function renderPointsEntry({ item, points, reason }) {
+  function renderPointsEntry({ item, points, reason, streakDays, when }) {
     const sign = points > 0 ? `+${points}` : `−${-points}`;
+    if (!item) {
+      return `<li class="buddy-log-item is-streak">
+          <span class="buddy-log-points is-gain">${sign}</span>
+          <span class="buddy-log-title">🔥 ${streakDays}-day streak bonus</span>
+          <span class="buddy-muted">${model.formatDate(when.slice(0, 10))}</span>
+        </li>`;
+    }
     return `<li class="buddy-log-item" style="--class-color: ${itemColor(item)}">
         <span class="buddy-log-points ${points > 0 ? 'is-gain' : 'is-loss'}">${sign}</span>
         <span class="buddy-log-title">${escapeHtml(item.assignment.title)}</span>
@@ -2230,6 +2272,7 @@
     const log = buddy.pointsLog(state, todayKey(), currentTime());
     const points = buddy.totalPoints(log);
     const where = buddy.stageFor(points);
+    const streak = buddyStreak();
     const recent =
       log.length === 0
         ? '<p class="empty">Check off an assignment to earn your first points!</p>'
@@ -2237,7 +2280,7 @@
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
         <section class="buddy-home">
-          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress)}</div>
+          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress)}${renderStreakFlame(streak)}</div>
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
               <span>Name</span>
@@ -2249,6 +2292,10 @@
           <p class="buddy-big-points"><strong>${points}</strong> point${points === 1 ? '' : 's'} · ${where.stage.name}</p>
           ${renderBuddyProgress(where, 'is-wide')}
           <p class="buddy-muted">${growHint(where)}</p>
+          <div class="buddy-streak-box">
+            <p class="buddy-streak-now">${streakText(streak)}</p>
+            <p class="buddy-muted">Best: ${dayCount(streak.best)} · ${nextBonusText(streak)}</p>
+          </div>
         </section>
         <div class="buddy-side">
           <section class="home-box">
@@ -2257,8 +2304,13 @@
               <li><span>Check off work on time</span> <strong class="is-gain">+${buddy.ON_TIME_POINTS}</strong></li>
               <li><span>Check it off late</span> <strong class="is-gain">+${buddy.LATE_POINTS}</strong></li>
               <li><span>Missed (no late work allowed)</span> <strong class="is-loss">−${-buddy.MISSED_POINTS}</strong></li>
+              <li class="buddy-rule-streaks"><span>Streak bonuses</span>
+                <span class="buddy-milestones">${buddy.STREAK_MILESTONES.map(
+                  (milestone) => `<span>🔥 ${milestone.days} days <strong class="is-gain">+${milestone.points}</strong></span>`,
+                ).join('')}</span></li>
             </ul>
-            <p class="buddy-muted">Counts work due from ${model.formatDate(state.buddy.startDate)} on.</p>
+            <p class="buddy-muted">A day adds to your streak when everything due that day is checked off on time.
+              Counts work due from ${model.formatDate(state.buddy.startDate)} on.</p>
             <ol class="buddy-stages">${renderBuddyStages(where)}</ol>
           </section>
           <section class="home-box">
@@ -2372,8 +2424,9 @@
       const nowDone = target.checked;
       const item = { assignment, date, time: assignment.dueTime };
       const pointsBefore = buddyPoints();
+      const streakBefore = buddyStreak().current;
       const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
-      applyChange(() => message + describePointsChange(pointsBefore), () => {
+      applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore), () => {
         buddy.recordCheckOff(state.buddy, item, nowDone, todayKey(), currentTime());
         if (assignment.kind === 'once') {
           assignment.done = nowDone;
