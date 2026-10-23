@@ -50,7 +50,6 @@
   const BANNER_DECORATION_COUNT = 12;
   const TOAST_DURATION_MS = 6000;
   const VIEW_STORAGE_KEY = 'student-planner-view';
-  const TAB_STORAGE_KEY = 'student-planner-tab';
   // Height of one hour on the calendar, in pixels.
   const HOUR_HEIGHT = 56;
   const MEETING_DAYS = [1, 2, 3, 4, 5];
@@ -74,9 +73,12 @@
   let showDone = false;
   let showMissed = false;
   let toastTimer = null;
+  // The greeting slides in once when the app opens, not again at each minute's redraw.
+  let greetingHasArrived = false;
   let resolveChoice = null;
   let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['list', 'week']);
-  let currentTab = loadSavedPreference(TAB_STORAGE_KEY, ['assignments', 'calendar']);
+  // The app always opens on Home.
+  let currentTab = 'home';
   let weekStart = model.startOfWeek(todayKey());
 
   const elements = {
@@ -89,6 +91,8 @@
     dueList: document.getElementById('due-list'),
     viewButtons: document.querySelectorAll('[data-action="set-view"]'),
     tabButtons: document.querySelectorAll('[data-action="set-tab"]'),
+    homePanel: document.getElementById('home-panel'),
+    home: document.getElementById('home'),
     assignmentsPanel: document.getElementById('assignments-panel'),
     calendarPanel: document.getElementById('calendar-panel'),
     calendar: document.getElementById('calendar'),
@@ -293,13 +297,16 @@
     renderTabs();
     renderDueList();
     renderCalendar();
+    renderHome();
   }
 
   function renderTabs() {
     elements.tabButtons.forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === currentTab)));
+    elements.homePanel.hidden = currentTab !== 'home';
     elements.assignmentsPanel.hidden = currentTab !== 'assignments';
     elements.calendarPanel.hidden = currentTab !== 'calendar';
     document.body.classList.toggle('calendar-tab', currentTab === 'calendar');
+    document.body.classList.toggle('home-tab', currentTab === 'home');
   }
 
   function renderSemester() {
@@ -636,6 +643,26 @@
             .join('');
   }
 
+  // A negative animation delay that picks up where the clock says an animation should be,
+  // so the once-a-minute redraw continues animations instead of restarting them.
+  function clockDelay(duration, offset = 0) {
+    return -((Date.now() / 1000 + offset) % duration);
+  }
+
+  // A break theme's decorations (leaves, snowflakes, blossoms...) drifting down behind
+  // something. Spread out evenly-ish but not in a grid, with staggered timing so they
+  // don't fall in step.
+  function renderFallingDecorations(style) {
+    const falling = Array.from({ length: BANNER_DECORATION_COUNT }, (_, index) => {
+      const symbol = style.decorations[index % style.decorations.length];
+      const left = (index * 37 + 5) % 100;
+      const duration = 7 + (index % 4) * 1.5;
+      const size = 14 + (index % 3) * 5;
+      return `<span class="falling-decoration" style="left: ${left}%; animation-delay: ${clockDelay(duration, index * 1.7)}s; animation-duration: ${duration}s; font-size: ${size}px">${symbol}</span>`;
+    }).join('');
+    return `<div class="banner-decorations" aria-hidden="true">${falling}</div>`;
+  }
+
   // A string of triangle flags spelling the break's name, sagging in the middle like real bunting.
   function renderBreakBanner(schoolBreak) {
     const style = BREAK_THEME_STYLES[schoolBreak.theme];
@@ -656,21 +683,9 @@
       })
       .join('');
     const stringMiddle = BUNTING_STRING_TOP + 2 * BUNTING_SAG;
-    // Spread out evenly-ish but not in a grid, with staggered timing so they don't fall in step.
-    // Each one's place in its fall comes from the clock, so the once-a-minute redraw
-    // continues the animation instead of restarting it.
-    const secondsNow = Date.now() / 1000;
-    const falling = Array.from({ length: BANNER_DECORATION_COUNT }, (_, index) => {
-      const symbol = style.decorations[index % style.decorations.length];
-      const left = (index * 37 + 5) % 100;
-      const duration = 7 + (index % 4) * 1.5;
-      const delay = -((secondsNow + index * 1.7) % duration);
-      const size = 14 + (index % 3) * 5;
-      return `<span class="falling-decoration" style="left: ${left}%; animation-delay: ${delay}s; animation-duration: ${duration}s; font-size: ${size}px">${symbol}</span>`;
-    }).join('');
     return `
       <div class="break-banner">
-        <div class="banner-decorations" aria-hidden="true">${falling}</div>
+        ${renderFallingDecorations(style)}
         <span class="string-end string-end-left" aria-hidden="true">${style.decorations[0]}</span>
         <span class="string-end string-end-right" aria-hidden="true">${style.decorations[1]}</span>
         <div class="bunting" style="--flag-count: ${letters.length}" role="img" aria-label="${escapeHtml(schoolBreak.name)} banner">
@@ -850,7 +865,163 @@
           </li>`,
       )
       .join('');
-    return `<div class="exam-countdown"><span class="exam-countdown-title">★ Exams</span><ul>${rows}</ul></div>`;
+    return `<div class="countdowns"><span class="countdowns-title">★ Exams</span><ul>${rows}</ul></div>`;
+  }
+
+  // ---------- Home ----------
+
+  // The greeting's sky follows the time of day: sunrise until noon, daytime until 5 PM, then night.
+  function skyPeriod(hour) {
+    if (hour >= 5 && hour < 12) {
+      return { name: 'morning', greeting: 'Good morning!' };
+    }
+    if (hour >= 12 && hour < 17) {
+      return { name: 'afternoon', greeting: 'Good afternoon!' };
+    }
+    return { name: 'evening', greeting: hour < 5 ? 'Up late?' : 'Good evening!' };
+  }
+
+  // How long (seconds) each calm, repeating sky animation takes: a wave through the
+  // greeting's letters, the sky's colors drifting, and something flying across.
+  const GREETING_WAVE_SECONDS = 6;
+  const SKY_SHIFT_SECONDS = 20;
+  const SKY_FLYER_SECONDS = 12;
+
+  // One thing at a time crosses the sky: a shooting star at night; by day, a bird or a
+  // plane, taking turns each minute.
+  function renderSkyFlyer(period) {
+    const delay = `animation-delay: ${clockDelay(SKY_FLYER_SECONDS, 4)}s`;
+    if (period === 'evening') {
+      return `<span class="sky-flyer shooting-star" style="${delay}"></span>`;
+    }
+    return new Date().getMinutes() % 2 === 0
+      ? `<span class="sky-flyer sky-bird" style="${delay}">🐦</span>`
+      : `<span class="sky-flyer sky-plane" style="${delay}">✈️</span>`;
+  }
+
+  // Each letter in its own span, so a wave can roll through them one after another.
+  function renderWavingText(text) {
+    const waveStart = clockDelay(GREETING_WAVE_SECONDS);
+    return [...text]
+      .map((letter, index) => `<span class="sky-letter" style="animation-delay: ${waveStart + index * 0.07}s">${letter === ' ' ? '&nbsp;' : escapeHtml(letter)}</span>`)
+      .join('');
+  }
+
+  // Sun, clouds, or moon and stars for the greeting's sky, animated in step with the clock.
+  function renderSkyDecorations(period) {
+    if (period === 'evening') {
+      const stars = Array.from({ length: 18 }, (_, index) => {
+        const duration = 2 + (index % 4) * 0.7;
+        return `<span class="sky-star" style="left: ${(index * 41 + 7) % 100}%; top: ${(index * 23 + 9) % 85}%; animation-delay: ${clockDelay(duration, index)}s; animation-duration: ${duration}s"></span>`;
+      }).join('');
+      return `${stars}<span class="sky-moon">🌙</span>${renderSkyFlyer(period)}`;
+    }
+    const clouds = Array.from({ length: period === 'afternoon' ? 4 : 2 }, (_, index) => {
+      const duration = 40 + index * 12;
+      return `<span class="sky-cloud" style="top: ${12 + index * 19}%; animation-delay: ${clockDelay(duration, index * 15)}s; animation-duration: ${duration}s; font-size: ${30 + (index % 2) * 14}px">☁️</span>`;
+    }).join('');
+    return `<span class="sky-sun">☀️</span>${clouds}${renderSkyFlyer(period)}`;
+  }
+
+  function renderGreeting(now, nowTime) {
+    const period = skyPeriod(now.getHours());
+    const html = `
+      <div class="sky sky-${period.name}" style="animation-delay: ${clockDelay(SKY_SHIFT_SECONDS * 2)}s">
+        <div class="sky-decorations" aria-hidden="true">${renderSkyDecorations(period.name)}</div>
+        <h2 class="sky-greeting${greetingHasArrived ? '' : ' is-arriving'}" aria-label="${period.greeting}">
+          <span aria-hidden="true">${renderWavingText(period.greeting)}</span>
+        </h2>
+        <p class="sky-date">${now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${model.formatTime(nowTime)}</p>
+      </div>`;
+    greetingHasArrived = true;
+    return html;
+  }
+
+  // A big card in the next break's theme: "30 days until Thanksgiving break", or during it, "Back in 4 days".
+  function renderBreakCountdown() {
+    const upcoming = model.upcomingBreak(state, todayKey());
+    if (!upcoming) {
+      return '';
+    }
+    const { schoolBreak } = upcoming;
+    const style = BREAK_THEME_STYLES[schoolBreak.theme];
+    const [number, words] = upcoming.ongoing
+      ? [upcoming.daysLeft, `more day${upcoming.daysLeft === 1 ? '' : 's'} of ${escapeHtml(schoolBreak.name)}! It’s here ${style.emoji}`]
+      : [upcoming.daysUntil, `day${upcoming.daysUntil === 1 ? '' : 's'} until ${escapeHtml(schoolBreak.name)} ${style.emoji}`];
+    const dates = upcoming.ongoing ? `Last day ${model.formatDate(schoolBreak.endDate)}` : breakDateRange(schoolBreak);
+    return `
+      <div class="break-countdown" style="--break-from: ${style.colors[0]}; --break-to: ${style.colors[2]}; --break-text: ${style.text}">
+        ${renderFallingDecorations(style)}
+        <span class="break-countdown-number">${number}</span>
+        <span class="break-countdown-words">${words}</span>
+        <span class="break-countdown-dates">${dates}</span>
+      </div>`;
+  }
+
+  // What one block on today's schedule says, and its color.
+  function describeBlock(block) {
+    switch (block.kind) {
+      case 'exam':
+        return { color: block.plannerClass.color, name: `<span class="exam-tag">Exam</span> ${escapeHtml(block.plannerClass.name)} ${escapeHtml(block.exam.title)}`, place: block.exam.location };
+      case 'rso-meeting':
+        return { color: block.rso.color, name: `${escapeHtml(block.rso.name)}${block.meeting.label ? ` ${escapeHtml(block.meeting.label)}` : ''}`, place: block.meeting.location };
+      case 'rso-event':
+        return { color: block.rso.color, name: `${escapeHtml(block.rso.name)}: ${escapeHtml(block.event.title)}`, place: block.event.location };
+      case 'event':
+        return { color: block.event.color, name: escapeHtml(block.event.title), place: block.event.location };
+      default:
+        return { color: block.plannerClass.color, name: `${escapeHtml(block.plannerClass.name)}${block.meeting.label ? ` ${escapeHtml(block.meeting.label)}` : ''}`, place: block.meeting.location };
+    }
+  }
+
+  function renderTodaySchedule(today, nowTime) {
+    const blocks = model.calendarBlocksOn(state, today);
+    if (blocks.length === 0) {
+      const schoolBreak = model.breakOn(state, today);
+      return `<p class="empty">${schoolBreak ? `No classes: it’s ${escapeHtml(schoolBreak.name)}! ${BREAK_THEME_STYLES[schoolBreak.theme].emoji}` : 'Nothing on your schedule today.'}</p>`;
+    }
+    const rows = blocks
+      .map((block) => {
+        const { color, name, place } = describeBlock(block);
+        const isNow = !block.cancelled && block.startTime <= nowTime && nowTime < block.endTime;
+        const isOver = !block.cancelled && block.endTime <= nowTime;
+        const status = block.cancelled ? ' is-cancelled' : isNow ? ' is-now' : isOver ? ' is-over' : '';
+        const note = block.cancelled ? ' · Cancelled' : isNow ? ' · <strong>Now</strong>' : '';
+        return `
+          <li class="schedule-item${status}" style="--class-color: ${color}">
+            <span class="schedule-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+            <span class="swatch" aria-hidden="true"></span>
+            <span class="schedule-name">${name}${place ? ` <span class="schedule-place">· ${escapeHtml(place)}</span>` : ''}${note}</span>
+          </li>`;
+      })
+      .join('');
+    return `<ul class="schedule-list">${rows}</ul>`;
+  }
+
+  function renderHome() {
+    const now = new Date();
+    const today = todayKey();
+    const nowTime = currentTime();
+    const dueToday = model.buildDueList(state).filter((item) => item.date === today);
+    const doneCount = dueToday.filter((item) => item.done).length;
+    const homework =
+      dueToday.length === 0
+        ? '<p class="empty">Nothing due today 🎉</p>'
+        : renderList(dueToday, false);
+    elements.home.innerHTML = `
+      ${renderGreeting(now, nowTime)}
+      ${renderBreakCountdown()}
+      <div class="home-columns">
+        <section class="home-box" aria-labelledby="home-homework-heading">
+          <h3 class="due-heading" id="home-homework-heading">Due today ${dueToday.length > 0 ? `<span class="count">${doneCount} of ${dueToday.length} done</span>` : ''}</h3>
+          ${homework}
+        </section>
+        <section class="home-box" aria-labelledby="home-schedule-heading">
+          ${renderExamCountdown()}
+          <h3 class="due-heading" id="home-schedule-heading">Today’s schedule</h3>
+          ${renderTodaySchedule(today, nowTime)}
+        </section>
+      </div>`;
   }
 
   function renderCalendar() {
@@ -891,7 +1062,6 @@
       .join('');
     elements.calendar.innerHTML = `
       ${currentClasses().some((plannerClass) => (plannerClass.meetings || []).length > 0) ? renderNextClass() : ''}
-      ${renderExamCountdown()}
       ${renderWeekNav()}
       ${renderBreakBanners(week.days.map((day) => day.date))}
       ${notice}
@@ -1921,7 +2091,6 @@
       renderDueList();
     } else if (action === 'set-tab') {
       currentTab = target.dataset.tab;
-      savePreference(TAB_STORAGE_KEY, currentTab);
       renderTabs();
     } else if (action === 'previous-week' || action === 'next-week') {
       weekStart = model.addDays(weekStart, action === 'next-week' ? 7 : -7);
@@ -2029,14 +2198,20 @@
   elements.confirmDialog.addEventListener('cancel', () => finishChoice(null));
   elements.confirmDialog.addEventListener('close', () => finishChoice(null));
   // Redraw each minute so items turn overdue or missed when their due time passes and
-  // the calendar's "now" line and next class stay current, unless a menu is open
-  // (redrawing would close it).
-  setInterval(() => {
+  // the calendar's "now" line, next class, and Home's clock stay current, unless a menu
+  // is open (redrawing would close it). The first redraw waits for the next whole minute,
+  // so the clock changes when the minute does.
+  function redrawEachMinute() {
     if (!document.querySelector('.row-menu[open]')) {
       renderDueList();
       renderCalendar();
+      renderHome();
     }
-  }, 60 * 1000);
+  }
+  setTimeout(() => {
+    redrawEachMinute();
+    setInterval(redrawEachMinute, 60 * 1000);
+  }, (60 - new Date().getSeconds()) * 1000);
   // 'toggle' doesn't bubble, so listen during the capture phase to catch every ⋯ menu.
   document.addEventListener(
     'toggle',

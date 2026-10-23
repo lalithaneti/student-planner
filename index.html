@@ -10,7 +10,8 @@
     <header class="app-header">
       <h1>Planner</h1>
       <nav class="tabs" role="tablist" aria-label="Planner sections">
-        <button type="button" role="tab" id="assignments-tab" data-action="set-tab" data-tab="assignments" aria-controls="assignments-panel" aria-selected="true">Assignments</button>
+        <button type="button" role="tab" id="home-tab" data-action="set-tab" data-tab="home" aria-controls="home-panel" aria-selected="true">Home</button>
+        <button type="button" role="tab" id="assignments-tab" data-action="set-tab" data-tab="assignments" aria-controls="assignments-panel" aria-selected="false">Assignments</button>
         <button type="button" role="tab" id="calendar-tab" data-action="set-tab" data-tab="calendar" aria-controls="calendar-panel" aria-selected="false">Calendar</button>
       </nav>
       <div class="header-actions">
@@ -34,7 +35,11 @@
     <p class="banner" id="banner" role="alert" hidden></p>
 
     <main class="layout" id="layout">
-      <section class="panel due-panel" id="assignments-panel" role="tabpanel" aria-labelledby="assignments-tab">
+      <section class="panel" id="home-panel" role="tabpanel" aria-labelledby="home-tab">
+        <div id="home"></div>
+      </section>
+
+      <section class="panel due-panel" id="assignments-panel" role="tabpanel" aria-labelledby="assignments-tab" hidden>
         <div class="panel-header">
           <h2 id="due-heading">Assignments</h2>
           <div class="view-switch" role="group" aria-label="Display assignments as">

@@ -164,6 +164,395 @@ body.calendar-tab .app-header {
   max-width: 1240px;
 }
 
+/* Home is a little wider than the list so its two boxes fit side by side, but not as wide
+   as the Week view or Calendar, even when the Assignments tab is set to Week. */
+body.home-tab .layout,
+body.home-tab .app-header {
+  max-width: 960px;
+}
+
+/* ---------- Home: greeting sky ---------- */
+
+.sky {
+  position: relative;
+  overflow: hidden;
+  padding: 28px 24px 24px;
+  border-radius: 14px;
+  color: #1c2024;
+}
+
+/* Each sky is a gradient twice as tall as the banner that slowly slides up and back,
+   so the light seems to shift. Timing must match SKY_SHIFT_SECONDS in app.js. */
+.sky {
+  background-size: 100% 200%;
+  animation: sky-shift 20s ease-in-out infinite alternate;
+}
+
+@keyframes sky-shift {
+  from {
+    background-position: 50% 0%;
+  }
+  to {
+    background-position: 50% 100%;
+  }
+}
+
+.sky-morning {
+  background-image: linear-gradient(180deg, #8ec5fc 0%, #ffd3a5 40%, #fda085 70%, #f9c8d9 100%);
+}
+
+.sky-afternoon {
+  background-image: linear-gradient(180deg, #4facfe 0%, #9fd3ff 40%, #d6efff 70%, #b8e1ff 100%);
+}
+
+.sky-evening {
+  background-image: linear-gradient(180deg, #0b1437 0%, #22305e 40%, #4b3f72 70%, #2a1f4f 100%);
+  color: #f5f3ff;
+}
+
+/* A small wave rolls through the greeting's letters, then they rest. Must match GREETING_WAVE_SECONDS. */
+.sky-letter {
+  display: inline-block;
+  animation: letter-wave 6s ease-in-out infinite;
+}
+
+@keyframes letter-wave {
+  0%,
+  10%,
+  100% {
+    transform: translateY(0);
+  }
+  5% {
+    transform: translateY(-7px);
+  }
+}
+
+/* Something crosses the sky early in each cycle, then stays out of sight until the next.
+   Must match SKY_FLYER_SECONDS. */
+.sky-flyer {
+  position: absolute;
+  opacity: 0;
+  animation: 12s linear infinite;
+}
+
+.shooting-star {
+  top: 10%;
+  left: 15%;
+  width: 90px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #ffffff);
+  animation-name: shooting-star;
+}
+
+@keyframes shooting-star {
+  0% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(0);
+  }
+  1% {
+    opacity: 1;
+  }
+  8% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(260px);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(18deg) translateX(260px);
+  }
+}
+
+/* The bird emoji faces left, so it flies right to left; the plane flies left to right. */
+.sky-bird {
+  top: 20%;
+  font-size: 22px;
+  animation-name: fly-left;
+}
+
+.sky-plane {
+  top: 14%;
+  font-size: 24px;
+  animation-name: fly-right;
+}
+
+@keyframes fly-left {
+  0% {
+    left: 105%;
+    opacity: 1;
+  }
+  40% {
+    left: -10%;
+    opacity: 1;
+  }
+  41%,
+  100% {
+    left: -10%;
+    opacity: 0;
+  }
+}
+
+@keyframes fly-right {
+  0% {
+    left: -10%;
+    opacity: 1;
+  }
+  40% {
+    left: 105%;
+    opacity: 1;
+  }
+  41%,
+  100% {
+    left: 105%;
+    opacity: 0;
+  }
+}
+
+.sky-decorations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ".sky" too, so this beats the plain ".panel h2" heading style. */
+.sky .sky-greeting {
+  position: relative;
+  margin: 0;
+  color: inherit;
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: -0.02em;
+}
+
+.sky .sky-greeting.is-arriving {
+  animation: greeting-in 0.8s ease-out;
+}
+
+.sky-date {
+  position: relative;
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+@keyframes greeting-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.sky-star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: twinkle ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 0.2;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+.sky-moon,
+.sky-sun {
+  position: absolute;
+  top: 14px;
+  right: 24px;
+  font-size: 52px;
+  animation: float 6s ease-in-out infinite alternate;
+}
+
+/* On a phone, a smaller sun or moon, and room so it doesn't sit on the greeting. */
+@media (max-width: 520px) {
+  .sky {
+    padding-right: 64px;
+  }
+
+  .sky-moon,
+  .sky-sun {
+    right: 12px;
+    font-size: 36px;
+  }
+}
+
+.sky-morning .sky-sun {
+  top: auto;
+  bottom: -12px;
+}
+
+@keyframes float {
+  to {
+    transform: translateY(-8px) rotate(6deg);
+  }
+}
+
+/* Clouds drift from the right edge to off the left edge and come around again. */
+.sky-cloud {
+  position: absolute;
+  left: 100%;
+  opacity: 0.9;
+  animation: drift-across linear infinite;
+}
+
+@keyframes drift-across {
+  to {
+    left: -20%;
+  }
+}
+
+/* ---------- Home: break countdown ---------- */
+
+.break-countdown {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  margin-top: 14px;
+  padding: 22px 16px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--break-from), var(--break-to));
+  color: var(--break-text);
+  text-align: center;
+}
+
+.break-countdown-number {
+  position: relative;
+  font-size: clamp(3.5rem, 14vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1;
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.break-countdown-words {
+  position: relative;
+  margin-top: 6px;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.break-countdown-dates {
+  position: relative;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+/* ---------- Home: due today and today's schedule ---------- */
+
+.home-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (min-width: 720px) {
+  .home-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.home-box {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+}
+
+.home-box .due-heading:first-child,
+.home-box .countdowns + .due-heading {
+  margin-top: 0;
+}
+
+/* The schedule box is narrower than the old full-width list, so times sit above names. */
+.home-box .schedule-item {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.home-box .schedule-time {
+  grid-column: 1 / -1;
+}
+
+/* For people who turn on "Reduce motion": the sky and countdown hold still. */
+@media (prefers-reduced-motion: reduce) {
+  .sky,
+  .sky-letter,
+  .sky .sky-greeting.is-arriving,
+  .sky-star,
+  .sky-moon,
+  .sky-sun,
+  .break-countdown-number {
+    animation: none;
+  }
+
+  .sky-cloud {
+    animation: none;
+    left: auto;
+    right: 30%;
+  }
+
+  .sky-flyer {
+    display: none;
+  }
+}
+
+.schedule-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-item {
+  display: grid;
+  grid-template-columns: 9.5em auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 4px solid var(--class-color);
+  background: color-mix(in srgb, var(--class-color) 12%, var(--surface));
+}
+
+.schedule-item.is-now {
+  outline: 2px solid var(--accent);
+}
+
+.schedule-item.is-over,
+.schedule-item.is-cancelled {
+  opacity: 0.55;
+}
+
+.schedule-item.is-cancelled .schedule-name {
+  text-decoration: line-through;
+}
+
+.schedule-time {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.schedule-place {
+  color: var(--text-muted);
+}
+
 /* ---------- Tabs ---------- */
 
 .tabs {
@@ -1125,7 +1514,7 @@ button:focus-visible {
   vertical-align: 1px;
 }
 
-.exam-countdown {
+.countdowns {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
@@ -1135,11 +1524,11 @@ button:focus-visible {
   background: color-mix(in srgb, var(--accent) 10%, var(--background));
 }
 
-.exam-countdown-title {
+.countdowns-title {
   font-weight: 700;
 }
 
-.exam-countdown ul {
+.countdowns ul {
   display: grid;
   gap: 4px;
   margin: 0;
@@ -1147,13 +1536,13 @@ button:focus-visible {
   list-style: none;
 }
 
-.exam-countdown li {
+.countdowns li {
   display: flex;
   align-items: baseline;
   gap: 8px;
 }
 
-.exam-countdown .swatch {
+.countdowns .swatch {
   width: 10px;
   height: 10px;
   flex-shrink: 0;
@@ -1452,7 +1841,7 @@ dialog::backdrop {
   }
 
   .swatch,
-  .exam-countdown .swatch,
+  .countdowns .swatch,
   .next-class .swatch {
     background: var(--bright-color, var(--class-color));
   }
@@ -1462,7 +1851,8 @@ dialog::backdrop {
     color: #1c2024;
   }
 
-  .due-item.week-item {
+  .due-item.week-item,
+  .schedule-item {
     border-left-color: var(--bright-color, var(--class-color));
   }
 

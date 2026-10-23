@@ -25,6 +25,11 @@ const PlannerModel = (() => {
     return toDateKey(date);
   }
 
+  // Whole days from one date key to another (negative if "to" is earlier).
+  function daysBetween(from, to) {
+    return Math.round((parseDateKey(to) - parseDateKey(from)) / (24 * 60 * 60 * 1000));
+  }
+
   function isValidDateKey(value) {
     return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && toDateKey(parseDateKey(value)) === value;
   }
@@ -129,6 +134,20 @@ const PlannerModel = (() => {
     return breaksOf(state)
       .filter((schoolBreak) => dates.some((date) => schoolBreak.startDate <= date && date <= schoolBreak.endDate))
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  }
+
+  // The break happening now ({ ongoing: true, daysLeft }), or else the next one coming up
+  // ({ ongoing: false, daysUntil }), however far away. null if there are none left.
+  function upcomingBreak(state, todayKey) {
+    const schoolBreak = breaksOf(state)
+      .filter((candidate) => candidate.endDate >= todayKey)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+    if (!schoolBreak) {
+      return null;
+    }
+    return schoolBreak.startDate <= todayKey
+      ? { schoolBreak, ongoing: true, daysLeft: daysBetween(todayKey, schoolBreak.endDate) }
+      : { schoolBreak, ongoing: false, daysUntil: daysBetween(todayKey, schoolBreak.startDate) };
   }
 
   // A starting theme from the month a break begins: Sep–Nov fall, Dec–Feb winter,
@@ -339,7 +358,7 @@ const PlannerModel = (() => {
     if (meeting.every !== 2) {
       return true;
     }
-    const daysApart = Math.round((parseDateKey(startOfWeek(date)) - parseDateKey(startOfWeek(meeting.firstDate))) / (24 * 60 * 60 * 1000));
+    const daysApart = daysBetween(startOfWeek(meeting.firstDate), startOfWeek(date));
     return date >= meeting.firstDate && (daysApart / 7) % 2 === 0;
   }
 
@@ -557,7 +576,7 @@ const PlannerModel = (() => {
       .map((exam) => ({
         exam,
         plannerClass: state.classes.find((plannerClass) => plannerClass.id === exam.classId),
-        daysUntil: Math.round((parseDateKey(exam.date) - parseDateKey(todayKey)) / (24 * 60 * 60 * 1000)),
+        daysUntil: daysBetween(todayKey, exam.date),
       }))
       .filter((upcoming) => upcoming.plannerClass);
   }
@@ -695,6 +714,7 @@ const PlannerModel = (() => {
     BREAK_THEMES,
     breakOn,
     breaksDuring,
+    upcomingBreak,
     guessBreakTheme,
     validateBreak,
     groupDueList,
