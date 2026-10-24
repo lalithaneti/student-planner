@@ -2697,3 +2697,36 @@ dialog::backdrop {
 .buddy-card-mood {
   font-size: 0.9rem;
 }
+
+/* A happy hop on Home when something is checked off: crouch, jump, squish on landing. */
+.buddy-card-art.is-hopping .buddy-art {
+  transform-origin: 50% 100%;
+  animation: buddy-hop 0.9s ease-out;
+}
+
+@keyframes buddy-hop {
+  0% {
+    transform: translateY(0) scale(1, 1);
+  }
+  18% {
+    transform: translateY(0) scale(1.08, 0.88);
+  }
+  45% {
+    transform: translateY(-22px) scale(0.95, 1.08);
+  }
+  72% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+  86% {
+    transform: translateY(-4px) scale(0.98, 1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-card-art.is-hopping .buddy-art {
+    animation: none;
+  }
+}

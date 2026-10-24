@@ -2462,6 +2462,10 @@
           assignment.doneDates = assignment.doneDates.filter((doneDate) => doneDate !== date);
         }
       });
+      // The Home card was just redrawn, so the hop plays once on the new buddy.
+      if (nowDone) {
+        elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
+      }
     } else if (action === 'skip') {
       applyChange(`Skipped ${assignment.title} on ${model.formatDate(date)}.`, () => {
         assignment.skippedDates.push(date);
