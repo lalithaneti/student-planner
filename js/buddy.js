@@ -25,10 +25,56 @@ const PlannerBuddy = (() => {
     { name: 'Grown-up', minPoints: 300, growVerb: null },
   ];
 
+  // Accessories unlock by best streak, so once earned they stay. One can be worn per spot.
+  const ACCESSORY_SPOTS = [
+    { id: 'head', name: 'Head' },
+    { id: 'face', name: 'Face' },
+    { id: 'neck', name: 'Neck' },
+  ];
+  const ACCESSORIES = [
+    { id: 'bow', name: 'Pink bow', spot: 'head', streakDays: 1 },
+    { id: 'round-glasses', name: 'Round glasses', spot: 'face', streakDays: 2 },
+    { id: 'scarf', name: 'Striped scarf', spot: 'neck', streakDays: 3 },
+    { id: 'beret', name: 'Beret', spot: 'head', streakDays: 5 },
+    { id: 'heart-shades', name: 'Heart shades', spot: 'face', streakDays: 7 },
+    { id: 'bow-tie', name: 'Bow tie', spot: 'neck', streakDays: 10 },
+    { id: 'flower-crown', name: 'Flower crown', spot: 'head', streakDays: 14 },
+    { id: 'party-hat', name: 'Party hat', spot: 'head', streakDays: 21 },
+    { id: 'crown', name: 'Gold crown', spot: 'head', streakDays: 30 },
+  ];
+
   // Only work due on or after startDate counts, so things missed before the buddy
-  // existed don't count against it.
+  // existed don't count against it. wearing maps a spot to an accessory id.
   function newBuddy(todayKey) {
-    return { name: '', startDate: todayKey, lateDone: [] };
+    return { name: '', startDate: todayKey, lateDone: [], wearing: {} };
+  }
+
+  function isUnlocked(accessory, bestStreak) {
+    return bestStreak >= accessory.streakDays;
+  }
+
+  // What the buddy has on, spot by spot, leaving out anything not unlocked.
+  function wornAccessories(buddy, bestStreak) {
+    const worn = {};
+    for (const [spot, id] of Object.entries((buddy && buddy.wearing) || {})) {
+      const accessory = ACCESSORIES.find((candidate) => candidate.id === id);
+      if (accessory && isUnlocked(accessory, bestStreak)) {
+        worn[spot] = id;
+      }
+    }
+    return worn;
+  }
+
+  // Puts an accessory on, or takes it off if it's already on. Anything else in that spot comes off.
+  function toggleAccessory(buddy, accessoryId) {
+    const accessory = ACCESSORIES.find((candidate) => candidate.id === accessoryId);
+    const wearing = { ...(buddy.wearing || {}) };
+    if (wearing[accessory.spot] === accessoryId) {
+      delete wearing[accessory.spot];
+    } else {
+      wearing[accessory.spot] = accessoryId;
+    }
+    buddy.wearing = wearing;
   }
 
   function occurrenceKey(assignmentId, date) {
@@ -302,7 +348,7 @@ const PlannerBuddy = (() => {
       <text class="buddy-zzz" style="animation-delay:1s" x="${x + 14}" y="${y - 16}" font-size="14" fill="${INK}" opacity="0.6">z</text>`;
   }
 
-  function drawEgg(cracked, fillId, mood) {
+  function drawEgg(cracked, fillId, mood, wearing) {
     const crack = cracked
       ? `<path d="M58 98 L70 108 L80 96 L92 110 L103 97 L114 109 L126 96 L140 104" fill="none" stroke="#c9a46e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />`
       : '';
@@ -322,8 +368,72 @@ const PlannerBuddy = (() => {
         <ellipse cx="138" cy="134" rx="11" ry="6.5" fill="${BLUSH}" opacity="0.55" />
         ${faceParts(mood === 'droopy' ? 'droopy' : 'content').mouth}
         ${moodExtras(mood, true)}
+        ${drawAccessories(wearing, true, mood === 'sleepy')}
       </g>
       ${mood === 'happy' ? '' : zzz(150, 52)}`;
+  }
+
+  // Accessory drawings, placed for the grown blob's head (top at y=60), eyes (y=116),
+  // and lower body (y=150). The egg and smaller blobs shift them to fit.
+  const flower = (x, y, color) =>
+    `<g transform="translate(${x} ${y})">
+      <circle cx="0" cy="-4" r="4" fill="${color}" /><circle cx="4" cy="0" r="4" fill="${color}" />
+      <circle cx="0" cy="4" r="4" fill="${color}" /><circle cx="-4" cy="0" r="4" fill="${color}" />
+      <circle r="2.6" fill="#ffd166" />
+    </g>`;
+  const heartLens = (x) =>
+    `<path transform="translate(${x} 108)" d="M0 6 C-2 -2 -16 -2 -16 8 C-16 16 -6 20 0 26 C6 20 16 16 16 8 C16 -2 2 -2 0 6 Z"
+      fill="#e8457f" opacity="0.88" stroke="#b8305f" stroke-width="2" />
+     <ellipse cx="${x - 7}" cy="114" rx="3.5" ry="2.2" fill="#fff" opacity="0.8" />`;
+  const ACCESSORY_ART = {
+    bow: `<g transform="translate(132 72) rotate(18)">
+        <path d="M0 0 C-6 -15 -26 -15 -24 0 C-26 15 -6 15 0 0 Z" fill="#ff86b6" stroke="#e0558c" stroke-width="2.5" />
+        <path d="M0 0 C6 -15 26 -15 24 0 C26 15 6 15 0 0 Z" fill="#ff86b6" stroke="#e0558c" stroke-width="2.5" />
+        <circle r="6" fill="#e0558c" />
+      </g>`,
+    beret: `<g transform="rotate(-12 100 62)">
+        <ellipse cx="102" cy="64" rx="44" ry="14" fill="#d9485f" stroke="#b83248" stroke-width="2.5" />
+        <path d="M60 66 Q102 80 144 66" fill="none" stroke="#b83248" stroke-width="3" />
+        <rect x="98" y="44" width="7" height="9" rx="3.5" fill="#b83248" />
+      </g>`,
+    'flower-crown': `<path d="M62 82 Q100 54 138 82" fill="none" stroke="#6cbf8a" stroke-width="3" />
+      ${flower(64, 80, '#ff9ebd')}${flower(82, 68, '#c9b3ff')}${flower(100, 64, '#ffffff')}${flower(118, 68, '#ff9ebd')}${flower(136, 80, '#c9b3ff')}`,
+    'party-hat': `<path d="M82 66 L112 12 L126 62 Z" fill="#7cc4ff" stroke="#4f9ee0" stroke-width="2.5" stroke-linejoin="round" />
+      <path d="M90 52 L118 46 M98 36 L114 33" stroke="#ffd166" stroke-width="5" stroke-linecap="round" />
+      <circle cx="112" cy="12" r="6" fill="#ff86b6" />`,
+    crown: `<path d="M74 68 L70 40 L87 53 L100 32 L113 53 L130 40 L126 68 Z" fill="#ffd166" stroke="#d99a1f" stroke-width="2.5" stroke-linejoin="round" />
+      <circle cx="100" cy="58" r="4.5" fill="#ff6f91" /><circle cx="84" cy="61" r="3" fill="#7cc4ff" /><circle cx="116" cy="61" r="3" fill="#7cc4ff" />`,
+    'round-glasses': `<g fill="#fff" fill-opacity="0.18" stroke="#6b4f3a" stroke-width="3.5">
+        <circle cx="80" cy="116" r="16" /><circle cx="120" cy="116" r="16" />
+      </g>
+      <path d="M96 114 Q100 110 104 114 M64 112 L48 106 M136 112 L152 106" fill="none" stroke="#6b4f3a" stroke-width="3.5" stroke-linecap="round" />`,
+    'heart-shades': `${heartLens(80)}${heartLens(120)}
+      <path d="M95 114 Q100 110 105 114 M64 114 L48 108 M136 114 L152 108" fill="none" stroke="#b8305f" stroke-width="3" stroke-linecap="round" />`,
+    scarf: `<g transform="translate(0 -12)"><path d="M34 142 Q100 166 166 142 L168 158 Q100 182 32 158 Z" fill="#ff9f6e" stroke="#e07a45" stroke-width="2.5" />
+      <path d="M58 150 L54 165 M82 156 L80 172 M106 158 L106 174 M130 155 L132 171 M152 148 L156 163" stroke="#fff3e8" stroke-width="5" />
+      <path d="M134 160 L150 190 L134 194 L124 164 Z" fill="#ff9f6e" stroke="#e07a45" stroke-width="2.5" stroke-linejoin="round" /></g>`,
+    'bow-tie': `<path d="M100 156 L82 146 L82 166 Z M100 156 L118 146 L118 166 Z" fill="#6f8cff" stroke="#4f6be0" stroke-width="2.5" stroke-linejoin="round" />
+      <circle cx="100" cy="156" r="5" fill="#4f6be0" />`,
+  };
+
+  // The worn accessories as SVG. On the egg, head things sit higher, face things lower
+  // (its eyes are lower), and neck things narrower.
+  function drawAccessories(wearing, isEgg, sleepy) {
+    const fit = isEgg
+      ? { head: 'translate(0 -24)', face: 'translate(0 8)', neck: 'translate(100 4) scale(0.86 1) translate(-100 0)' }
+      : { head: '', face: '', neck: '' };
+    return ['neck', 'face', 'head']
+      .filter((spot) => wearing[spot] && !(spot === 'head' && sleepy))
+      .map((spot) => `<g transform="${fit[spot]}">${ACCESSORY_ART[wearing[spot]]}</g>`)
+      .join('');
+  }
+
+  // The part of the drawing each spot's accessories sit in, for drawing one on its own.
+  const SPOT_VIEW_BOXES = { head: '50 6 110 86', face: '42 90 116 50', neck: '26 122 148 66' };
+
+  function drawAccessory(accessoryId) {
+    const accessory = ACCESSORIES.find((candidate) => candidate.id === accessoryId);
+    return `<svg class="accessory-art" viewBox="${SPOT_VIEW_BOXES[accessory.spot]}" aria-hidden="true" focusable="false">${ACCESSORY_ART[accessoryId]}</svg>`;
   }
 
   // Each drawing gets its own gradient ids: a gradient defined inside a hidden tab
@@ -332,8 +442,10 @@ const PlannerBuddy = (() => {
 
   const BODY_PATH = 'M42 172 C30 172 28 150 32 130 C40 82 70 60 100 60 C130 60 160 82 168 130 C172 150 170 172 158 172 Z';
 
-  function drawBlob(stageIndex, fillId, mood) {
+  function drawBlob(stageIndex, fillId, mood, wearing) {
     const sleepy = mood === 'sleepy';
+    // A head accessory or the nightcap takes the place of the eggshell and the daisy.
+    const headCovered = sleepy || Boolean(wearing.head);
     const scale = [0, 0.72, 0.86, 1][stageIndex];
     const hasEars = stageIndex >= 2;
     const isGrown = stageIndex >= 3;
@@ -356,11 +468,11 @@ const PlannerBuddy = (() => {
          <ellipse cx="164" cy="140" rx="9" ry="13" transform="rotate(-20 164 140)" fill="#ffc6da" stroke="#f29bbb" stroke-width="2.5" />`
       : '';
     const shell =
-      stageIndex === 1 && !sleepy
+      stageIndex === 1 && !headCovered
         ? `<path d="M70 74 L80 63 L90 73 L100 61 L110 73 L120 63 L130 74 C130 46 70 46 70 74 Z" fill="#fff7e8" stroke="#ecd3a8" stroke-width="2.5" stroke-linejoin="round" />
            <circle cx="88" cy="58" r="4" fill="#ffc8dc" /><circle cx="112" cy="55" r="3" fill="#c3ecd8" />`
         : '';
-    const flower = isGrown && !sleepy
+    const daisy = isGrown && !headCovered
       ? `<path d="M100 62 C100 52 102 46 104 40" fill="none" stroke="#6cbf8a" stroke-width="3.5" stroke-linecap="round" />
          <ellipse cx="94" cy="52" rx="7" ry="4" transform="rotate(30 94 52)" fill="#86d4a2" />
          <g transform="translate(105 34)">
@@ -374,7 +486,7 @@ const PlannerBuddy = (() => {
           ${tail}${ears}${feet}
           <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="#f29bbb" stroke-width="3" />
           <ellipse cx="68" cy="88" rx="13" ry="7" transform="rotate(-32 68 88)" fill="#fff" opacity="0.65" />
-          ${arms}${face(mood)}${shell}${flower}${sleepy ? NIGHTCAP : ''}
+          ${arms}${face(mood)}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
           ${moodExtras(mood, false)}
         </g>
         ${sleepy ? zzz(160, 62) : ''}
@@ -387,11 +499,12 @@ const PlannerBuddy = (() => {
     return star(30, 60, 9, 0) + star(172, 70, 7, 0.8) + star(176, 30, 5, 1.6) + star(22, 110, 5, 2.2);
   }
 
-  // An SVG of the buddy at a stage, in a mood. The egg cracks once it's over halfway to hatching.
-  function drawBuddy(stageIndex, progress = 0, mood = 'content') {
+  // An SVG of the buddy at a stage, in a mood, wearing accessories ({ spot: id }).
+  // The egg cracks once it's over halfway to hatching.
+  function drawBuddy(stageIndex, progress = 0, mood = 'content', wearing = {}) {
     drawingCount += 1;
     const fillId = `buddy-fill-${drawingCount}`;
-    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood) : drawBlob(stageIndex, fillId, mood);
+    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood, wearing) : drawBlob(stageIndex, fillId, mood, wearing);
     const [light, dark] = stageIndex === 0 ? ['#fffdf7', '#ffe8c4'] : ['#fff0f6', '#ffbcd3'];
     return `<svg class="buddy-art buddy-mood-${mood}" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
         <defs>
@@ -411,7 +524,12 @@ const PlannerBuddy = (() => {
     MISSED_POINTS,
     STAGES,
     STREAK_MILESTONES,
+    ACCESSORY_SPOTS,
+    ACCESSORIES,
     newBuddy,
+    isUnlocked,
+    wornAccessories,
+    toggleAccessory,
     streakFor,
     pointsLog,
     totalPoints,
@@ -422,5 +540,6 @@ const PlannerBuddy = (() => {
     validateName,
     displayName,
     drawBuddy,
+    drawAccessory,
   };
 })();

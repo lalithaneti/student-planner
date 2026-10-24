@@ -2730,3 +2730,54 @@ dialog::backdrop {
     animation: none;
   }
 }
+
+/* Wardrobe: a row of accessories per spot on the buddy. */
+.wardrobe-spot {
+  margin: 12px 0 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.wardrobe-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.wardrobe-item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 6px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.wardrobe-item:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.wardrobe-item[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.wardrobe-item.is-locked {
+  cursor: default;
+}
+
+.wardrobe-item.is-locked .accessory-art {
+  filter: contrast(0);
+  opacity: 0.4;
+}
+
+.accessory-art {
+  width: 56px;
+  height: 36px;
+}

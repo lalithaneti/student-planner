@@ -2230,6 +2230,35 @@
     return `${name} is cheering you on: ${dueLeft} thing${dueLeft === 1 ? '' : 's'} left today ✨`;
   }
 
+  function buddyWearing(streak) {
+    return buddy.wornAccessories(state.buddy, streak.best);
+  }
+
+  // One button per accessory in each spot: tap to put on or take off. Locked ones say what unlocks them.
+  function renderWardrobe(streak) {
+    const wearing = buddyWearing(streak);
+    return buddy.ACCESSORY_SPOTS.map((spot) => {
+      const buttons = buddy.ACCESSORIES.filter((accessory) => accessory.spot === spot.id)
+        .map((accessory) => {
+          if (!buddy.isUnlocked(accessory, streak.best)) {
+            return `<button type="button" class="wardrobe-item is-locked" disabled>
+                ${buddy.drawAccessory(accessory.id)}
+                <span>${accessory.name}</span>
+                <span class="buddy-muted">🔒 ${accessory.streakDays}-day streak</span>
+              </button>`;
+          }
+          const worn = wearing[spot.id] === accessory.id;
+          return `<button type="button" class="wardrobe-item" data-action="wear-accessory" data-accessory="${accessory.id}" aria-pressed="${worn}">
+              ${buddy.drawAccessory(accessory.id)}
+              <span>${accessory.name}</span>
+              <span class="buddy-muted">${worn ? 'Wearing' : 'Tap to wear'}</span>
+            </button>`;
+        })
+        .join('');
+      return `<h4 class="wardrobe-spot">${spot.name}</h4><div class="wardrobe-row">${buttons}</div>`;
+    }).join('');
+  }
+
   function growHint(where) {
     if (!where.next) {
       return 'All grown up! Keep it happy by finishing your work.';
@@ -2251,7 +2280,7 @@
     const streak = buddyStreak();
     const mood = buddyMood();
     return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
-        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress, mood.mood)}${renderStreakFlame(streak)}</span>
+        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak))}${renderStreakFlame(streak)}</span>
         <span class="buddy-card-text">
           <span><strong>${escapeHtml(buddy.displayName(state.buddy))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
           <span class="buddy-card-mood">${escapeHtml(moodText(mood))}</span>
@@ -2305,7 +2334,7 @@
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
         <section class="buddy-home">
-          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress, mood.mood)}${renderStreakFlame(streak)}</div>
+          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak))}${renderStreakFlame(streak)}</div>
           <p class="buddy-mood-line">${escapeHtml(moodText(mood))}</p>
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
@@ -2324,6 +2353,11 @@
           </div>
         </section>
         <div class="buddy-side">
+          <section class="home-box">
+            <h3 class="due-heading">Wardrobe</h3>
+            <p class="buddy-muted">Longer streaks unlock more. Once unlocked, they're yours to keep.</p>
+            ${renderWardrobe(streak)}
+          </section>
           <section class="home-box">
             <h3 class="due-heading">How your buddy grows</h3>
             <ul class="buddy-rules">
@@ -2466,6 +2500,13 @@
       if (nowDone) {
         elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
       }
+    } else if (action === 'wear-accessory') {
+      const accessory = buddy.ACCESSORIES.find((candidate) => candidate.id === target.dataset.accessory);
+      const name = buddy.displayName(state.buddy);
+      const takingOff = (state.buddy.wearing || {})[accessory.spot] === accessory.id;
+      applyChange(takingOff ? `${name} took off the ${accessory.name.toLowerCase()}.` : `${name} is wearing the ${accessory.name.toLowerCase()} ✨`, () => {
+        buddy.toggleAccessory(state.buddy, accessory.id);
+      });
     } else if (action === 'skip') {
       applyChange(`Skipped ${assignment.title} on ${model.formatDate(date)}.`, () => {
         assignment.skippedDates.push(date);
