@@ -2208,6 +2208,28 @@
     return change > 0 ? ` +${change} ✨${grown}` : ` (−${-change} points)`;
   }
 
+  function buddyMood() {
+    return buddy.moodFor(state, todayKey(), currentTime());
+  }
+
+  // What the buddy is feeling and why, e.g. "Mochi is worried about Lab 3 (overdue)".
+  function moodText({ mood, worries, dueLeft }) {
+    const name = buddy.displayName(state.buddy);
+    if (mood === 'droopy') {
+      const first = worries[0];
+      const why = model.allowsLateWork(first.assignment) ? 'overdue' : 'missed';
+      const more = worries.length > 1 ? ` and ${worries.length - 1} more` : '';
+      return `${name} is worried about ${first.assignment.title} (${why})${more} 🥺`;
+    }
+    if (mood === 'sleepy') {
+      return `${name} is fast asleep. Good night! 🌙`;
+    }
+    if (mood === 'happy') {
+      return `${name} is so happy, you’re all caught up! 💕`;
+    }
+    return `${name} is cheering you on: ${dueLeft} thing${dueLeft === 1 ? '' : 's'} left today ✨`;
+  }
+
   function growHint(where) {
     if (!where.next) {
       return 'All grown up! Keep it happy by finishing your work.';
@@ -2227,10 +2249,12 @@
     const points = buddyPoints();
     const where = buddy.stageFor(points);
     const streak = buddyStreak();
+    const mood = buddyMood();
     return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
-        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress)}${renderStreakFlame(streak)}</span>
+        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress, mood.mood)}${renderStreakFlame(streak)}</span>
         <span class="buddy-card-text">
           <span><strong>${escapeHtml(buddy.displayName(state.buddy))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
+          <span class="buddy-card-mood">${escapeHtml(moodText(mood))}</span>
           <span class="buddy-card-points">${points} point${points === 1 ? '' : 's'} ${streak.current > 0 ? `<span class="buddy-streak">${streakText(streak)}</span>` : ''}</span>
           ${renderBuddyProgress(where)}
           <span class="buddy-muted">${growHint(where)}</span>
@@ -2273,6 +2297,7 @@
     const points = buddy.totalPoints(log);
     const where = buddy.stageFor(points);
     const streak = buddyStreak();
+    const mood = buddyMood();
     const recent =
       log.length === 0
         ? '<p class="empty">Check off an assignment to earn your first points!</p>'
@@ -2280,7 +2305,8 @@
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
         <section class="buddy-home">
-          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress)}${renderStreakFlame(streak)}</div>
+          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress, mood.mood)}${renderStreakFlame(streak)}</div>
+          <p class="buddy-mood-line">${escapeHtml(moodText(mood))}</p>
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
               <span>Name</span>

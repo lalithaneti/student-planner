@@ -2645,3 +2645,55 @@ dialog::backdrop {
   background: color-mix(in srgb, #f59e0b 14%, var(--surface));
   font-size: 0.85rem;
 }
+
+/* Moods: hearts float up when happy; when droopy it sways slowly and a sweat drop slides. */
+.buddy-heart {
+  transform-box: fill-box;
+  animation: buddy-heart-float 3s ease-in-out infinite;
+}
+
+.buddy-mood-droopy .buddy-body {
+  animation-duration: 6s;
+}
+
+.buddy-sweat {
+  animation: buddy-sweat 3s ease-in-out infinite;
+}
+
+@keyframes buddy-heart-float {
+  0%,
+  100% {
+    opacity: 0.4;
+    translate: 0 4px;
+  }
+  50% {
+    opacity: 1;
+    translate: 0 -6px;
+  }
+}
+
+@keyframes buddy-sweat {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-heart,
+  .buddy-sweat {
+    animation: none;
+  }
+}
+
+.buddy-mood-line {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.buddy-card-mood {
+  font-size: 0.9rem;
+}
