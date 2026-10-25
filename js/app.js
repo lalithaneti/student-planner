@@ -87,10 +87,12 @@
   // The greeting slides in once when the app opens, not again at each minute's redraw.
   let greetingHasArrived = false;
   let resolveChoice = null;
-  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['list', 'week']);
+  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'list', 'week']);
   // The app always opens on Home.
   let currentTab = 'home';
   let weekStart = model.startOfWeek(todayKey());
+  // The day shown in the assignments Day view.
+  let selectedDay = todayKey();
 
   const elements = {
     backupStatus: document.getElementById('backup-status'),
@@ -202,7 +204,7 @@
       .replaceAll("'", '&#39;');
   }
 
-  // Display preferences (List or Week, which tab) are remembered on this device.
+  // Display preferences (Day, List or Week, which tab) are remembered on this device.
   // Losing them is harmless, so failures fall back to the first option.
   function loadSavedPreference(key, options) {
     try {
@@ -478,7 +480,8 @@
     if (items.length === 0) {
       elements.dueList.innerHTML = renderEmptyPlanner();
     } else {
-      elements.dueList.innerHTML = currentView === 'week' ? renderWeekView(items) : renderListView(items);
+      const renderView = { day: renderDayView, list: renderListView, week: renderWeekView }[currentView];
+      elements.dueList.innerHTML = renderView(items);
     }
   }
 
@@ -571,6 +574,40 @@
     return html;
   }
 
+  // ---------- Day view ----------
+
+  // One day at a time, so the rest of the week doesn't crowd it. Done items stay, checked off.
+  function renderDayView(items) {
+    const today = todayKey();
+    const day = model.buildDay(items, selectedDay, today, currentTime());
+    const period = selectedDay === today ? 'today' : 'this day';
+    let html = renderDayNav(day.items.length > 0 ? renderProgress(day.progress, period) : '');
+    if (day.overdue.length > 0) {
+      html += renderHeading('Overdue', day.overdue.length, 'overdue') + renderList(day.overdue, true);
+    }
+    if (day.items.length === 0) {
+      html += `<p class="empty">Nothing due ${period}.</p>`;
+    } else {
+      html += renderHeading(dayHeading(selectedDay), day.items.length) + renderList(day.items, false);
+      if (day.progress.done === day.progress.total) {
+        html += `<p class="day-complete">All done for ${period}!</p>`;
+      }
+    }
+    return html;
+  }
+
+  function renderDayNav(extra) {
+    const isToday = selectedDay === todayKey();
+    return `
+      <div class="week-nav">
+        <button type="button" class="icon-button" data-action="previous-day" aria-label="Previous day">←</button>
+        <span class="week-range">${weekdayName(selectedDay)}, ${model.formatMonthDay(selectedDay)}</span>
+        <button type="button" class="icon-button" data-action="next-day" aria-label="Next day">→</button>
+        ${isToday ? '' : '<button type="button" class="text-button" data-action="go-to-today">Today</button>'}
+        ${extra}
+      </div>`;
+  }
+
   // ---------- Week view ----------
 
   // A compact card for a narrow day column: class tag and ⋯ on top, then checkbox and title, then time.
@@ -592,15 +629,15 @@
     return `<section class="week-column ${className}"><h3 class="week-column-heading">${heading}</h3>${body}</section>`;
   }
 
-  function renderProgress({ done, total }) {
+  function renderProgress({ done, total }, period = 'this week') {
     if (total === 0) {
-      return '<span class="week-progress"><span class="progress-text">Nothing due this week</span></span>';
+      return `<span class="week-progress"><span class="progress-text">Nothing due ${period}</span></span>`;
     }
     const percent = Math.round((done / total) * 100);
     return `
       <span class="week-progress">
         <span class="progress-text">${done} of ${total} done</span>
-        <span class="progress-bar" role="progressbar" aria-label="Done this week" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
+        <span class="progress-bar" role="progressbar" aria-label="Done ${period}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}">
           <span class="progress-fill" style="width: ${percent}%"></span>
         </span>
       </span>`;
@@ -2649,6 +2686,12 @@
       weekStart = model.addDays(weekStart, action === 'next-week' ? 7 : -7);
       renderDueList();
       renderCalendar();
+    } else if (action === 'previous-day' || action === 'next-day') {
+      selectedDay = model.addDays(selectedDay, action === 'next-day' ? 1 : -1);
+      renderDueList();
+    } else if (action === 'go-to-today') {
+      selectedDay = todayKey();
+      renderDueList();
     } else if (action === 'this-week') {
       weekStart = model.startOfWeek(todayKey());
       renderDueList();

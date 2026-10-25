@@ -341,6 +341,16 @@ const PlannerModel = (() => {
     return { overdue, columns, progress };
   }
 
+  // One day's assignments for the Day view, done ones included so progress adds up.
+  // When the day is today, unfinished late-allowed items from earlier days go in overdue.
+  function buildDay(items, date, todayKey, nowTime = '00:00') {
+    const dayItems = items.filter((item) => item.date === date);
+    const overdue =
+      date === todayKey ? items.filter((item) => item.date < date && itemStatus(item, todayKey, nowTime) === 'overdue') : [];
+    const progress = { done: dayItems.filter((item) => item.done).length, total: dayItems.length };
+    return { overdue, items: dayItems, progress };
+  }
+
   // Pulls one date out of a repeating assignment into its own one-time assignment,
   // keeping whether it was done. This is how "edit only this date" works.
   function detachOccurrence(series, date, newAssignmentId) {
@@ -849,6 +859,7 @@ const PlannerModel = (() => {
     groupByDay,
     startOfWeek,
     buildWeek,
+    buildDay,
     detachOccurrence,
     newRecurringAssignment,
     quickAddDays,

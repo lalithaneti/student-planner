@@ -1257,6 +1257,15 @@ button:focus-visible {
   transition: width 0.3s ease;
 }
 
+/* ---------- Day view ---------- */
+
+.day-complete {
+  margin: 12px 0 0;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: center;
+}
+
 /* ---------- Break banner ---------- */
 
 .break-banner {
