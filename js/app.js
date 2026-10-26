@@ -78,16 +78,14 @@
   let editingEventId = null;
   // Whether the break theme was picked by hand; until then it follows the first day's month.
   let breakThemeChosen = false;
-  let showLater = false;
   let showDone = false;
-  let showMissed = false;
   let toastTimer = null;
   // Weather for Home: { status: 'loading' | 'ready' | 'denied' | 'unavailable', ...readWeather's fields }.
   let weather = { status: 'loading' };
   // The greeting slides in once when the app opens, not again at each minute's redraw.
   let greetingHasArrived = false;
   let resolveChoice = null;
-  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'list', 'week']);
+  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'week']);
   // The app always opens on Home.
   let currentTab = 'home';
   let weekStart = model.startOfWeek(todayKey());
@@ -204,7 +202,7 @@
       .replaceAll("'", '&#39;');
   }
 
-  // Display preferences (Day, List or Week, which tab) are remembered on this device.
+  // Display preferences (Day or Week, which tab) are remembered on this device.
   // Losing them is harmless, so failures fall back to the first option.
   function loadSavedPreference(key, options) {
     try {
@@ -480,12 +478,11 @@
     if (items.length === 0) {
       elements.dueList.innerHTML = renderEmptyPlanner();
     } else {
-      const renderView = { day: renderDayView, list: renderListView, week: renderWeekView }[currentView];
-      elements.dueList.innerHTML = renderView(items);
+      elements.dueList.innerHTML = currentView === 'week' ? renderWeekView(items) : renderDayView(items);
     }
   }
 
-  // ---------- List view ----------
+  // ---------- Assignment rows ----------
 
   // One row: checkbox, class tag and time, title, and the ⋯ menu.
   // showDate adds the day to the time, for sections that aren't already grouped by day.
@@ -531,47 +528,8 @@
     return model.formatDate(date);
   }
 
-  // A heading per day, like a planner agenda.
-  function renderDays(items) {
-    return model
-      .groupByDay(items)
-      .map((day) => renderHeading(dayHeading(day.date), day.items.length) + renderList(day.items, false))
-      .join('');
-  }
-
   function renderToggle(action, expanded, label) {
     return `<button type="button" class="toggle-button" data-action="${action}" aria-expanded="${expanded}">${label}</button>`;
-  }
-
-  function renderListView(items) {
-    const groups = model.groupDueList(items, todayKey(), currentTime());
-    let html = '';
-    if (groups.overdue.length > 0) {
-      html += renderHeading('Overdue', groups.overdue.length, 'overdue') + renderList(groups.overdue, true);
-    }
-    if (groups.today.length + groups.thisWeek.length === 0) {
-      html += '<p class="empty">Nothing else due in the next 7 days.</p>';
-    }
-    html += renderDays([...groups.today, ...groups.thisWeek]);
-    if (groups.later.length > 0) {
-      html += renderToggle('toggle-later', showLater, showLater ? 'Hide later' : `Show later (${groups.later.length})`);
-      if (showLater) {
-        html += renderDays(groups.later);
-      }
-    }
-    if (groups.missed.length > 0) {
-      html += renderToggle('toggle-missed', showMissed, showMissed ? 'Hide missed' : `Show missed (${groups.missed.length})`);
-      if (showMissed) {
-        html += renderHeading('Missed', groups.missed.length) + renderList(groups.missed, true);
-      }
-    }
-    if (groups.done.length > 0) {
-      html += renderToggle('toggle-done-section', showDone, showDone ? 'Hide completed' : `Show completed (${groups.done.length})`);
-      if (showDone) {
-        html += renderHeading('Completed', groups.done.length) + renderList(groups.done, true);
-      }
-    }
-    return html;
   }
 
   // ---------- Day view ----------
@@ -591,6 +549,12 @@
       html += renderHeading(dayHeading(selectedDay), day.items.length) + renderList(day.items, false);
       if (day.progress.done === day.progress.total) {
         html += `<p class="day-complete">All done for ${period}!</p>`;
+      }
+    }
+    if (day.completed.length > 0) {
+      html += renderToggle('toggle-done-section', showDone, showDone ? 'Hide completed' : `Show completed (${day.completed.length})`);
+      if (showDone) {
+        html += renderHeading('Completed', day.completed.length) + renderList(day.completed, true);
       }
     }
     return html;
@@ -2704,12 +2668,6 @@
       switchSemester(id);
     } else if (action === 'retry-weather') {
       loadWeather();
-    } else if (action === 'toggle-later') {
-      showLater = !showLater;
-      renderDueList();
-    } else if (action === 'toggle-missed') {
-      showMissed = !showMissed;
-      renderDueList();
     } else if (action === 'toggle-done-section') {
       showDone = !showDone;
       renderDueList();

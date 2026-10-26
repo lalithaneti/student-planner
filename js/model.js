@@ -269,47 +269,6 @@ const PlannerModel = (() => {
     return allowsLateWork(item.assignment) ? 'overdue' : 'missed';
   }
 
-  // Splits the due list into the sections shown on screen. Missed items stay on their
-  // day if that's today; earlier missed items go in their own section.
-  function groupDueList(items, todayKey, nowTime = '00:00') {
-    const weekEnd = addDays(todayKey, 7);
-    const groups = { overdue: [], today: [], thisWeek: [], later: [], missed: [], done: [] };
-    for (const item of items) {
-      const status = itemStatus(item, todayKey, nowTime);
-      if (status === 'done') {
-        groups.done.push(item);
-      } else if (status === 'overdue') {
-        groups.overdue.push(item);
-      } else if (status === 'missed' && item.date < todayKey) {
-        groups.missed.push(item);
-      } else if (item.date === todayKey) {
-        groups.today.push(item);
-      } else if (item.date <= weekEnd) {
-        groups.thisWeek.push(item);
-      } else {
-        groups.later.push(item);
-      }
-    }
-    // Most recent first, so these lists stay useful as they grow.
-    groups.done.reverse();
-    groups.missed.reverse();
-    return groups;
-  }
-
-  // Bundles a sorted list into one entry per day: [{ date, items }].
-  function groupByDay(items) {
-    const days = [];
-    for (const item of items) {
-      const lastDay = days[days.length - 1];
-      if (lastDay && lastDay.date === item.date) {
-        lastDay.items.push(item);
-      } else {
-        days.push({ date: item.date, items: [item] });
-      }
-    }
-    return days;
-  }
-
   // The Monday of the week containing dateKey.
   function startOfWeek(dateKey) {
     const weekday = parseDateKey(dateKey).getDay();
@@ -343,12 +302,14 @@ const PlannerModel = (() => {
 
   // One day's assignments for the Day view, done ones included so progress adds up.
   // When the day is today, unfinished late-allowed items from earlier days go in overdue.
+  // completed is everything checked off this semester, most recent first.
   function buildDay(items, date, todayKey, nowTime = '00:00') {
     const dayItems = items.filter((item) => item.date === date);
     const overdue =
       date === todayKey ? items.filter((item) => item.date < date && itemStatus(item, todayKey, nowTime) === 'overdue') : [];
     const progress = { done: dayItems.filter((item) => item.done).length, total: dayItems.length };
-    return { overdue, items: dayItems, progress };
+    const completed = items.filter((item) => item.done).reverse();
+    return { overdue, items: dayItems, progress, completed };
   }
 
   // Pulls one date out of a repeating assignment into its own one-time assignment,
@@ -855,8 +816,6 @@ const PlannerModel = (() => {
     upcomingBreak,
     guessBreakTheme,
     validateBreak,
-    groupDueList,
-    groupByDay,
     startOfWeek,
     buildWeek,
     buildDay,
