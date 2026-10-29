@@ -767,6 +767,17 @@ const PlannerModel = (() => {
     return repeating.length > 0 ? repeating[repeating.length - 1].dueTime : '23:59';
   }
 
+  // The Getting started steps on Home, in order: add a class, add an assignment, then
+  // check one off so the Study Buddy earns its first points.
+  function gettingStartedSteps(state, buddyPoints) {
+    const inSemester = (item) => item.semesterId === state.currentSemesterId;
+    return [
+      { id: 'class', done: state.classes.some(inSemester) },
+      { id: 'assignment', done: state.assignments.some(inSemester) },
+      { id: 'check-off', done: buddyPoints > 0 },
+    ];
+  }
+
   function validateAssignment(assignment) {
     const errors = [];
     if (!assignment.title.trim()) {
@@ -823,6 +834,7 @@ const PlannerModel = (() => {
     newRecurringAssignment,
     quickAddDays,
     usualDueTime,
+    gettingStartedSteps,
     timeToMinutes,
     validateMeeting,
     buildCalendarWeek,

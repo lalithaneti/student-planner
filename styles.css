@@ -2072,6 +2072,77 @@ body {
   }
 }
 
+/* ---------- Getting started (Home, new planners only) ---------- */
+
+.getting-started {
+  margin-top: 14px;
+}
+
+.getting-started p {
+  margin: 0 0 10px;
+}
+
+.getting-started-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.getting-started-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.getting-started-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  font-weight: 600;
+}
+
+.getting-started-step.is-next .getting-started-number {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.getting-started-step.is-done .getting-started-number {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.getting-started-step.is-done strong {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.getting-started-text {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  padding-top: 3px;
+}
+
+.getting-started-text .primary-button {
+  margin-top: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .empty-state {
   display: grid;
   justify-items: start;

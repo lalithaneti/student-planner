@@ -67,6 +67,11 @@
     state.buddy = buddy.newBuddy(model.toDateKey(new Date()));
     PlannerStorage.save(state);
   }
+  // Planners that already have classes skip the Getting started card on Home.
+  if (state.gettingStartedClosed === undefined) {
+    state.gettingStartedClosed = state.classes.length > 0;
+    PlannerStorage.save(state);
+  }
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
@@ -1096,6 +1101,61 @@
     return `<ul class="schedule-list">${rows}</ul>`;
   }
 
+  const GETTING_STARTED_STEPS = {
+    class: {
+      title: 'Add a class',
+      why: 'Each class gets a color, and its meeting times fill your Calendar.',
+      button: '<button type="button" class="primary-button" data-action="open-drawer" data-section="class">Add a class</button>',
+    },
+    assignment: {
+      title: 'Add an assignment',
+      why: 'Anything due, from Canvas or a course website. Homework that repeats every week is added once.',
+      button: '<button type="button" class="primary-button" data-action="open-drawer" data-section="assignment">Add an assignment</button>',
+    },
+    'check-off': {
+      title: 'Check it off to feed your Study Buddy',
+      why: 'Work done on time earns 10 points (late work earns 5). At 50 points, the egg hatches.',
+      button: '<button type="button" class="primary-button" data-action="show-next-assignment">Go to Assignments</button>',
+    },
+  };
+
+  // A checklist for a new planner. Only the next step has a button; done steps are ticked.
+  function renderGettingStarted() {
+    if (state.gettingStartedClosed) {
+      return '';
+    }
+    const steps = model.gettingStartedSteps(state, buddyPoints());
+    if (steps.every((step) => step.done)) {
+      return `<section class="home-box getting-started" aria-labelledby="getting-started-heading">
+          <h3 class="due-heading" id="getting-started-heading">🎉 You’re all set!</h3>
+          <p>Your Study Buddy has its first points. Keep checking off work to help it grow.</p>
+          <button type="button" class="primary-button" data-action="close-getting-started">Got it</button>
+        </section>`;
+    }
+    const nextStepId = steps.find((step) => !step.done).id;
+    const rows = steps
+      .map((step, index) => {
+        const info = GETTING_STARTED_STEPS[step.id];
+        const isNext = step.id === nextStepId;
+        return `<li class="getting-started-step${step.done ? ' is-done' : ''}${isNext ? ' is-next' : ''}">
+            <span class="getting-started-number" aria-hidden="true">${step.done ? '✓' : index + 1}</span>
+            <span class="getting-started-text">
+              <strong>${info.title}</strong>${step.done ? '<span class="visually-hidden"> (done)</span>' : ''}
+              <span class="buddy-muted">${info.why}</span>
+              ${isNext ? info.button : ''}
+            </span>
+          </li>`;
+      })
+      .join('');
+    return `<section class="home-box getting-started" aria-labelledby="getting-started-heading">
+        <div class="home-box-heading">
+          <h3 class="due-heading" id="getting-started-heading">Getting started</h3>
+          <button type="button" class="text-button" data-action="close-getting-started">Hide</button>
+        </div>
+        <ol class="getting-started-steps">${rows}</ol>
+      </section>`;
+  }
+
   function renderHome() {
     const now = new Date();
     const today = todayKey();
@@ -1108,6 +1168,7 @@
         : renderList(dueToday, false);
     elements.home.innerHTML = `
       ${renderGreeting(now, nowTime)}
+      ${renderGettingStarted()}
       ${renderBreakCountdown()}
       ${renderBuddyCard()}
       <div class="home-columns">
@@ -2660,6 +2721,19 @@
       weekStart = model.startOfWeek(todayKey());
       renderDueList();
       renderCalendar();
+    } else if (action === 'show-next-assignment') {
+      // Opens Assignments on the day the next unfinished assignment is due (overdue work shows on today).
+      const today = todayKey();
+      const nextItem = model.buildDueList(state).find((item) => !item.done && statusOf(item) !== 'missed');
+      const date = nextItem && nextItem.date > today ? nextItem.date : today;
+      selectedDay = date;
+      weekStart = model.startOfWeek(date);
+      currentTab = 'assignments';
+      render();
+    } else if (action === 'close-getting-started') {
+      applyChange('Getting started hidden.', () => {
+        state.gettingStartedClosed = true;
+      });
     } else if (action === 'open-quick-add') {
       openQuickAdd();
     } else if (action === 'open-new-semester') {
