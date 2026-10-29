@@ -97,5 +97,5 @@ const PlannerStorage = (() => {
     };
   }
 
-  return { createEmptyState, load, save, createBackup, readBackup };
+  return { STORAGE_KEY, createEmptyState, load, save, createBackup, readBackup };
 })();

@@ -2972,6 +2972,26 @@
     }
   });
 
+  // Each tab keeps its own copy of the planner and saves all of it on every change, so a tab
+  // opened earlier would save its older copy over work done in another tab. Picking up every
+  // save from other tabs (and from a page the browser brings back with Back) prevents that.
+  function reloadSavedPlanner() {
+    state = PlannerStorage.load(new Date()).state;
+    // Undo would put back this tab's older copy, so it's only offered right after a change made here.
+    elements.toast.hidden = true;
+    render();
+  }
+  window.addEventListener('storage', (event) => {
+    if (event.key === PlannerStorage.STORAGE_KEY && event.newValue !== null) {
+      reloadSavedPlanner();
+    }
+  });
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      reloadSavedPlanner();
+    }
+  });
+
   elements.buddy.addEventListener('submit', handleBuddyNameSubmit);
 
   themeMenu.addEventListener('click', handleThemeClick);
