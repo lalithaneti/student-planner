@@ -754,12 +754,24 @@
       </div>`;
   }
 
-  // Banners for every break covering any of the given dates.
+  // Finals get a plain title instead of a banner: the word FINALS with the dates under it.
+  function renderFinalsTitle() {
+    const semester = currentSemester();
+    return `
+      <div class="finals-title">
+        <h3>Finals</h3>
+        <p>
+          ${model.formatDate(semester.finalsStartDate)} – ${model.formatDate(semester.endDate)} · no classes
+          <button type="button" class="text-button" data-action="edit-semester" aria-label="Edit finals dates">✎</button>
+        </p>
+      </div>`;
+  }
+
+  // Banners for every break covering any of the given dates, then the finals title if finals are among them.
   function renderBreakBanners(dates) {
-    return model
-      .breaksDuring(state, dates)
-      .map(renderBreakBanner)
-      .join('');
+    const breakBanners = model.breaksDuring(state, dates).map(renderBreakBanner).join('');
+    const finalsTitle = dates.some((date) => model.finalsDayKind(state, date) === 'finals') ? renderFinalsTitle() : '';
+    return breakBanners + finalsTitle;
   }
 
   function weekDates(dayCount) {
@@ -1209,7 +1221,7 @@
         (day) => `
           <div class="calendar-day-heading${day.date === today ? ' is-today' : ''}">
             <span class="weekday">${day.label}</span> <span class="day-number">${Number(day.date.slice(8))}</span>
-            ${model.breakOn(state, day.date) ? '<span class="break-tag">Break</span>' : ''}
+            ${renderDayTag(day.date)}
           </div>`,
       )
       .join('');
@@ -1235,6 +1247,14 @@
           ${columns}
         </div>
       </div>`;
+  }
+
+  const FINALS_DAY_TAGS = { reading: 'Reading day', finals: 'Finals' };
+
+  // A small label under a calendar day's date for a break, a reading day, or a finals day.
+  function renderDayTag(date) {
+    const label = model.breakOn(state, date) ? 'Break' : FINALS_DAY_TAGS[model.finalsDayKind(state, date)];
+    return label ? `<span class="break-tag">${label}</span>` : '';
   }
 
   // ---------- Add panel ----------
@@ -2066,6 +2086,8 @@
     form.elements.name.value = semester.name;
     form.elements.startDate.value = semester.startDate;
     form.elements.endDate.value = semester.endDate;
+    form.elements.lastClassDate.value = semester.lastClassDate || '';
+    form.elements.finalsStartDate.value = semester.finalsStartDate || '';
     form.elements.schoolYearEndDate.value = model.schoolYearEnd(semester);
     showErrors(elements.semesterErrors, []);
     elements.backupStatus.textContent = '';
@@ -2078,8 +2100,10 @@
     const name = form.elements.name.value.trim();
     const startDate = form.elements.startDate.value;
     const endDate = form.elements.endDate.value;
+    const lastClassDate = form.elements.lastClassDate.value;
+    const finalsStartDate = form.elements.finalsStartDate.value;
     const schoolYearEndDate = form.elements.schoolYearEndDate.value;
-    const errors = model.validateSemester({ name, startDate, endDate });
+    const errors = model.validateSemester({ name, startDate, endDate, lastClassDate, finalsStartDate });
     // The school year end is only checked once the semester's own dates are right.
     if (errors.length === 0 && !model.isValidDateKey(schoolYearEndDate)) {
       errors.push('Pick when the school year ends.');
@@ -2090,7 +2114,9 @@
     if (errors.length > 0) {
       return;
     }
-    applyChange('Semester saved.', () => Object.assign(currentSemester(), { name, startDate, endDate, schoolYearEndDate }));
+    applyChange('Semester saved.', () =>
+      Object.assign(currentSemester(), { name, startDate, endDate, lastClassDate, finalsStartDate, schoolYearEndDate }),
+    );
     elements.semesterDialog.close();
     resetAssignmentDates();
   }
@@ -2464,6 +2490,8 @@
     form.elements.name.value = guess.name;
     form.elements.startDate.value = guess.startDate;
     form.elements.endDate.value = guess.endDate;
+    form.elements.lastClassDate.value = '';
+    form.elements.finalsStartDate.value = '';
     // Year-long RSOs start checked, semester-only ones unchecked.
     const rsos = model.currentRsos(state);
     elements.newSemesterRsosField.hidden = rsos.length === 0;
@@ -2503,7 +2531,13 @@
   function handleNewSemesterSubmit(event) {
     event.preventDefault();
     const form = elements.newSemesterForm;
-    const fields = { name: form.elements.name.value.trim(), startDate: form.elements.startDate.value, endDate: form.elements.endDate.value };
+    const fields = {
+      name: form.elements.name.value.trim(),
+      startDate: form.elements.startDate.value,
+      endDate: form.elements.endDate.value,
+      lastClassDate: form.elements.lastClassDate.value,
+      finalsStartDate: form.elements.finalsStartDate.value,
+    };
     const errors = model.validateSemester(fields);
     if (state.semesters.some((semester) => semester.name.toLowerCase() === fields.name.toLowerCase())) {
       errors.push(`You already have a semester called ${fields.name}.`);
@@ -2734,6 +2768,8 @@
       applyChange('Getting started hidden.', () => {
         state.gettingStartedClosed = true;
       });
+    } else if (action === 'edit-semester') {
+      openSemesterDialog();
     } else if (action === 'open-quick-add') {
       openQuickAdd();
     } else if (action === 'open-new-semester') {

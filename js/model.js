@@ -107,6 +107,20 @@ const PlannerModel = (() => {
     } else if (semester.startDate > semester.endDate) {
       errors.push('The end date must be after the start date.');
     }
+    // The finals dates are optional; without them, classes run until the semester ends.
+    const { lastClassDate, finalsStartDate } = semester;
+    if (errors.length === 0 && lastClassDate) {
+      if (!isValidDateKey(lastClassDate) || lastClassDate < semester.startDate || lastClassDate > semester.endDate) {
+        errors.push('The last day of classes must be during the semester.');
+      }
+    }
+    if (errors.length === 0 && finalsStartDate) {
+      if (!lastClassDate) {
+        errors.push('Add the last day of classes too, so finals know when to start.');
+      } else if (!isValidDateKey(finalsStartDate) || finalsStartDate <= lastClassDate || finalsStartDate > semester.endDate) {
+        errors.push('Finals must start after the last day of classes and by the day the semester ends.');
+      }
+    }
     return errors;
   }
 
@@ -156,6 +170,31 @@ const PlannerModel = (() => {
       }
     }
     return dates;
+  }
+
+  // ---------- Finals ----------
+
+  function currentSemesterOf(state) {
+    return state.semesters.find((semester) => semester.id === state.currentSemesterId);
+  }
+
+  // After the last day of classes, classes stop meeting and repeating homework stops being due.
+  function classesOverOn(state, date) {
+    const { lastClassDate } = currentSemesterOf(state);
+    return Boolean(lastClassDate) && date > lastClassDate;
+  }
+
+  // 'reading' for the days between the last class and the first day of finals, 'finals'
+  // from then until the semester ends, or null.
+  function finalsDayKind(state, date) {
+    const semester = currentSemesterOf(state);
+    if (!semester.finalsStartDate || date > semester.endDate) {
+      return null;
+    }
+    if (date >= semester.finalsStartDate) {
+      return 'finals';
+    }
+    return classesOverOn(state, date) ? 'reading' : null;
   }
 
   // ---------- Breaks ----------
@@ -234,8 +273,8 @@ const PlannerModel = (() => {
         continue;
       }
       for (const date of occurrenceDates(assignment)) {
-        // Repeating assignments take break days off; one-time ones were entered on purpose.
-        if (assignment.kind === 'weekly' && breakOn(state, date)) {
+        // Repeating assignments take break days and finals off; one-time ones were entered on purpose.
+        if (assignment.kind === 'weekly' && (breakOn(state, date) || classesOverOn(state, date))) {
           continue;
         }
         items.push({
@@ -434,8 +473,8 @@ const PlannerModel = (() => {
   // Every class meeting on one date (only inside the current semester and not on a break),
   // including cancelled ones, which are marked so the calendar can show them faded.
   function classMeetingsOn(state, date) {
-    const semester = state.semesters.find((candidate) => candidate.id === state.currentSemesterId);
-    if (date < semester.startDate || date > semester.endDate || breakOn(state, date)) {
+    const semester = currentSemesterOf(state);
+    if (date < semester.startDate || date > semester.endDate || breakOn(state, date) || classesOverOn(state, date)) {
       return [];
     }
     const weekday = parseDateKey(date).getDay();
@@ -823,6 +862,7 @@ const PlannerModel = (() => {
     itemStatus,
     BREAK_THEMES,
     breakOn,
+    finalsDayKind,
     breaksDuring,
     upcomingBreak,
     guessBreakTheme,

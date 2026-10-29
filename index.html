@@ -370,7 +370,7 @@
     <dialog id="semester-dialog" aria-labelledby="semester-dialog-heading">
       <form id="semester-form" method="dialog" novalidate>
         <h2 id="semester-dialog-heading">Semester</h2>
-        <p class="hint">New repeating assignments run until the semester ends.</p>
+        <p class="hint">After the last day of classes, classes and repeating homework stop until the semester ends.</p>
         <label class="field">
           <span>Name</span>
           <input name="name" type="text" maxlength="40" />
@@ -381,8 +381,18 @@
             <input name="startDate" type="date" />
           </label>
           <label class="field">
-            <span>Ends</span>
+            <span>Ends <small>(last day of finals)</small></span>
             <input name="endDate" type="date" />
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Last day of classes <small>(optional)</small></span>
+            <input name="lastClassDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Finals start <small>(optional)</small></span>
+            <input name="finalsStartDate" type="date" />
           </label>
         </div>
         <label class="field">
@@ -424,8 +434,18 @@
             <input name="startDate" type="date" />
           </label>
           <label class="field">
-            <span>Ends</span>
+            <span>Ends <small>(last day of finals)</small></span>
             <input name="endDate" type="date" />
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Last day of classes <small>(optional)</small></span>
+            <input name="lastClassDate" type="date" />
+          </label>
+          <label class="field">
+            <span>Finals start <small>(optional)</small></span>
+            <input name="finalsStartDate" type="date" />
           </label>
         </div>
         <fieldset class="field" id="new-semester-rsos-field">
