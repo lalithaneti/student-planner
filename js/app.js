@@ -171,6 +171,7 @@
     rsoMeetingList: document.getElementById('rso-meeting-list'),
     rsoEventList: document.getElementById('rso-event-list'),
     classExamList: document.getElementById('class-exam-list'),
+    finalFields: document.getElementById('final-fields'),
     rsoLastsHint: document.getElementById('rso-lasts-hint'),
     eventPanel: document.getElementById('event-panel'),
     eventForm: document.getElementById('event-form'),
@@ -800,7 +801,11 @@
     };
   }
 
-  // An exam on the calendar, in its class's color and marked EXAM. Clicking it opens a
+  function examTag(exam) {
+    return exam.isFinal ? 'Final' : 'Exam';
+  }
+
+  // An exam on the calendar, in its class's color and marked EXAM (or FINAL). Clicking it opens a
   // menu to edit or delete it.
   function renderExamBlock(block, startHour) {
     const { exam, plannerClass } = block;
@@ -811,7 +816,7 @@
       <details class="row-menu class-block-slot" style="${style}">
         <summary class="class-block is-exam" style="--class-color: ${plannerClass.color}"
           title="${escapeHtml(plannerClass.name)} ${title}${exam.location ? ` · ${escapeHtml(exam.location)}` : ''}">
-          <span class="class-block-name"><span class="exam-tag">Exam</span> ${escapeHtml(plannerClass.name)} ${title}</span>
+          <span class="class-block-name"><span class="exam-tag">${examTag(exam)}</span> ${escapeHtml(plannerClass.name)} ${title}</span>
           ${details}
           <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
         </summary>
@@ -1077,7 +1082,7 @@
   function describeBlock(block) {
     switch (block.kind) {
       case 'exam':
-        return { color: block.plannerClass.color, name: `<span class="exam-tag">Exam</span> ${escapeHtml(block.plannerClass.name)} ${escapeHtml(block.exam.title)}`, place: block.exam.location };
+        return { color: block.plannerClass.color, name: `<span class="exam-tag">${examTag(block.exam)}</span> ${escapeHtml(block.plannerClass.name)} ${escapeHtml(block.exam.title)}`, place: block.exam.location };
       case 'rso-meeting':
         return { color: block.rso.color, name: `${escapeHtml(block.rso.name)}${block.meeting.label ? ` ${escapeHtml(block.meeting.label)}` : ''}`, place: block.meeting.location };
       case 'rso-event':
@@ -1482,6 +1487,50 @@
     renderOneTimeRows(list, readOneTimeRows(list).filter((candidate) => candidate.id !== row.dataset.rowId));
   }
 
+  // ---------- A class's final exam ----------
+
+  // The final is saved as one of the class's exams, marked isFinal, so the Calendar and the
+  // exam countdown treat it like any exam. The class form gives it a section of its own.
+  function fillFinalFields(final) {
+    const fields = elements.classForm.elements;
+    fields.hasFinal.checked = Boolean(final);
+    fields.finalDate.value = final ? final.date : '';
+    fields.finalStart.value = final ? final.startTime : '';
+    fields.finalEnd.value = final ? final.endTime : '';
+    fields.finalLocation.value = final ? final.location : '';
+    elements.finalFields.hidden = !final;
+  }
+
+  // The final from the form, or null when "This class has a final" is off. A class that
+  // already has a final keeps its id.
+  function readFinalFields(classId) {
+    const fields = elements.classForm.elements;
+    if (!fields.hasFinal.checked) {
+      return null;
+    }
+    const existing = (state.exams || []).find((exam) => exam.classId === classId && exam.isFinal);
+    return {
+      id: existing ? existing.id : newId('exam'),
+      semesterId: state.currentSemesterId,
+      classId,
+      title: 'Final exam',
+      date: fields.finalDate.value,
+      startTime: fields.finalStart.value,
+      endTime: fields.finalEnd.value,
+      location: fields.finalLocation.value.trim(),
+      isFinal: true,
+    };
+  }
+
+  // Turning the final on shows its fields, with the date starting on the first day of finals.
+  function handleHasFinalChange() {
+    const fields = elements.classForm.elements;
+    elements.finalFields.hidden = !fields.hasFinal.checked;
+    if (fields.hasFinal.checked && !fields.finalDate.value) {
+      fields.finalDate.value = currentSemester().finalsStartDate || '';
+    }
+  }
+
   // ---------- Recurring assignments in the class form ----------
 
   function renderRecurringRows(rows) {
@@ -1862,10 +1911,12 @@
     renderMeetingRows(elements.meetingList, plannerClass.meetings || []);
     renderRecurringRows([]);
     renderExistingRecurring(id);
+    const classExams = (state.exams || []).filter((exam) => exam.classId === id);
     renderOneTimeRows(
       elements.classExamList,
-      (state.exams || []).filter((exam) => exam.classId === id).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
+      classExams.filter((exam) => !exam.isFinal).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)),
     );
+    fillFinalFields(classExams.find((exam) => exam.isFinal) || null);
     elements.classFormLabel.textContent = `Edit ${plannerClass.name}`;
     elements.classSubmit.textContent = 'Save class';
     elements.classCancel.hidden = false;
@@ -1879,6 +1930,7 @@
     renderMeetingRows(elements.meetingList, []);
     renderRecurringRows([]);
     renderOneTimeRows(elements.classExamList, []);
+    fillFinalFields(null);
     elements.existingRecurring.innerHTML = '';
     elements.classFormLabel.textContent = 'New class';
     elements.classSubmit.textContent = 'Add class';
@@ -1913,6 +1965,11 @@
       const which = exam.title || `Exam ${index + 1}`;
       model.validateExam(exam).forEach((error) => errors.push(`${which}: ${error}`));
     });
+    const final = readFinalFields(classId);
+    if (final) {
+      model.validateExam(final).forEach((error) => errors.push(`Final exam: ${error}`));
+      exams.push(final);
+    }
     showErrors(elements.classErrors, errors);
     if (errors.length > 0) {
       return;
@@ -2906,6 +2963,7 @@
   document.getElementById('add-rso-meeting').addEventListener('click', () => addMeetingRow(elements.rsoMeetingList, ALL_DAYS, 'General meeting'));
   document.getElementById('add-rso-event').addEventListener('click', () => addOneTimeRow(elements.rsoEventList));
   document.getElementById('add-class-exam').addEventListener('click', () => addOneTimeRow(elements.classExamList));
+  document.getElementById('has-final').addEventListener('change', handleHasFinalChange);
   elements.rsoForm.addEventListener('submit', handleRsoSubmit);
   elements.rsoCancel.addEventListener('click', stopEditingRso);
   elements.eventForm.addEventListener('submit', handleEventSubmit);

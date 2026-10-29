@@ -111,7 +111,19 @@
             <button type="button" class="text-button" id="add-recurring">+ Add recurring assignment</button>
           </fieldset>
           <fieldset class="field">
-            <legend>Exams <small>(optional: midterms, final…)</small></legend>
+            <legend>Final exam</legend>
+            <label class="checkbox-field"><input type="checkbox" name="hasFinal" id="has-final" /> <span>This class has a final</span></label>
+            <div class="final-fields" id="final-fields" hidden>
+              <label class="field"><span>Date</span><input name="finalDate" type="date" /></label>
+              <div class="field-row">
+                <label class="field"><span>Starts</span><input name="finalStart" type="time" /></label>
+                <label class="field"><span>Ends</span><input name="finalEnd" type="time" /></label>
+              </div>
+              <input name="finalLocation" type="text" maxlength="40" placeholder="Room (optional)" aria-label="Final exam room" />
+            </div>
+          </fieldset>
+          <fieldset class="field">
+            <legend>Exams <small>(optional: midterms, quizzes…)</small></legend>
             <ul class="meeting-list" id="class-exam-list" data-kind="exam"></ul>
             <button type="button" class="text-button" id="add-class-exam">+ Add exam</button>
           </fieldset>
