@@ -42,6 +42,7 @@
             <button type="button" role="menuitem" data-action="open-drawer" data-section="assignment">Assignment</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="exam">Exam</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="quiz">Quiz</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="break">Break</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="rso">RSO</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="event">Event</button>
@@ -230,7 +231,7 @@
             </label>
           </div>
           <label class="field">
-            <span>Room <small>(optional)</small></span>
+            <span><span id="exam-place-label">Room</span> <small>(optional)</small></span>
             <input name="location" type="text" maxlength="40" placeholder="e.g. Foellinger Auditorium" autocomplete="off" />
           </label>
           <ul class="form-errors" id="exam-errors" role="alert"></ul>

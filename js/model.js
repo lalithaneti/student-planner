@@ -504,18 +504,24 @@ const PlannerModel = (() => {
     return (state.exams || []).filter((exam) => exam.semesterId === state.currentSemesterId);
   }
 
-  // Returns a list of problems with an exam; empty means it is valid.
-  function validateExam(exam) {
+  // Quizzes are booked times (like a CBTF slot). Unlike exams, they can be on a weekend,
+  // don't replace a class meeting, and aren't in the exam countdown.
+  function quizzesOf(state) {
+    return (state.quizzes || []).filter((quiz) => quiz.semesterId === state.currentSemesterId);
+  }
+
+  // Returns a list of problems with an exam (or, with kind 'quiz', a quiz); empty means it is valid.
+  function validateExam(exam, kind = 'exam') {
     const errors = [];
     if (!exam.title.trim()) {
-      errors.push('Give the exam a name, like Midterm 1.');
+      errors.push(kind === 'quiz' ? 'Give the quiz a name, like Quiz 5.' : 'Give the exam a name, like Midterm 1.');
     }
     if (!exam.classId) {
-      errors.push('Pick the class this exam is for.');
+      errors.push(`Pick the class this ${kind} is for.`);
     }
     if (!isValidDateKey(exam.date)) {
-      errors.push('Pick the exam date.');
-    } else if ([0, 6].includes(parseDateKey(exam.date).getDay())) {
+      errors.push(`Pick the ${kind} date.`);
+    } else if (kind === 'exam' && [0, 6].includes(parseDateKey(exam.date).getDay())) {
       errors.push('The calendar shows Monday to Friday, so pick a weekday.');
     }
     if (!isValidTime(exam.startTime) || !isValidTime(exam.endTime)) {
@@ -623,7 +629,7 @@ const PlannerModel = (() => {
     return errors;
   }
 
-  // Everything on the calendar for one date: class meetings, exams, RSO meetings, and
+  // Everything on the calendar for one date: class meetings, exams, quizzes, RSO meetings, and
   // events. An exam replaces its own class's meeting when they overlap (an in-class exam).
   function calendarBlocksOn(state, date) {
     const classesById = new Map(state.classes.map((plannerClass) => [plannerClass.id, plannerClass]));
@@ -633,7 +639,10 @@ const PlannerModel = (() => {
     const meetings = classMeetingsOn(state, date)
       .filter((meeting) => !exams.some((exam) => exam.plannerClass.id === meeting.plannerClass.id && exam.startTime < meeting.endTime && meeting.startTime < exam.endTime))
       .map((meeting) => ({ kind: 'meeting', ...meeting }));
-    return [...meetings, ...exams, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const quizzes = quizzesOf(state)
+      .filter((quiz) => quiz.date === date && classesById.has(quiz.classId))
+      .map((quiz) => ({ kind: 'quiz', quiz, plannerClass: classesById.get(quiz.classId), date, startTime: quiz.startTime, endTime: quiz.endTime, cancelled: false }));
+    return [...meetings, ...exams, ...quizzes, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   // How far ahead the exam countdown looks.
@@ -679,19 +688,20 @@ const PlannerModel = (() => {
       endHour: Math.ceil(endMinutes / 60),
       hasMeetings:
         classes.some((plannerClass) => (plannerClass.meetings || []).length > 0) ||
+        quizzesOf(state).length > 0 ||
         rsosOf(state).some((rso) => rso.meetings.length > 0 || (rso.events || []).length > 0) ||
         (state.events || []).length > 0,
       outsideSemester: addDays(weekStart, 4) < semester.startDate || weekStart > semester.endDate,
     };
   }
 
-  // The class or exam happening now ({ status: 'now', ... }), or else the next one that
+  // The class, exam, or quiz happening now ({ status: 'now', ... }), or else the next one that
   // isn't cancelled ({ status: 'next', ... }), looking up to two weeks ahead. null if none.
   // RSOs aren't classes, so they don't count.
   function nextClass(state, todayKey, nowTime) {
     for (let offset = 0; offset < 14; offset += 1) {
       const date = addDays(todayKey, offset);
-      const meetings = calendarBlocksOn(state, date).filter((meeting) => !meeting.cancelled && (meeting.kind === 'meeting' || meeting.kind === 'exam'));
+      const meetings = calendarBlocksOn(state, date).filter((meeting) => !meeting.cancelled && ['meeting', 'exam', 'quiz'].includes(meeting.kind));
       if (offset === 0) {
         const happeningNow = meetings.find((meeting) => meeting.startTime <= nowTime && nowTime < meeting.endTime);
         if (happeningNow) {
