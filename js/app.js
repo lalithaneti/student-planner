@@ -62,9 +62,8 @@
 
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
-  // Planners from before the Study Buddy get one that starts counting today.
-  if (!state.buddy) {
-    state.buddy = buddy.newBuddy(model.toDateKey(new Date()));
+  // Planners from before buddies were per semester keep theirs as their semester's buddy.
+  if (buddy.moveToSemesterBuddies(state, model.toDateKey(new Date()))) {
     PlannerStorage.save(state);
   }
   // Planners that already have classes skip the Getting started card on Home.
@@ -2325,9 +2324,7 @@
     }
     applyChange(`Restored the backup${from}.`, () => {
       state = backup.planner;
-      if (!state.buddy) {
-        state.buddy = buddy.newBuddy(todayKey());
-      }
+      buddy.moveToSemesterBuddies(state, todayKey());
     });
     if (backup.theme) {
       themes.setChoice(backup.theme);
@@ -2337,14 +2334,24 @@
 
   // ---------- Study Buddy ----------
 
+  // The planner as the viewed semester's buddy sees it (see PlannerBuddy.forSemester).
+  function buddyView() {
+    return buddy.forSemester(state, state.currentSemesterId);
+  }
+
+  // The viewed semester's buddy, or null until one is picked.
+  function currentBuddy() {
+    return buddyView().buddy;
+  }
+
   function buddyPoints() {
-    return buddy.totalPoints(buddy.pointsLog(state, todayKey(), currentTime()));
+    return buddy.totalPoints(buddy.pointsLog(buddyView(), todayKey(), currentTime()));
   }
 
   const GROWN_MESSAGES = ['', 'hatched! 🐣', 'grew little ears! 🐾', 'is all grown up! 🌼'];
 
   function buddyStreak() {
-    return buddy.streakFor(state, todayKey(), currentTime());
+    return buddy.streakFor(buddyView(), todayKey(), currentTime());
   }
 
   function dayCount(days) {
@@ -2386,17 +2393,20 @@
     }
     const stageBefore = buddy.stageFor(pointsBefore).index;
     const stageAfter = buddy.stageFor(pointsAfter).index;
-    const grown = stageAfter > stageBefore ? ` ${buddy.displayName(state.buddy)} ${GROWN_MESSAGES[stageAfter]}` : '';
+    const grown = stageAfter > stageBefore ? ` ${buddy.displayName(currentBuddy())} ${GROWN_MESSAGES[stageAfter]}` : '';
     return change > 0 ? ` +${change} ✨${grown}` : ` (−${-change} points)`;
   }
 
   function buddyMood() {
-    return buddy.moodFor(state, todayKey(), currentTime());
+    return buddy.moodFor(buddyView(), todayKey(), currentTime());
   }
 
   // What the buddy is feeling and why, e.g. "Mochi is worried about Lab 3 (overdue)".
-  function moodText({ mood, worries, dueLeft }) {
-    const name = buddy.displayName(state.buddy);
+  function moodText({ mood, worries, dueLeft, wakesOn }) {
+    const name = buddy.displayName(currentBuddy());
+    if (wakesOn) {
+      return `${name} is asleep until ${currentSemester().name} starts on ${model.formatDate(wakesOn)} 💤`;
+    }
     if (mood === 'droopy') {
       const first = worries[0];
       const why = model.allowsLateWork(first.assignment) ? 'overdue' : 'missed';
@@ -2413,7 +2423,7 @@
   }
 
   function buddyWearing(streak) {
-    return buddy.wornAccessories(state.buddy, streak.best);
+    return buddy.wornAccessories(currentBuddy(), streak.best);
   }
 
   // One button per accessory in each spot: tap to put on or take off. Locked ones say what unlocks them.
@@ -2456,15 +2466,30 @@
       </span>`;
   }
 
+  // The viewed semester's buddy drawn as it is now.
+  function drawCurrentBuddy(where, mood, streak) {
+    return buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak), currentBuddy().color);
+  }
+
   function renderBuddyCard() {
+    if (!currentBuddy()) {
+      return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
+          <span class="buddy-card-art">${buddy.drawBuddy(0, 0, 'happy')}</span>
+          <span class="buddy-card-text">
+            <strong>${escapeHtml(currentSemester().name)} needs a Study Buddy</strong>
+            <span class="buddy-muted">Pick its color to start a new egg.</span>
+          </span>
+          <span class="buddy-card-arrow" aria-hidden="true">›</span>
+        </button>`;
+    }
     const points = buddyPoints();
     const where = buddy.stageFor(points);
     const streak = buddyStreak();
     const mood = buddyMood();
     return `<button type="button" class="buddy-card" data-action="set-tab" data-tab="buddy">
-        <span class="buddy-card-art">${buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak))}${renderStreakFlame(streak)}</span>
+        <span class="buddy-card-art">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</span>
         <span class="buddy-card-text">
-          <span><strong>${escapeHtml(buddy.displayName(state.buddy))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
+          <span><strong>${escapeHtml(buddy.displayName(currentBuddy()))}</strong> <span class="buddy-muted">· ${where.stage.name}</span></span>
           <span class="buddy-card-mood">${escapeHtml(moodText(mood))}</span>
           <span class="buddy-card-points">${points} point${points === 1 ? '' : 's'} ${streak.current > 0 ? `<span class="buddy-streak">${streakText(streak)}</span>` : ''}</span>
           ${renderBuddyProgress(where)}
@@ -2494,7 +2519,7 @@
     return buddy.STAGES.map((stage, index) => {
       const reached = index <= where.index;
       return `<li class="buddy-stage-item ${reached ? 'is-reached' : 'is-locked'}">
-          ${buddy.drawBuddy(index)}
+          ${buddy.drawBuddy(index, 0, 'content', {}, currentBuddy().color)}
           <span>${reached ? stage.name : '???'}</span>
           <span class="buddy-muted">${stage.minPoints} pts</span>
         </li>`;
@@ -2503,8 +2528,56 @@
 
   const RECENT_POINTS_COUNT = 8;
 
+  // For a semester without a buddy: an egg in each color to choose from.
+  function renderBuddyPicker() {
+    const choices = buddy.COLORS.map(
+      (color) => `<button type="button" class="buddy-color-choice" data-action="pick-buddy-color" data-color="${color.id}">
+          ${buddy.drawBuddy(0, 0, 'happy', {}, color.id)}
+          <span>${color.name}</span>
+        </button>`,
+    ).join('');
+    return `<section class="home-box buddy-picker">
+        <h3 class="due-heading">Pick a Study Buddy for ${escapeHtml(currentSemester().name)}</h3>
+        <p class="buddy-muted">Each semester gets its own buddy. It starts as an egg and grows with this semester’s work.</p>
+        <div class="buddy-color-choices">${choices}</div>
+      </section>`;
+  }
+
+  // Buddies from the other semesters, each as it is in its own semester.
+  function renderBuddyShelf() {
+    const today = todayKey();
+    const nowTime = currentTime();
+    const cards = state.semesters
+      .filter((semester) => semester.id !== state.currentSemesterId && (state.buddies || {})[semester.id])
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map((semester) => {
+        const view = buddy.forSemester(state, semester.id);
+        const points = buddy.totalPoints(buddy.pointsLog(view, today, nowTime));
+        const where = buddy.stageFor(points);
+        const best = buddy.streakFor(view, today, nowTime).best;
+        return `<li class="buddy-shelf-item">
+            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best), view.buddy.color)}
+            <strong>${escapeHtml(buddy.displayName(view.buddy))}</strong>
+            <span>${escapeHtml(semester.name)}</span>
+            <span class="buddy-muted">${where.stage.name} · ${points} point${points === 1 ? '' : 's'}</span>
+            <span class="buddy-muted">Best streak: ${dayCount(best)}</span>
+          </li>`;
+      });
+    if (cards.length === 0) {
+      return '';
+    }
+    return `<section class="home-box buddy-shelf">
+        <h3 class="due-heading">Buddy Collection</h3>
+        <ul class="buddy-shelf-list">${cards.join('')}</ul>
+      </section>`;
+  }
+
   function renderBuddy() {
-    const log = buddy.pointsLog(state, todayKey(), currentTime());
+    if (!currentBuddy()) {
+      elements.buddy.innerHTML = renderBuddyPicker() + renderBuddyShelf();
+      return;
+    }
+    const log = buddy.pointsLog(buddyView(), todayKey(), currentTime());
     const points = buddy.totalPoints(log);
     const where = buddy.stageFor(points);
     const streak = buddyStreak();
@@ -2516,12 +2589,12 @@
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
         <section class="buddy-home">
-          <div class="buddy-big">${buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak))}${renderStreakFlame(streak)}</div>
+          <div class="buddy-big">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</div>
           <p class="buddy-mood-line">${escapeHtml(moodText(mood))}</p>
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
               <span>Name</span>
-              <input type="text" name="name" maxlength="20" autocomplete="off" placeholder="Give your buddy a name" value="${escapeHtml(state.buddy.name)}" />
+              <input type="text" name="name" maxlength="20" autocomplete="off" placeholder="Give your buddy a name" value="${escapeHtml(currentBuddy().name)}" />
             </label>
             <button type="submit" class="secondary-button">Save</button>
           </form>
@@ -2552,7 +2625,7 @@
                 ).join('')}</span></li>
             </ul>
             <p class="buddy-muted">A day adds to your streak when everything due that day is checked off on time.
-              Counts work due from ${model.formatDate(state.buddy.startDate)} on.</p>
+              Counts ${escapeHtml(currentSemester().name)} work due from ${model.formatDate(currentBuddy().startDate)} on.</p>
             <ol class="buddy-stages">${renderBuddyStages(where)}</ol>
           </section>
           <section class="home-box">
@@ -2560,7 +2633,8 @@
             ${recent}
           </section>
         </div>
-      </div>`;
+      </div>
+      ${renderBuddyShelf()}`;
   }
 
   function handleBuddyNameSubmit(event) {
@@ -2572,7 +2646,7 @@
       return;
     }
     applyChange(name ? `Named your buddy ${name} 💕` : 'Cleared your buddy’s name.', () => {
-      state.buddy.name = name;
+      currentBuddy().name = name;
     });
   }
 
@@ -2677,7 +2751,9 @@
       const streakBefore = buddyStreak().current;
       const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
       applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore), () => {
-        buddy.recordCheckOff(state.buddy, item, nowDone, todayKey(), currentTime());
+        if (currentBuddy()) {
+          buddy.recordCheckOff(currentBuddy(), item, nowDone, todayKey(), currentTime());
+        }
         if (assignment.kind === 'once') {
           assignment.done = nowDone;
         } else if (nowDone) {
@@ -2692,10 +2768,15 @@
       }
     } else if (action === 'wear-accessory') {
       const accessory = buddy.ACCESSORIES.find((candidate) => candidate.id === target.dataset.accessory);
-      const name = buddy.displayName(state.buddy);
-      const takingOff = (state.buddy.wearing || {})[accessory.spot] === accessory.id;
+      const name = buddy.displayName(currentBuddy());
+      const takingOff = (currentBuddy().wearing || {})[accessory.spot] === accessory.id;
       applyChange(takingOff ? `${name} took off the ${accessory.name.toLowerCase()}.` : `${name} is wearing the ${accessory.name.toLowerCase()} ✨`, () => {
-        buddy.toggleAccessory(state.buddy, accessory.id);
+        buddy.toggleAccessory(currentBuddy(), accessory.id);
+      });
+    } else if (action === 'pick-buddy-color') {
+      const color = buddy.COLORS.find((candidate) => candidate.id === target.dataset.color);
+      applyChange(`A ${color.name.toLowerCase()} egg for ${currentSemester().name}! 🥚`, () => {
+        buddy.startBuddy(state, state.currentSemesterId, color.id, todayKey());
       });
     } else if (action === 'skip') {
       applyChange(`Skipped ${assignment.title} on ${model.formatDate(date)}.`, () => {
@@ -3120,6 +3201,7 @@
   // save from other tabs (and from a page the browser brings back with Back) prevents that.
   function reloadSavedPlanner() {
     state = PlannerStorage.load(new Date()).state;
+    buddy.moveToSemesterBuddies(state, todayKey());
     // Undo would put back this tab's older copy, so it's only offered right after a change made here.
     elements.toast.hidden = true;
     render();

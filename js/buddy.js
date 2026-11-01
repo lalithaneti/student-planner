@@ -43,10 +43,53 @@ const PlannerBuddy = (() => {
     { id: 'crown', name: 'Gold crown', spot: 'head', streakDays: 30 },
   ];
 
+  // The mochi blob comes in these colors, picked when a semester's buddy is started.
+  const COLORS = [
+    { id: 'pink', name: 'Pink' },
+    { id: 'mint', name: 'Mint' },
+    { id: 'lavender', name: 'Lavender' },
+    { id: 'peach', name: 'Peach' },
+    { id: 'sky', name: 'Sky blue' },
+    { id: 'lemon', name: 'Lemon' },
+  ];
+
   // Only work due on or after startDate counts, so things missed before the buddy
   // existed don't count against it. wearing maps a spot to an accessory id.
-  function newBuddy(todayKey) {
-    return { name: '', startDate: todayKey, lateDone: [], wearing: {} };
+  function newBuddy(todayKey, color = 'pink') {
+    return { name: '', color, startDate: todayKey, lateDone: [], wearing: {} };
+  }
+
+  // Each semester has its own buddy in state.buddies, keyed by semester id. A new one
+  // starts counting on the semester's first day, or today if the semester already began.
+  function startBuddy(state, semesterId, color, todayKey) {
+    const semester = state.semesters.find((candidate) => candidate.id === semesterId);
+    state.buddies = { ...(state.buddies || {}), [semesterId]: newBuddy(semester.startDate > todayKey ? semester.startDate : todayKey, color) };
+  }
+
+  // Planners from before buddies were per semester had one state.buddy; it becomes the buddy of
+  // the semester it started in, in its original pink. A brand-new planner gets a pink buddy for
+  // its first semester. Returns true if anything changed, so the caller knows to save.
+  function moveToSemesterBuddies(state, todayKey) {
+    if (state.buddies) {
+      return false;
+    }
+    state.buddies = {};
+    if (state.buddy) {
+      const home =
+        state.semesters.find((semester) => semester.startDate <= state.buddy.startDate && state.buddy.startDate <= semester.endDate) ||
+        state.semesters.find((semester) => semester.id === state.currentSemesterId);
+      state.buddies[home.id] = { color: 'pink', ...state.buddy };
+      delete state.buddy;
+    } else {
+      startBuddy(state, state.currentSemesterId, 'pink', todayKey);
+    }
+    return true;
+  }
+
+  // The planner as one semester's buddy sees it: that semester's work and that buddy (or
+  // null if the semester has none yet). Every function below takes a view like this.
+  function forSemester(state, semesterId) {
+    return { ...state, currentSemesterId: semesterId, buddy: (state.buddies || {})[semesterId] || null };
   }
 
   function isUnlocked(accessory, bestStreak) {
@@ -81,14 +124,9 @@ const PlannerBuddy = (() => {
     return `${assignmentId}|${date}`;
   }
 
-  // Every assignment date in every semester, so switching semesters doesn't change points.
-  function allItems(state) {
-    return state.semesters.flatMap((semester) => PlannerModel.buildDueList({ ...state, currentSemesterId: semester.id }));
-  }
-
-  // Assignment dates since the buddy started, oldest first.
+  // The semester's assignment dates since its buddy started, oldest first.
   function countedItems(state) {
-    return allItems(state)
+    return PlannerModel.buildDueList(state)
       .filter((item) => item.date >= state.buddy.startDate)
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   }
@@ -111,7 +149,10 @@ const PlannerBuddy = (() => {
   // unchecked), or 'pending' (today, with work still to do before it's due).
   function streakDays(state, items, todayKey, nowTime) {
     const days = [];
-    for (let date = state.buddy.startDate; date <= todayKey; date = PlannerModel.addDays(date, 1)) {
+    // Days after the semester ends don't count, so a past semester's buddy stays as it finished.
+    const semesterEnd = state.semesters.find((semester) => semester.id === state.currentSemesterId).endDate;
+    const lastDay = todayKey < semesterEnd ? todayKey : semesterEnd;
+    for (let date = state.buddy.startDate; date <= lastDay; date = PlannerModel.addDays(date, 1)) {
       const dueThatDay = items.filter((item) => item.date === date);
       const broken = dueThatDay.some((item) =>
         item.done ? wasDoneLate(state.buddy, item) : isPastDue(item, todayKey, nowTime),
@@ -244,6 +285,10 @@ const PlannerBuddy = (() => {
     if (!state.buddy) {
       return { mood: 'content', worries: [], dueLeft: 0 };
     }
+    // A buddy for a semester that hasn't started sleeps until its first day.
+    if (todayKey < state.buddy.startDate) {
+      return { mood: 'sleepy', worries: [], dueLeft: 0, wakesOn: state.buddy.startDate };
+    }
     const items = countedItems(state);
     const worries = items.filter((item) => {
       const status = PlannerModel.itemStatus(item, todayKey, nowTime);
@@ -276,6 +321,17 @@ const PlannerBuddy = (() => {
   // ---------- Drawing ----------
 
   const INK = '#4a2e44';
+
+  // Each color's body gradient (light to dark), outline, ears and arms (soft), inner ears
+  // (deep), feet, and egg (light, dark, outline).
+  const PALETTES = {
+    pink: { light: '#fff0f6', dark: '#ffbcd3', outline: '#f29bbb', soft: '#ffc6da', deep: '#ff9ebd', feet: '#ffb3cd', egg: ['#fff8fb', '#ffd9e7', '#efb7cb'] },
+    mint: { light: '#effcf5', dark: '#b2ebcd', outline: '#7fcfa6', soft: '#c6f0da', deep: '#93dcb6', feet: '#a8e6c6', egg: ['#f6fef9', '#cdf3df', '#93d8b4'] },
+    lavender: { light: '#f6f1ff', dark: '#d4c6ff', outline: '#ab97ea', soft: '#ddd2ff', deep: '#bfaef5', feet: '#cdbffb', egg: ['#faf7ff', '#e2d9ff', '#b9a8ee'] },
+    peach: { light: '#fff4ec', dark: '#ffcfae', outline: '#f0a77a', soft: '#ffd9bf', deep: '#ffb88c', feet: '#ffc7a3', egg: ['#fffaf5', '#ffe0c9', '#f0b48c'] },
+    sky: { light: '#eff8ff', dark: '#bde0ff', outline: '#86bfe8', soft: '#cbe7ff', deep: '#9fd0f7', feet: '#b3dbfb', egg: ['#f6fbff', '#d3ebff', '#94c7ec'] },
+    lemon: { light: '#fffcea', dark: '#ffeea0', outline: '#e0c252', soft: '#fff3b8', deep: '#ffe27a', feet: '#ffeb99', egg: ['#fffef5', '#fff3c2', '#e3cc72'] },
+  };
   const BLUSH = '#ff8fab';
 
   const CLOSED_EYES = `<path d="M77 124 q7 7 14 0 M109 124 q7 7 14 0" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round" />`;
@@ -348,13 +404,13 @@ const PlannerBuddy = (() => {
       <text class="buddy-zzz" style="animation-delay:1s" x="${x + 14}" y="${y - 16}" font-size="14" fill="${INK}" opacity="0.6">z</text>`;
   }
 
-  function drawEgg(cracked, fillId, mood, wearing) {
+  function drawEgg(cracked, fillId, mood, wearing, palette) {
     const crack = cracked
       ? `<path d="M58 98 L70 108 L80 96 L92 110 L103 97 L114 109 L126 96 L140 104" fill="none" stroke="#c9a46e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />`
       : '';
     return `<g class="buddy-body buddy-egg">
         <path d="M100 38 C142 38 162 108 160 136 C158 166 134 180 100 180 C66 180 42 166 40 136 C38 108 58 38 100 38 Z"
-          fill="url(#${fillId})" stroke="#ecd3a8" stroke-width="3" />
+          fill="url(#${fillId})" stroke="${palette.egg[2]}" stroke-width="3" />
         <circle cx="74" cy="84" r="10" fill="#ffc8dc" />
         <circle cx="128" cy="72" r="7" fill="#c3ecd8" />
         <circle cx="138" cy="118" r="11" fill="#ffc8dc" />
@@ -442,7 +498,8 @@ const PlannerBuddy = (() => {
 
   const BODY_PATH = 'M42 172 C30 172 28 150 32 130 C40 82 70 60 100 60 C130 60 160 82 168 130 C172 150 170 172 158 172 Z';
 
-  function drawBlob(stageIndex, fillId, mood, wearing) {
+  function drawBlob(stageIndex, fillId, mood, wearing, palette) {
+    const { outline, soft, deep, feet: feetColor } = palette;
     const sleepy = mood === 'sleepy';
     // A head accessory or the nightcap takes the place of the eggshell and the daisy.
     const headCovered = sleepy || Boolean(wearing.head);
@@ -450,22 +507,22 @@ const PlannerBuddy = (() => {
     const hasEars = stageIndex >= 2;
     const isGrown = stageIndex >= 3;
     const ears = hasEars
-      ? `<circle cx="58" cy="82" r="19" fill="#ffc6da" stroke="#f29bbb" stroke-width="3" />
-         <circle cx="142" cy="82" r="19" fill="#ffc6da" stroke="#f29bbb" stroke-width="3" />
-         <circle cx="58" cy="82" r="9" fill="#ff9ebd" />
-         <circle cx="142" cy="82" r="9" fill="#ff9ebd" />`
+      ? `<circle cx="58" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
+         <circle cx="142" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
+         <circle cx="58" cy="82" r="9" fill="${deep}" />
+         <circle cx="142" cy="82" r="9" fill="${deep}" />`
       : '';
     const tail = isGrown
-      ? `<path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="#f29bbb" stroke-width="9" stroke-linecap="round" />
-         <path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="#ffc6da" stroke-width="4" stroke-linecap="round" />`
+      ? `<path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${outline}" stroke-width="9" stroke-linecap="round" />
+         <path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${soft}" stroke-width="4" stroke-linecap="round" />`
       : '';
     const feet = hasEars
-      ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="#ffb3cd" stroke="#f29bbb" stroke-width="2.5" />
-         <ellipse cx="128" cy="172" rx="15" ry="7" fill="#ffb3cd" stroke="#f29bbb" stroke-width="2.5" />`
+      ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />
+         <ellipse cx="128" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />`
       : '';
     const arms = hasEars
-      ? `<ellipse cx="36" cy="140" rx="9" ry="13" transform="rotate(20 36 140)" fill="#ffc6da" stroke="#f29bbb" stroke-width="2.5" />
-         <ellipse cx="164" cy="140" rx="9" ry="13" transform="rotate(-20 164 140)" fill="#ffc6da" stroke="#f29bbb" stroke-width="2.5" />`
+      ? `<ellipse cx="36" cy="140" rx="9" ry="13" transform="rotate(20 36 140)" fill="${soft}" stroke="${outline}" stroke-width="2.5" />
+         <ellipse cx="164" cy="140" rx="9" ry="13" transform="rotate(-20 164 140)" fill="${soft}" stroke="${outline}" stroke-width="2.5" />`
       : '';
     const shell =
       stageIndex === 1 && !headCovered
@@ -484,7 +541,7 @@ const PlannerBuddy = (() => {
     return `<g transform="translate(100 172) scale(${scale}) translate(-100 -172)">
         <g class="buddy-body">
           ${tail}${ears}${feet}
-          <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="#f29bbb" stroke-width="3" />
+          <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="${outline}" stroke-width="3" />
           <ellipse cx="68" cy="88" rx="13" ry="7" transform="rotate(-32 68 88)" fill="#fff" opacity="0.65" />
           ${arms}${face(mood)}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
           ${moodExtras(mood, false)}
@@ -499,13 +556,14 @@ const PlannerBuddy = (() => {
     return star(30, 60, 9, 0) + star(172, 70, 7, 0.8) + star(176, 30, 5, 1.6) + star(22, 110, 5, 2.2);
   }
 
-  // An SVG of the buddy at a stage, in a mood, wearing accessories ({ spot: id }).
+  // An SVG of the buddy at a stage, in a mood, wearing accessories ({ spot: id }), in a color.
   // The egg cracks once it's over halfway to hatching.
-  function drawBuddy(stageIndex, progress = 0, mood = 'content', wearing = {}) {
+  function drawBuddy(stageIndex, progress = 0, mood = 'content', wearing = {}, color = 'pink') {
     drawingCount += 1;
     const fillId = `buddy-fill-${drawingCount}`;
-    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood, wearing) : drawBlob(stageIndex, fillId, mood, wearing);
-    const [light, dark] = stageIndex === 0 ? ['#fffdf7', '#ffe8c4'] : ['#fff0f6', '#ffbcd3'];
+    const palette = PALETTES[color] || PALETTES.pink;
+    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood, wearing, palette) : drawBlob(stageIndex, fillId, mood, wearing, palette);
+    const [light, dark] = stageIndex === 0 ? palette.egg : [palette.light, palette.dark];
     return `<svg class="buddy-art buddy-mood-${mood}" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
         <defs>
           <radialGradient id="${fillId}" cx="0.38" cy="0.3" r="0.85">
@@ -526,7 +584,11 @@ const PlannerBuddy = (() => {
     STREAK_MILESTONES,
     ACCESSORY_SPOTS,
     ACCESSORIES,
+    COLORS,
     newBuddy,
+    startBuddy,
+    moveToSemesterBuddies,
+    forSemester,
     isUnlocked,
     wornAccessories,
     toggleAccessory,

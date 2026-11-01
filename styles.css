@@ -2632,6 +2632,67 @@ dialog::backdrop {
   animation: none;
 }
 
+/* ---------- Picking a new semester's buddy, and the Buddy Collection ---------- */
+
+.buddy-color-choices {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.buddy-shelf-list {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+.buddy-color-choices,
+.buddy-shelf-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buddy-color-choice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.buddy-color-choice:hover {
+  border-color: var(--accent);
+}
+
+/* On a phone the boxes are narrower than the drawing, so it shrinks to fit. */
+.buddy-color-choice .buddy-art,
+.buddy-shelf-item .buddy-art {
+  width: min(84px, 100%);
+}
+
+.buddy-shelf {
+  margin-top: 14px;
+}
+
+.buddy-shelf-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
 .buddy-log {
   display: grid;
   gap: 6px;
