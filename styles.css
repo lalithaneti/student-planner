@@ -2667,8 +2667,23 @@ dialog::backdrop {
   cursor: pointer;
 }
 
-.buddy-color-choice:hover {
+.buddy-color-choice:hover:not(:disabled),
+.buddy-color-choice[aria-pressed='true'] {
   border-color: var(--accent);
+}
+
+.buddy-color-choice[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* A species another semester already has. */
+.buddy-color-choice:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.buddy-start {
+  margin-top: 14px;
 }
 
 /* On a phone the boxes are narrower than the drawing, so it shrinks to fit. */

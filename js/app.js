@@ -63,7 +63,10 @@
   const loaded = PlannerStorage.load(new Date());
   let state = loaded.state;
   // Planners from before buddies were per semester keep theirs as their semester's buddy.
-  if (buddy.moveToSemesterBuddies(state, model.toDateKey(new Date()))) {
+  // Buddies from before species existed get one: the oldest stays a mochi, later ones get new species.
+  const movedBuddy = buddy.moveToSemesterBuddies(state, model.toDateKey(new Date()));
+  const filledInSpecies = buddy.fillInSpecies(state);
+  if (movedBuddy || filledInSpecies) {
     PlannerStorage.save(state);
   }
   // Planners that already have classes skip the Getting started card on Home.
@@ -91,6 +94,8 @@
   // The greeting slides in once when the app opens, not again at each minute's redraw.
   let greetingHasArrived = false;
   let resolveChoice = null;
+  // What's chosen so far in the Study Buddy picker, before the egg is started.
+  let buddyPick = { species: 'mochi', color: 'pink' };
   let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'week']);
   // The app always opens on Home.
   let currentTab = 'home';
@@ -2325,6 +2330,7 @@
     applyChange(`Restored the backup${from}.`, () => {
       state = backup.planner;
       buddy.moveToSemesterBuddies(state, todayKey());
+      buddy.fillInSpecies(state);
     });
     if (backup.theme) {
       themes.setChoice(backup.theme);
@@ -2468,7 +2474,8 @@
 
   // The viewed semester's buddy drawn as it is now.
   function drawCurrentBuddy(where, mood, streak) {
-    return buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak), currentBuddy().color);
+    const { color, species } = currentBuddy();
+    return buddy.drawBuddy(where.index, where.progress, mood.mood, buddyWearing(streak), color, species);
   }
 
   function renderBuddyCard() {
@@ -2519,7 +2526,7 @@
     return buddy.STAGES.map((stage, index) => {
       const reached = index <= where.index;
       return `<li class="buddy-stage-item ${reached ? 'is-reached' : 'is-locked'}">
-          ${buddy.drawBuddy(index, 0, 'content', {}, currentBuddy().color)}
+          ${buddy.drawBuddy(index, 0, 'content', {}, currentBuddy().color, currentBuddy().species)}
           <span>${reached ? stage.name : '???'}</span>
           <span class="buddy-muted">${stage.minPoints} pts</span>
         </li>`;
@@ -2528,18 +2535,48 @@
 
   const RECENT_POINTS_COUNT = 8;
 
-  // For a semester without a buddy: an egg in each color to choose from.
+  // The semester whose buddy is a species, other than the one being viewed, or undefined.
+  function semesterWithSpecies(speciesId) {
+    const [semesterId] = Object.entries(state.buddies || {}).find(
+      ([id, semesterBuddy]) => id !== state.currentSemesterId && semesterBuddy.species === speciesId,
+    ) || [];
+    return state.semesters.find((semester) => semester.id === semesterId);
+  }
+
+  // For a semester without a buddy: pick a species (each shown grown up, with ones other
+  // semesters already have grayed out), then a color, then start the egg.
   function renderBuddyPicker() {
-    const choices = buddy.COLORS.map(
-      (color) => `<button type="button" class="buddy-color-choice" data-action="pick-buddy-color" data-color="${color.id}">
-          ${buddy.drawBuddy(0, 0, 'happy', {}, color.id)}
+    const available = buddy.speciesChoices(state, state.currentSemesterId);
+    if (!available.includes(buddyPick.species)) {
+      buddyPick.species = available[0];
+    }
+    const speciesButtons = buddy.SPECIES.map((species) => {
+      const taken = !available.includes(species.id);
+      const owner = taken ? semesterWithSpecies(species.id) : null;
+      return `<button type="button" class="buddy-color-choice" data-action="choose-buddy-species" data-species="${species.id}"
+          aria-pressed="${buddyPick.species === species.id}" ${taken ? 'disabled' : ''}>
+          ${buddy.drawBuddy(3, 0, 'happy', {}, buddyPick.color, species.id)}
+          <span>${species.name}</span>
+          ${owner ? `<span class="buddy-muted">${escapeHtml(owner.name)}’s buddy</span>` : ''}
+        </button>`;
+    }).join('');
+    const colorButtons = buddy.COLORS.map(
+      (color) => `<button type="button" class="buddy-color-choice" data-action="choose-buddy-color" data-color="${color.id}"
+          aria-pressed="${buddyPick.color === color.id}">
+          ${buddy.drawBuddy(3, 0, 'content', {}, color.id, buddyPick.species)}
           <span>${color.name}</span>
         </button>`,
     ).join('');
+    const species = buddy.SPECIES.find((candidate) => candidate.id === buddyPick.species);
+    const color = buddy.COLORS.find((candidate) => candidate.id === buddyPick.color);
     return `<section class="home-box buddy-picker">
         <h3 class="due-heading">Pick a Study Buddy for ${escapeHtml(currentSemester().name)}</h3>
-        <p class="buddy-muted">Each semester gets its own buddy. It starts as an egg and grows with this semester’s work.</p>
-        <div class="buddy-color-choices">${choices}</div>
+        <p class="buddy-muted">Each semester gets its own buddy, and a species you haven’t had yet. It starts as an egg and grows with this semester’s work.</p>
+        <h4 class="wardrobe-spot">Species</h4>
+        <div class="buddy-color-choices">${speciesButtons}</div>
+        <h4 class="wardrobe-spot">Color</h4>
+        <div class="buddy-color-choices">${colorButtons}</div>
+        <button type="button" class="primary-button buddy-start" data-action="start-buddy">Start a ${color.name.toLowerCase()} ${species.name.toLowerCase()} egg</button>
       </section>`;
   }
 
@@ -2556,7 +2593,7 @@
         const where = buddy.stageFor(points);
         const best = buddy.streakFor(view, today, nowTime).best;
         return `<li class="buddy-shelf-item">
-            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best), view.buddy.color)}
+            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best), view.buddy.color, view.buddy.species)}
             <strong>${escapeHtml(buddy.displayName(view.buddy))}</strong>
             <span>${escapeHtml(semester.name)}</span>
             <span class="buddy-muted">${where.stage.name} · ${points} point${points === 1 ? '' : 's'}</span>
@@ -2773,10 +2810,18 @@
       applyChange(takingOff ? `${name} took off the ${accessory.name.toLowerCase()}.` : `${name} is wearing the ${accessory.name.toLowerCase()} ✨`, () => {
         buddy.toggleAccessory(currentBuddy(), accessory.id);
       });
-    } else if (action === 'pick-buddy-color') {
-      const color = buddy.COLORS.find((candidate) => candidate.id === target.dataset.color);
-      applyChange(`A ${color.name.toLowerCase()} egg for ${currentSemester().name}! 🥚`, () => {
-        buddy.startBuddy(state, state.currentSemesterId, color.id, todayKey());
+    } else if (action === 'choose-buddy-species') {
+      buddyPick.species = target.dataset.species;
+      renderBuddy();
+    } else if (action === 'choose-buddy-color') {
+      buddyPick.color = target.dataset.color;
+      renderBuddy();
+    } else if (action === 'start-buddy') {
+      const { species, color } = buddyPick;
+      const speciesName = buddy.SPECIES.find((candidate) => candidate.id === species).name.toLowerCase();
+      const colorName = buddy.COLORS.find((candidate) => candidate.id === color).name.toLowerCase();
+      applyChange(`A new egg for ${currentSemester().name}! It will hatch into a ${colorName} ${speciesName} 🥚`, () => {
+        buddy.startBuddy(state, state.currentSemesterId, color, todayKey(), species);
       });
     } else if (action === 'skip') {
       applyChange(`Skipped ${assignment.title} on ${model.formatDate(date)}.`, () => {
@@ -3202,6 +3247,7 @@
   function reloadSavedPlanner() {
     state = PlannerStorage.load(new Date()).state;
     buddy.moveToSemesterBuddies(state, todayKey());
+    buddy.fillInSpecies(state);
     // Undo would put back this tab's older copy, so it's only offered right after a change made here.
     elements.toast.hidden = true;
     render();

@@ -53,17 +53,55 @@ const PlannerBuddy = (() => {
     { id: 'lemon', name: 'Lemon' },
   ];
 
+  // Each semester's buddy is a species it hasn't been before, as long as unused ones are left.
+  const SPECIES = [
+    { id: 'mochi', name: 'Mochi' },
+    { id: 'bunny', name: 'Bunny' },
+  ];
+
   // Only work due on or after startDate counts, so things missed before the buddy
   // existed don't count against it. wearing maps a spot to an accessory id.
-  function newBuddy(todayKey, color = 'pink') {
-    return { name: '', color, startDate: todayKey, lateDone: [], wearing: {} };
+  function newBuddy(todayKey, color = 'pink', species = 'mochi') {
+    return { name: '', species, color, startDate: todayKey, lateDone: [], wearing: {} };
   }
 
   // Each semester has its own buddy in state.buddies, keyed by semester id. A new one
   // starts counting on the semester's first day, or today if the semester already began.
-  function startBuddy(state, semesterId, color, todayKey) {
+  function startBuddy(state, semesterId, color, todayKey, species = 'mochi') {
     const semester = state.semesters.find((candidate) => candidate.id === semesterId);
-    state.buddies = { ...(state.buddies || {}), [semesterId]: newBuddy(semester.startDate > todayKey ? semester.startDate : todayKey, color) };
+    state.buddies = {
+      ...(state.buddies || {}),
+      [semesterId]: newBuddy(semester.startDate > todayKey ? semester.startDate : todayKey, color, species),
+    };
+  }
+
+  // The species other semesters' buddies already are.
+  function usedSpecies(state, semesterId) {
+    return Object.entries(state.buddies || {})
+      .filter(([id, buddy]) => id !== semesterId && buddy.species)
+      .map(([, buddy]) => buddy.species);
+  }
+
+  // The species a semester can pick: the unused ones, or every one once all have been used.
+  function speciesChoices(state, semesterId) {
+    const used = usedSpecies(state, semesterId);
+    const unused = SPECIES.filter((species) => !used.includes(species.id));
+    return unused.length > 0 ? unused.map((species) => species.id) : SPECIES.map((species) => species.id);
+  }
+
+  // Buddies from before species existed get one, oldest semester first: the first is a mochi,
+  // and each later one the first species not used yet. Returns true if anything changed.
+  function fillInSpecies(state) {
+    let changed = false;
+    const semesters = [...state.semesters].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    for (const semester of semesters) {
+      const buddy = (state.buddies || {})[semester.id];
+      if (buddy && !buddy.species) {
+        buddy.species = speciesChoices(state, semester.id)[0];
+        changed = true;
+      }
+    }
+    return changed;
   }
 
   // Planners from before buddies were per semester had one state.buddy; it becomes the buddy of
@@ -78,7 +116,7 @@ const PlannerBuddy = (() => {
       const home =
         state.semesters.find((semester) => semester.startDate <= state.buddy.startDate && state.buddy.startDate <= semester.endDate) ||
         state.semesters.find((semester) => semester.id === state.currentSemesterId);
-      state.buddies[home.id] = { color: 'pink', ...state.buddy };
+      state.buddies[home.id] = { color: 'pink', species: 'mochi', ...state.buddy };
       delete state.buddy;
     } else {
       startBuddy(state, state.currentSemesterId, 'pink', todayKey);
@@ -498,24 +536,48 @@ const PlannerBuddy = (() => {
 
   const BODY_PATH = 'M42 172 C30 172 28 150 32 130 C40 82 70 60 100 60 C130 60 160 82 168 130 C172 150 170 172 158 172 Z';
 
-  function drawBlob(stageIndex, fillId, mood, wearing, palette) {
+  // A bunny's long ears, drawn behind its body: short at first, longer as it grows, and
+  // the right one flops over once it's grown up.
+  function bunnyEars(stageIndex, palette) {
+    const { light, outline, deep } = palette;
+    const length = [0, 18, 26, 32][stageIndex];
+    const ear = (x, tilt) => `<g transform="rotate(${tilt} ${x} 72)">
+        <ellipse cx="${x}" cy="${72 - length}" rx="12" ry="${length + 6}" fill="${light}" stroke="${outline}" stroke-width="3" />
+        <ellipse cx="${x}" cy="${74 - length}" rx="5.5" ry="${length - 2}" fill="${deep}" opacity="0.8" />
+      </g>`;
+    return ear(80, -10) + (stageIndex >= 3 ? ear(124, 62) : ear(120, 10));
+  }
+
+  // A round puff of a tail on a grown-up bunny.
+  function bunnyTail(palette) {
+    return `<g fill="${palette.light}" stroke="${palette.outline}" stroke-width="2.5">
+        <circle cx="168" cy="146" r="13" /><circle cx="160" cy="138" r="7" stroke="none" />
+      </g>`;
+  }
+
+  function drawBlob(stageIndex, fillId, mood, wearing, palette, species) {
     const { outline, soft, deep, feet: feetColor } = palette;
+    const isBunny = species === 'bunny';
     const sleepy = mood === 'sleepy';
     // A head accessory or the nightcap takes the place of the eggshell and the daisy.
     const headCovered = sleepy || Boolean(wearing.head);
     const scale = [0, 0.72, 0.86, 1][stageIndex];
     const hasEars = stageIndex >= 2;
     const isGrown = stageIndex >= 3;
-    const ears = hasEars
+    const roundEars = hasEars
       ? `<circle cx="58" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
          <circle cx="142" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
          <circle cx="58" cy="82" r="9" fill="${deep}" />
          <circle cx="142" cy="82" r="9" fill="${deep}" />`
       : '';
-    const tail = isGrown
+    const curlyTail = isGrown
       ? `<path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${outline}" stroke-width="9" stroke-linecap="round" />
          <path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${soft}" stroke-width="4" stroke-linecap="round" />`
       : '';
+    const ears = isBunny ? bunnyEars(stageIndex, palette) : roundEars;
+    const tail = isBunny ? (isGrown ? bunnyTail(palette) : '') : curlyTail;
+    // Bunnies get a little pink nose under their eyes.
+    const nose = isBunny ? `<ellipse cx="100" cy="125" rx="3.4" ry="2.4" fill="${BLUSH}" />` : '';
     const feet = hasEars
       ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />
          <ellipse cx="128" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />`
@@ -543,7 +605,7 @@ const PlannerBuddy = (() => {
           ${tail}${ears}${feet}
           <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="${outline}" stroke-width="3" />
           <ellipse cx="68" cy="88" rx="13" ry="7" transform="rotate(-32 68 88)" fill="#fff" opacity="0.65" />
-          ${arms}${face(mood)}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
+          ${arms}${face(mood)}${nose}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
           ${moodExtras(mood, false)}
         </g>
         ${sleepy ? zzz(160, 62) : ''}
@@ -556,13 +618,14 @@ const PlannerBuddy = (() => {
     return star(30, 60, 9, 0) + star(172, 70, 7, 0.8) + star(176, 30, 5, 1.6) + star(22, 110, 5, 2.2);
   }
 
-  // An SVG of the buddy at a stage, in a mood, wearing accessories ({ spot: id }), in a color.
+  // An SVG of the buddy at a stage, in a mood, wearing accessories ({ spot: id }), in a color,
+  // as a species. Every species hatches from the same egg.
   // The egg cracks once it's over halfway to hatching.
-  function drawBuddy(stageIndex, progress = 0, mood = 'content', wearing = {}, color = 'pink') {
+  function drawBuddy(stageIndex, progress = 0, mood = 'content', wearing = {}, color = 'pink', species = 'mochi') {
     drawingCount += 1;
     const fillId = `buddy-fill-${drawingCount}`;
     const palette = PALETTES[color] || PALETTES.pink;
-    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood, wearing, palette) : drawBlob(stageIndex, fillId, mood, wearing, palette);
+    const art = stageIndex === 0 ? drawEgg(progress >= 0.5, fillId, mood, wearing, palette) : drawBlob(stageIndex, fillId, mood, wearing, palette, species);
     const [light, dark] = stageIndex === 0 ? palette.egg : [palette.light, palette.dark];
     return `<svg class="buddy-art buddy-mood-${mood}" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
         <defs>
@@ -585,8 +648,12 @@ const PlannerBuddy = (() => {
     ACCESSORY_SPOTS,
     ACCESSORIES,
     COLORS,
+    SPECIES,
     newBuddy,
     startBuddy,
+    speciesChoices,
+    usedSpecies,
+    fillInSpecies,
     moveToSemesterBuddies,
     forSemester,
     isUnlocked,
