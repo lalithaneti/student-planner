@@ -63,6 +63,8 @@ const PlannerBuddy = (() => {
     { id: 'bear', name: 'Bear' },
     { id: 'penguin', name: 'Penguin' },
     { id: 'hamster', name: 'Hamster' },
+    { id: 'hedgehog', name: 'Hedgehog' },
+    { id: 'mouse', name: 'Mouse' },
   ];
 
   // Only work due on or after startDate counts, so things missed before the buddy
@@ -708,6 +710,49 @@ const PlannerBuddy = (() => {
     front: () => PINK_NOSE,
   };
 
+  // The hedgehog has a ring of soft spikes behind its body that grows each stage, a pale face
+  // with tiny ears, and a little dark nose.
+  function hedgehogSpikes(stageIndex, { deep, outline }) {
+    const length = [0, 9, 13, 17][stageIndex];
+    const spikeCount = 11;
+    // The spikes follow the top of the body (an arc around its middle), from one side to the other.
+    const pointAt = (angle, radius) => {
+      const radians = (angle * Math.PI) / 180;
+      return `${(100 + Math.cos(radians) * radius).toFixed(1)} ${(132 + Math.sin(radians) * radius).toFixed(1)}`;
+    };
+    const points = [];
+    for (let index = 0; index <= spikeCount * 2; index += 1) {
+      const angle = 195 + (150 * index) / (spikeCount * 2);
+      points.push(pointAt(angle, index % 2 === 0 ? 66 : 70 + length));
+    }
+    return `<path d="M${pointAt(195, 50)} L${points.join(' L')} L${pointAt(345, 50)} Z" fill="${deep}" stroke="${outline}" stroke-width="3" stroke-linejoin="round" />`;
+  }
+
+  const HEDGEHOG_PARTS = {
+    ears: hedgehogSpikes,
+    underFace: (stageIndex, { light, soft, outline }) => `<ellipse cx="100" cy="124" rx="42" ry="32" fill="${light}" opacity="0.9" />
+      <circle cx="70" cy="92" r="7" fill="${soft}" stroke="${outline}" stroke-width="2" />
+      <circle cx="130" cy="92" r="7" fill="${soft}" stroke="${outline}" stroke-width="2" />`,
+    front: () => `<ellipse cx="100" cy="125" rx="4.6" ry="3.4" fill="${INK}" />`,
+  };
+
+  // The mouse has big round ears high on its head that grow each stage, whiskers, a pink nose,
+  // and a long thin tail from Little one on.
+  const MOUSE_PARTS = {
+    ears: (stageIndex, { soft, outline }) => {
+      const size = [0, 14, 19, 23][stageIndex];
+      const ear = (x) => `<circle cx="${x}" cy="68" r="${size}" fill="${soft}" stroke="${outline}" stroke-width="3" />
+        <circle cx="${x}" cy="68" r="${size * 0.6}" fill="${BLUSH}" opacity="0.6" />`;
+      return ear(64) + ear(136);
+    },
+    tail: (stageIndex, { outline }) =>
+      stageIndex >= 2
+        ? `<path d="M158 160 C186 162 192 136 178 128 C168 122 164 136 176 140" fill="none" stroke="${outline}" stroke-width="3.5" stroke-linecap="round" />`
+        : '',
+    front: (stageIndex, { outline }) => `${PINK_NOSE}
+      <path d="M80 128 L58 124 M80 132 L58 134 M120 128 L142 124 M120 132 L142 134" fill="none" stroke="${outline}" stroke-width="1.8" stroke-linecap="round" />`,
+  };
+
   const SPECIES_PARTS = {
     mochi: MOCHI_PARTS,
     bunny: BUNNY_PARTS,
@@ -717,6 +762,8 @@ const PlannerBuddy = (() => {
     bear: BEAR_PARTS,
     penguin: PENGUIN_PARTS,
     hamster: HAMSTER_PARTS,
+    hedgehog: HEDGEHOG_PARTS,
+    mouse: MOUSE_PARTS,
   };
 
   function drawBlob(stageIndex, fillId, mood, wearing, palette, species) {
