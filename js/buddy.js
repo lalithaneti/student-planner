@@ -61,6 +61,8 @@ const PlannerBuddy = (() => {
     { id: 'fox', name: 'Fox' },
     { id: 'puppy', name: 'Puppy' },
     { id: 'bear', name: 'Bear' },
+    { id: 'penguin', name: 'Penguin' },
+    { id: 'hamster', name: 'Hamster' },
   ];
 
   // Only work due on or after startDate counts, so things missed before the buddy
@@ -542,8 +544,9 @@ const PlannerBuddy = (() => {
 
   // ---------- Species ----------
   // Every species shares the round body, face, and accessory spots; each adds its own parts.
-  // ears and tail are drawn behind the body, underFace on the body under the eyes, and front
-  // over the face. Each takes (stageIndex, palette); stage 0 is the egg and never gets here.
+  // ears and tail are drawn behind the body, underFace on the body under the eyes, front over
+  // the face, and arms (if a species has its own) in place of the usual little arms. Each takes
+  // (stageIndex, palette); stage 0 is the egg and never gets here.
 
   // The mochi's round ears (from Little one on) and curly tail (Grown-up).
   const MOCHI_PARTS = {
@@ -672,6 +675,39 @@ const PlannerBuddy = (() => {
     front: () => `<ellipse cx="100" cy="125" rx="5.5" ry="3.8" fill="${INK}" />`,
   };
 
+  // The penguin has a white face and tummy, a small orange beak and feet, and flippers in
+  // place of arms. Unlike the chick, it has no tuft.
+  const PENGUIN_PARTS = {
+    underFace: () => `<g fill="#fff" opacity="0.88">
+        <circle cx="83" cy="120" r="21" /><circle cx="117" cy="120" r="21" /><ellipse cx="100" cy="134" rx="26" ry="14" />
+        <ellipse cx="100" cy="156" rx="34" ry="16" />
+      </g>`,
+    arms: (stageIndex, { deep, outline }) =>
+      stageIndex >= 2
+        ? `<ellipse cx="33" cy="136" rx="8" ry="21" transform="rotate(32 33 136)" fill="${deep}" stroke="${outline}" stroke-width="2.5" />
+           <ellipse cx="167" cy="136" rx="8" ry="21" transform="rotate(-32 167 136)" fill="${deep}" stroke="${outline}" stroke-width="2.5" />`
+        : '',
+    front: () => `<path d="M94 122 L106 122 L100 129 Z" fill="${BEAK_ORANGE}" stroke="${BEAK_EDGE}" stroke-width="2" stroke-linejoin="round" />`,
+    feet: { fill: BEAK_ORANGE, stroke: BEAK_EDGE },
+  };
+
+  // The hamster has puffy cheek pouches that fill out as it grows, tiny ears set low, and a
+  // pink nose. Unlike the bear, it has no snout.
+  const HAMSTER_PARTS = {
+    ears: (stageIndex, { soft, deep, outline }) => {
+      const size = [0, 8, 10, 11][stageIndex];
+      const ear = (x) => `<circle cx="${x}" cy="78" r="${size}" fill="${soft}" stroke="${outline}" stroke-width="3" />
+        <circle cx="${x}" cy="78" r="${size / 2}" fill="${BLUSH}" opacity="0.7" />`;
+      return ear(62) + ear(138);
+    },
+    underFace: (stageIndex, { light, outline }) => {
+      const puff = [0, 15, 18, 20][stageIndex];
+      const cheek = (x) => `<ellipse cx="${x}" cy="136" rx="${puff}" ry="${puff - 3}" fill="${light}" stroke="${outline}" stroke-width="2" />`;
+      return `${cheek(66)}${cheek(134)}<ellipse cx="100" cy="150" rx="24" ry="14" fill="#fff" opacity="0.6" />`;
+    },
+    front: () => PINK_NOSE,
+  };
+
   const SPECIES_PARTS = {
     mochi: MOCHI_PARTS,
     bunny: BUNNY_PARTS,
@@ -679,6 +715,8 @@ const PlannerBuddy = (() => {
     fox: FOX_PARTS,
     puppy: PUPPY_PARTS,
     bear: BEAR_PARTS,
+    penguin: PENGUIN_PARTS,
+    hamster: HAMSTER_PARTS,
   };
 
   function drawBlob(stageIndex, fillId, mood, wearing, palette, species) {
@@ -698,10 +736,11 @@ const PlannerBuddy = (() => {
       ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="${feetColors.fill}" stroke="${feetColors.stroke}" stroke-width="2.5" />
          <ellipse cx="128" cy="172" rx="15" ry="7" fill="${feetColors.fill}" stroke="${feetColors.stroke}" stroke-width="2.5" />`
       : '';
-    const arms = hasEars
+    const usualArms = hasEars
       ? `<ellipse cx="36" cy="140" rx="9" ry="13" transform="rotate(20 36 140)" fill="${soft}" stroke="${outline}" stroke-width="2.5" />
          <ellipse cx="164" cy="140" rx="9" ry="13" transform="rotate(-20 164 140)" fill="${soft}" stroke="${outline}" stroke-width="2.5" />`
       : '';
+    const arms = parts.arms ? part('arms') : usualArms;
     const shell =
       stageIndex === 1 && !headCovered
         ? `<path d="M70 74 L80 63 L90 73 L100 61 L110 73 L120 63 L130 74 C130 46 70 46 70 74 Z" fill="#fff7e8" stroke="#ecd3a8" stroke-width="2.5" stroke-linejoin="round" />
