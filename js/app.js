@@ -2543,6 +2543,24 @@
     return state.semesters.find((semester) => semester.id === semesterId);
   }
 
+  // Every species grown up, in this semester's buddy's color, with whose buddy each one is.
+  function renderAllSpecies() {
+    const items = buddy.SPECIES.map((species) => {
+      const owner =
+        currentBuddy().species === species.id ? currentSemester() : semesterWithSpecies(species.id);
+      return `<li class="buddy-shelf-item">
+          ${buddy.drawBuddy(3, 0, 'happy', {}, currentBuddy().color, species.id)}
+          <strong>${species.name}</strong>
+          <span class="buddy-muted">${owner ? `${escapeHtml(owner.name)}’s buddy` : 'Not picked yet'}</span>
+        </li>`;
+    }).join('');
+    return `<section class="home-box">
+        <h3 class="due-heading">All species</h3>
+        <p class="buddy-muted">Each new semester, pick one you haven’t had yet.</p>
+        <ul class="buddy-shelf-list">${items}</ul>
+      </section>`;
+  }
+
   // For a semester without a buddy: pick a species (each shown grown up, with ones other
   // semesters already have grayed out), then a color, then start the egg.
   function renderBuddyPicker() {
@@ -2669,6 +2687,7 @@
             <h3 class="due-heading">Recent points</h3>
             ${recent}
           </section>
+          ${renderAllSpecies()}
         </div>
       </div>
       ${renderBuddyShelf()}`;

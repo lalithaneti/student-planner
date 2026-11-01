@@ -57,6 +57,8 @@ const PlannerBuddy = (() => {
   const SPECIES = [
     { id: 'mochi', name: 'Mochi' },
     { id: 'bunny', name: 'Bunny' },
+    { id: 'chick', name: 'Chick' },
+    { id: 'fox', name: 'Fox' },
   ];
 
   // Only work due on or after startDate counts, so things missed before the buddy
@@ -536,10 +538,30 @@ const PlannerBuddy = (() => {
 
   const BODY_PATH = 'M42 172 C30 172 28 150 32 130 C40 82 70 60 100 60 C130 60 160 82 168 130 C172 150 170 172 158 172 Z';
 
-  // A bunny's long ears, drawn behind its body: short at first, longer as it grows, and
-  // the right one flops over once it's grown up.
-  function bunnyEars(stageIndex, palette) {
-    const { light, outline, deep } = palette;
+  // ---------- Species ----------
+  // Every species shares the round body, face, and accessory spots; each adds its own parts.
+  // ears and tail are drawn behind the body, underFace on the body under the eyes, and front
+  // over the face. Each takes (stageIndex, palette); stage 0 is the egg and never gets here.
+
+  // The mochi's round ears (from Little one on) and curly tail (Grown-up).
+  const MOCHI_PARTS = {
+    ears: (stageIndex, { soft, deep, outline }) =>
+      stageIndex >= 2
+        ? `<circle cx="58" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
+           <circle cx="142" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
+           <circle cx="58" cy="82" r="9" fill="${deep}" />
+           <circle cx="142" cy="82" r="9" fill="${deep}" />`
+        : '',
+    tail: (stageIndex, { soft, outline }) =>
+      stageIndex >= 3
+        ? `<path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${outline}" stroke-width="9" stroke-linecap="round" />
+           <path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${soft}" stroke-width="4" stroke-linecap="round" />`
+        : '',
+  };
+
+  // The bunny's long ears grow each stage, and the right one flops over once it's grown up.
+  // It gets a puff of a tail when grown, and a little pink nose.
+  function bunnyEars(stageIndex, { light, outline, deep }) {
     const length = [0, 18, 26, 32][stageIndex];
     const ear = (x, tilt) => `<g transform="rotate(${tilt} ${x} 72)">
         <ellipse cx="${x}" cy="${72 - length}" rx="12" ry="${length + 6}" fill="${light}" stroke="${outline}" stroke-width="3" />
@@ -548,39 +570,91 @@ const PlannerBuddy = (() => {
     return ear(80, -10) + (stageIndex >= 3 ? ear(124, 62) : ear(120, 10));
   }
 
-  // A round puff of a tail on a grown-up bunny.
-  function bunnyTail(palette) {
-    return `<g fill="${palette.light}" stroke="${palette.outline}" stroke-width="2.5">
-        <circle cx="168" cy="146" r="13" /><circle cx="160" cy="138" r="7" stroke="none" />
-      </g>`;
+  const PINK_NOSE = `<ellipse cx="100" cy="125" rx="3.4" ry="2.4" fill="${BLUSH}" />`;
+
+  const BUNNY_PARTS = {
+    ears: bunnyEars,
+    tail: (stageIndex, { light, outline }) =>
+      stageIndex >= 3
+        ? `<g fill="${light}" stroke="${outline}" stroke-width="2.5"><circle cx="168" cy="146" r="13" /><circle cx="160" cy="138" r="7" stroke="none" /></g>`
+        : '',
+    front: () => PINK_NOSE,
+  };
+
+  // The chick has a feather tuft that grows, a little orange beak and feet, and tail feathers when grown.
+  const BEAK_ORANGE = '#ffb347';
+  const BEAK_EDGE = '#e8912c';
+
+  const CHICK_PARTS = {
+    ears: (stageIndex, { soft, outline }) => {
+      const height = [0, 16, 22, 28][stageIndex];
+      const feather = (path) => `<path d="${path}" fill="none" stroke="${outline}" stroke-width="8" stroke-linecap="round" />
+        <path d="${path}" fill="none" stroke="${soft}" stroke-width="3.5" stroke-linecap="round" />`;
+      // Left of center, so the grown-up's daisy doesn't hide it.
+      return feather(`M86 70 C82 ${62 - height} 72 ${58 - height} 70 ${64 - height}`) + feather(`M90 70 C90 ${58 - height} 96 ${52 - height} 101 ${56 - height}`);
+    },
+    tail: (stageIndex, { soft, outline }) =>
+      stageIndex >= 3
+        ? `<path d="M158 148 L182 134 L177 148 L186 154 L162 160 Z" fill="${soft}" stroke="${outline}" stroke-width="2.5" stroke-linejoin="round" />`
+        : '',
+    front: () => `<path d="M90 120 L110 120 L100 133 Z" fill="${BEAK_ORANGE}" stroke="${BEAK_EDGE}" stroke-width="2" stroke-linejoin="round" />`,
+    feet: { fill: BEAK_ORANGE, stroke: BEAK_EDGE },
+  };
+
+  // The fox has pointed ears with dark tips that grow each stage, a white muzzle, a dark nose,
+  // and a bushy white-tipped tail from Little one on.
+  const FOX_DARK = '#5b4636';
+
+  function foxEars(stageIndex, { light, outline, deep }) {
+    const height = [0, 22, 30, 38][stageIndex];
+    const ear = (flip) => {
+      const x = (value) => (flip ? 200 - value : value);
+      const apex = [60, 72 - height];
+      const base = [[54, 94], [92, 70]];
+      // The dark tip is the top third of the ear.
+      const tip = base.map(([bx, by]) => [apex[0] + (bx - apex[0]) * 0.33, apex[1] + (by - apex[1]) * 0.33]);
+      const points = (list) => list.map(([px, py]) => `${x(px)} ${py}`).join(' L');
+      return `<path d="M${points([base[0], apex, base[1]])} Z" fill="${light}" stroke="${outline}" stroke-width="3" stroke-linejoin="round" />
+        <path d="M${points([[62, 88], [apex[0] + 3, apex[1] + 12], [84, 74]])} Z" fill="${deep}" opacity="0.8" />
+        <path d="M${points([tip[0], apex, tip[1]])} Z" fill="${FOX_DARK}" stroke="${FOX_DARK}" stroke-width="3" stroke-linejoin="round" />`;
+    };
+    return ear(false) + ear(true);
   }
 
+  const FOX_PARTS = {
+    ears: foxEars,
+    tail: (stageIndex, { light, outline }) => {
+      if (stageIndex < 2) {
+        return '';
+      }
+      const size = stageIndex >= 3 ? 1 : 0.75;
+      return `<g transform="translate(160 156) scale(${size}) translate(-160 -156)">
+          <path d="M156 156 C190 154 200 118 186 96 C176 112 160 126 150 140 Z" fill="${light}" stroke="${outline}" stroke-width="3" stroke-linejoin="round" />
+          <path d="M186 96 C196 110 194 122 189 128 C182 124 178 116 177 108 Z" fill="#fff" stroke="${outline}" stroke-width="2" stroke-linejoin="round" />
+        </g>`;
+    },
+    underFace: () => `<ellipse cx="100" cy="133" rx="21" ry="13" fill="#fff" opacity="0.85" />`,
+    front: () => `<ellipse cx="100" cy="125" rx="4.2" ry="3" fill="${FOX_DARK}" />`,
+  };
+
+  const SPECIES_PARTS = { mochi: MOCHI_PARTS, bunny: BUNNY_PARTS, chick: CHICK_PARTS, fox: FOX_PARTS };
+
   function drawBlob(stageIndex, fillId, mood, wearing, palette, species) {
-    const { outline, soft, deep, feet: feetColor } = palette;
-    const isBunny = species === 'bunny';
+    const { outline, soft } = palette;
+    const parts = SPECIES_PARTS[species] || MOCHI_PARTS;
+    const part = (name) => (parts[name] ? parts[name](stageIndex, palette) : '');
+    const feetColors = parts.feet || { fill: palette.feet, stroke: outline };
     const sleepy = mood === 'sleepy';
     // A head accessory or the nightcap takes the place of the eggshell and the daisy.
     const headCovered = sleepy || Boolean(wearing.head);
     const scale = [0, 0.72, 0.86, 1][stageIndex];
     const hasEars = stageIndex >= 2;
     const isGrown = stageIndex >= 3;
-    const roundEars = hasEars
-      ? `<circle cx="58" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
-         <circle cx="142" cy="82" r="19" fill="${soft}" stroke="${outline}" stroke-width="3" />
-         <circle cx="58" cy="82" r="9" fill="${deep}" />
-         <circle cx="142" cy="82" r="9" fill="${deep}" />`
-      : '';
-    const curlyTail = isGrown
-      ? `<path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${outline}" stroke-width="9" stroke-linecap="round" />
-         <path d="M160 150 C184 150 188 124 174 120 C164 117 160 130 170 134" fill="none" stroke="${soft}" stroke-width="4" stroke-linecap="round" />`
-      : '';
-    const ears = isBunny ? bunnyEars(stageIndex, palette) : roundEars;
-    const tail = isBunny ? (isGrown ? bunnyTail(palette) : '') : curlyTail;
-    // Bunnies get a little pink nose under their eyes.
-    const nose = isBunny ? `<ellipse cx="100" cy="125" rx="3.4" ry="2.4" fill="${BLUSH}" />` : '';
+    const ears = part('ears');
+    const tail = part('tail');
     const feet = hasEars
-      ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />
-         <ellipse cx="128" cy="172" rx="15" ry="7" fill="${feetColor}" stroke="${outline}" stroke-width="2.5" />`
+      ? `<ellipse cx="72" cy="172" rx="15" ry="7" fill="${feetColors.fill}" stroke="${feetColors.stroke}" stroke-width="2.5" />
+         <ellipse cx="128" cy="172" rx="15" ry="7" fill="${feetColors.fill}" stroke="${feetColors.stroke}" stroke-width="2.5" />`
       : '';
     const arms = hasEars
       ? `<ellipse cx="36" cy="140" rx="9" ry="13" transform="rotate(20 36 140)" fill="${soft}" stroke="${outline}" stroke-width="2.5" />
@@ -605,7 +679,7 @@ const PlannerBuddy = (() => {
           ${tail}${ears}${feet}
           <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="${outline}" stroke-width="3" />
           <ellipse cx="68" cy="88" rx="13" ry="7" transform="rotate(-32 68 88)" fill="#fff" opacity="0.65" />
-          ${arms}${face(mood)}${nose}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
+          ${part('underFace')}${arms}${face(mood)}${part('front')}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
           ${moodExtras(mood, false)}
         </g>
         ${sleepy ? zzz(160, 62) : ''}
