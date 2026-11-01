@@ -96,7 +96,7 @@
   let resolveChoice = null;
   // What's chosen so far in the Study Buddy picker, before the egg is started.
   let buddyPick = { species: 'mochi', color: 'pink' };
-  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'week']);
+  let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'week', 'game']);
   // The app always opens on Home.
   let currentTab = 'home';
   let weekStart = model.startOfWeek(todayKey());
@@ -488,7 +488,9 @@
     elements.viewButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.view === currentView)));
     document.body.classList.toggle('week-view', currentView === 'week');
     const items = model.buildDueList(state);
-    if (items.length === 0) {
+    if (currentView === 'game') {
+      elements.dueList.innerHTML = renderGameView();
+    } else if (items.length === 0) {
       elements.dueList.innerHTML = renderEmptyPlanner();
     } else {
       elements.dueList.innerHTML = currentView === 'week' ? renderWeekView(items) : renderDayView(items);
@@ -666,6 +668,41 @@
         <button type="button" class="icon-button" data-action="next-week" aria-label="Next week">→</button>
         ${isCurrentWeek ? '' : '<button type="button" class="text-button" data-action="this-week">This week</button>'}
         ${extra}
+      </div>`;
+  }
+
+  // ---------- Game view: Buddy's Path ----------
+
+  const TREASURE_CHEST = `<svg class="treasure-chest" viewBox="0 0 80 70" aria-hidden="true" focusable="false">
+      <ellipse cx="40" cy="64" rx="32" ry="4" fill="#000" opacity="0.1" />
+      <path d="M8 30 C8 12 72 12 72 30 Z" fill="#d9965b" stroke="#9c5f2e" stroke-width="3" stroke-linejoin="round" />
+      <rect x="8" y="30" width="64" height="32" rx="4" fill="#c7814a" stroke="#9c5f2e" stroke-width="3" />
+      <path d="M8 30 H72 M30 18 V62 M50 18 V62" stroke="#ffd166" stroke-width="5" />
+      <rect x="34" y="32" width="12" height="14" rx="3" fill="#ffd166" stroke="#d99a1f" stroke-width="2" />
+      <circle cx="40" cy="39" r="2.2" fill="#9c5f2e" />
+    </svg>`;
+
+  // The buddy for the game: the viewed semester's, or a waiting egg if it has none yet.
+  function drawGameBuddy() {
+    if (!currentBuddy()) {
+      return buddy.drawBuddy(0, 0, 'happy');
+    }
+    const where = buddy.stageFor(buddyPoints());
+    return drawCurrentBuddy(where, buddyMood(), buddyStreak());
+  }
+
+  // The week as a winding trail, with the buddy at the start and a chest at the end.
+  // The assignments become stepping stones along it in the next step.
+  function renderGameView() {
+    return `
+      <h3 class="buddy-path-title">Buddy’s Path</h3>
+      ${renderWeekNav()}
+      <div class="buddy-path">
+        <svg class="buddy-path-trail" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <path d="M84 112 C165 40 240 150 320 92 S468 40 516 100" />
+        </svg>
+        <div class="buddy-path-buddy">${drawGameBuddy()}</div>
+        <div class="buddy-path-chest">${TREASURE_CHEST}</div>
       </div>`;
   }
 

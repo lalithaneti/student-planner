@@ -2632,6 +2632,64 @@ dialog::backdrop {
   animation: none;
 }
 
+/* ---------- Game view: Buddy's Path ---------- */
+
+.buddy-path-title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+}
+
+.buddy-path {
+  position: relative;
+  height: 220px;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+/* The trail stretches to fill the box, so its line keeps the same thickness at any width. */
+.buddy-path-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.buddy-path-trail path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  stroke-width: 22;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Placed on the trail's ends, which sit at 14% and 86% across (see the path in app.js). */
+.buddy-path-buddy,
+.buddy-path-chest {
+  position: absolute;
+  transform: translate(-50%, -85%);
+}
+
+.buddy-path-buddy {
+  left: 14%;
+  top: 70%;
+  width: min(96px, 19%);
+}
+
+.buddy-path-chest {
+  left: 86%;
+  top: 62%;
+  width: min(72px, 15%);
+}
+
+.buddy-path-buddy .buddy-art,
+.treasure-chest {
+  display: block;
+  width: 100%;
+}
+
 /* ---------- Picking a new semester's buddy, and the Buddy Collection ---------- */
 
 .buddy-color-choices {
