@@ -59,6 +59,8 @@ const PlannerBuddy = (() => {
     { id: 'bunny', name: 'Bunny' },
     { id: 'chick', name: 'Chick' },
     { id: 'fox', name: 'Fox' },
+    { id: 'puppy', name: 'Puppy' },
+    { id: 'bear', name: 'Bear' },
   ];
 
   // Only work due on or after startDate counts, so things missed before the buddy
@@ -637,7 +639,47 @@ const PlannerBuddy = (() => {
     front: () => `<ellipse cx="100" cy="125" rx="4.2" ry="3" fill="${FOX_DARK}" />`,
   };
 
-  const SPECIES_PARTS = { mochi: MOCHI_PARTS, bunny: BUNNY_PARTS, chick: CHICK_PARTS, fox: FOX_PARTS };
+  // The puppy has floppy ears hanging over the sides of its head that grow each stage, a patch
+  // over one eye, a big dark nose, and a wagging tail from Little one on.
+  const PUPPY_PARTS = {
+    tail: (stageIndex, { soft, outline }) =>
+      stageIndex >= 2
+        ? `<path d="M160 146 C176 140 182 122 174 110" fill="none" stroke="${outline}" stroke-width="10" stroke-linecap="round" />
+           <path d="M160 146 C176 140 182 122 174 110" fill="none" stroke="${soft}" stroke-width="5" stroke-linecap="round" />`
+        : '',
+    underFace: (stageIndex, { deep, outline }) => {
+      const length = [0, 16, 20, 24][stageIndex];
+      const ear = (x, tilt) =>
+        `<ellipse cx="${x}" cy="${78 + length}" rx="13" ry="${length}" transform="rotate(${tilt} ${x} 78)" fill="${deep}" stroke="${outline}" stroke-width="3" />`;
+      return `${ear(58, 18)}${ear(142, -18)}<ellipse cx="121" cy="115" rx="16" ry="15" fill="${deep}" opacity="0.45" />`;
+    },
+    front: () => `<ellipse cx="100" cy="125" rx="6" ry="4.2" fill="${INK}" /><ellipse cx="98" cy="123.5" rx="2" ry="1.2" fill="#fff" opacity="0.7" />`,
+  };
+
+  // The bear has small round ears high on its head that grow each stage, a round snout with a
+  // dark nose (which the earless-at-first mochi doesn't have), and a stubby tail when grown.
+  const BEAR_PARTS = {
+    ears: (stageIndex, { soft, deep, outline }) => {
+      const size = [0, 10, 12, 14][stageIndex];
+      const ear = (x) => `<circle cx="${x}" cy="70" r="${size}" fill="${soft}" stroke="${outline}" stroke-width="3" />
+        <circle cx="${x}" cy="70" r="${size / 2}" fill="${deep}" />`;
+      return ear(68) + ear(132);
+    },
+    tail: (stageIndex, { soft, outline }) =>
+      stageIndex >= 3 ? `<circle cx="166" cy="152" r="9" fill="${soft}" stroke="${outline}" stroke-width="2.5" />` : '',
+    underFace: (stageIndex, { light, outline }) =>
+      `<ellipse cx="100" cy="132" rx="19" ry="13" fill="${light}" stroke="${outline}" stroke-width="2" />`,
+    front: () => `<ellipse cx="100" cy="125" rx="5.5" ry="3.8" fill="${INK}" />`,
+  };
+
+  const SPECIES_PARTS = {
+    mochi: MOCHI_PARTS,
+    bunny: BUNNY_PARTS,
+    chick: CHICK_PARTS,
+    fox: FOX_PARTS,
+    puppy: PUPPY_PARTS,
+    bear: BEAR_PARTS,
+  };
 
   function drawBlob(stageIndex, fillId, mood, wearing, palette, species) {
     const { outline, soft } = palette;
