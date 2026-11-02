@@ -74,6 +74,14 @@ const PlannerModel = (() => {
   // The bold colors used before 2026-10-22, in the same order as the lists above.
   const OLD_BOLD_COLORS = ['#e5484d', '#f76b15', '#c99a06', '#30a46c', '#12a594', '#3e63dd', '#8e4ec6', '#d6409f'];
 
+  // The color for a new class: the first one no class uses yet, or once all are taken,
+  // the one used least, so classes stay as easy to tell apart as they can.
+  function suggestClassColor(classes) {
+    const uses = (color) => classes.filter((plannerClass) => plannerClass.color === color.value).length;
+    const fewestUses = Math.min(...CLASS_COLORS.map(uses));
+    return CLASS_COLORS.find((color) => uses(color) === fewestUses).value;
+  }
+
   // Switches anything saved with an old bold color to its match in the new palettes.
   function updateOldColors(state) {
     const swap = (item, palette) => {
@@ -858,6 +866,7 @@ const PlannerModel = (() => {
   return {
     WEEKDAY_NAMES,
     CLASS_COLORS,
+    suggestClassColor,
     RSO_COLORS,
     updateOldColors,
     toDateKey,

@@ -1352,6 +1352,10 @@
     if (open) {
       drawerSection = section;
       elements.classPanel.hidden = section !== 'class';
+      // A new class starts on a color no other class has; an edit or a half-typed class keeps its own.
+      if (section === 'class' && !editingClassId && !elements.classForm.elements.name.value) {
+        selectColor(elements.classForm, model.suggestClassColor(currentClasses()));
+      }
       elements.assignmentPanel.hidden = section !== 'assignment';
       elements.examPanel.hidden = section !== 'exam' && section !== 'quiz';
       if ((section === 'exam' || section === 'quiz') && !editingExamId) {
@@ -2005,6 +2009,7 @@
   function stopEditingClass() {
     editingClassId = null;
     elements.classForm.reset();
+    selectColor(elements.classForm, model.suggestClassColor(currentClasses()));
     renderMeetingRows(elements.meetingList, []);
     renderRecurringRows([]);
     renderOneTimeRows(elements.classExamList, []);
