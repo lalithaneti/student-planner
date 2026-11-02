@@ -102,6 +102,17 @@
             <div class="color-picker" id="color-picker"></div>
           </fieldset>
           <fieldset class="field">
+            <legend>Dates</legend>
+            <label class="checkbox-field"><input type="checkbox" name="hasClassDates" id="has-class-dates" /> <span>Only part of the semester (like an 8-week class)</span></label>
+            <div class="final-fields" id="class-date-fields" hidden>
+              <div class="field-row">
+                <label class="field"><span>Starts</span><input name="classStartDate" type="date" /></label>
+                <label class="field"><span>Ends</span><input name="classEndDate" type="date" /></label>
+              </div>
+              <p class="hint">Meetings and recurring assignments stop outside these dates.</p>
+            </div>
+          </fieldset>
+          <fieldset class="field">
             <legend>Meeting times <small>(optional: lecture, discussion, lab…)</small></legend>
             <ul class="meeting-list" id="meeting-list"></ul>
             <button type="button" class="text-button" id="add-meeting">+ Add meeting time</button>

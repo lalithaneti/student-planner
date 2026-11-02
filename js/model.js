@@ -272,6 +272,24 @@ const PlannerModel = (() => {
     return assignment.kind === 'once' ? assignment.done : assignment.doneDates.includes(date);
   }
 
+  // A class with dates (like an 8-week class) only runs between them; without dates it runs all semester.
+  function classRunsOn(plannerClass, date) {
+    return !plannerClass.startDate || (date >= plannerClass.startDate && date <= plannerClass.endDate);
+  }
+
+  function validateClassDates({ startDate, endDate }, semester) {
+    if (!isValidDateKey(startDate) || !isValidDateKey(endDate)) {
+      return ['Pick a start and end date for the class.'];
+    }
+    if (startDate > endDate) {
+      return ['The class must end after it starts.'];
+    }
+    if (startDate < semester.startDate || endDate > semester.endDate) {
+      return ['The class dates must be during the semester.'];
+    }
+    return [];
+  }
+
   // One entry per due date for the current semester, sorted soonest first.
   function buildDueList(state) {
     const classesById = new Map(state.classes.map((plannerClass) => [plannerClass.id, plannerClass]));
@@ -281,13 +299,15 @@ const PlannerModel = (() => {
         continue;
       }
       for (const date of occurrenceDates(assignment)) {
-        // Repeating assignments take break days and finals off; one-time ones were entered on purpose.
-        if (assignment.kind === 'weekly' && (breakOn(state, date) || classesOverOn(state, date))) {
+        // Repeating assignments take break days and finals off and stop outside their class's
+        // dates; one-time ones were entered on purpose.
+        const plannerClass = classesById.get(assignment.classId);
+        if (assignment.kind === 'weekly' && (breakOn(state, date) || classesOverOn(state, date) || (plannerClass && !classRunsOn(plannerClass, date)))) {
           continue;
         }
         items.push({
           assignment,
-          plannerClass: classesById.get(assignment.classId) || null,
+          plannerClass: plannerClass || null,
           date,
           time: assignment.dueTime,
           done: isOccurrenceDone(assignment, date),
@@ -488,7 +508,7 @@ const PlannerModel = (() => {
     const weekday = parseDateKey(date).getDay();
     const meetings = [];
     for (const plannerClass of state.classes) {
-      if (plannerClass.semesterId !== state.currentSemesterId) {
+      if (plannerClass.semesterId !== state.currentSemesterId || !classRunsOn(plannerClass, date)) {
         continue;
       }
       for (const meeting of plannerClass.meetings || []) {
@@ -867,6 +887,7 @@ const PlannerModel = (() => {
     WEEKDAY_NAMES,
     CLASS_COLORS,
     suggestClassColor,
+    validateClassDates,
     RSO_COLORS,
     updateOldColors,
     toDateKey,

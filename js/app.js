@@ -179,6 +179,7 @@
     rsoEventList: document.getElementById('rso-event-list'),
     classExamList: document.getElementById('class-exam-list'),
     finalFields: document.getElementById('final-fields'),
+    classDateFields: document.getElementById('class-date-fields'),
     rsoLastsHint: document.getElementById('rso-lasts-hint'),
     eventPanel: document.getElementById('event-panel'),
     eventForm: document.getElementById('event-form'),
@@ -388,6 +389,7 @@
             <span class="class-info">
               <span class="class-name">${escapeHtml(plannerClass.name)}</span>
               <span class="class-count">${count} assignment${count === 1 ? '' : 's'}</span>
+              ${plannerClass.startDate ? `<span class="class-meeting">${model.formatMonthDay(plannerClass.startDate)} – ${model.formatMonthDay(plannerClass.endDate)}</span>` : ''}
               ${(plannerClass.meetings || []).map((meeting) => `<span class="class-meeting">${describeMeeting(meeting)}</span>`).join('')}
             </span>
             <button type="button" class="text-button" data-action="edit-class" data-id="${plannerClass.id}">Edit</button>
@@ -1547,6 +1549,15 @@
 
   // The final is saved as one of the class's exams, marked isFinal, so the Calendar and the
   // exam countdown treat it like any exam. The class form gives it a section of its own.
+  function fillClassDateFields(plannerClass) {
+    const fields = elements.classForm.elements;
+    const hasDates = Boolean(plannerClass && plannerClass.startDate);
+    fields.hasClassDates.checked = hasDates;
+    fields.classStartDate.value = hasDates ? plannerClass.startDate : '';
+    fields.classEndDate.value = hasDates ? plannerClass.endDate : '';
+    elements.classDateFields.hidden = !hasDates;
+  }
+
   function fillFinalFields(final) {
     const fields = elements.classForm.elements;
     fields.hasFinal.checked = Boolean(final);
@@ -1990,6 +2001,7 @@
     editingClassId = id;
     elements.classForm.elements.name.value = plannerClass.name;
     selectColor(elements.classForm, plannerClass.color);
+    fillClassDateFields(plannerClass);
     renderMeetingRows(elements.meetingList, plannerClass.meetings || []);
     renderRecurringRows([]);
     renderExistingRecurring(id);
@@ -2010,6 +2022,7 @@
     editingClassId = null;
     elements.classForm.reset();
     selectColor(elements.classForm, model.suggestClassColor(currentClasses()));
+    fillClassDateFields(null);
     renderMeetingRows(elements.meetingList, []);
     renderRecurringRows([]);
     renderOneTimeRows(elements.classExamList, []);
@@ -2035,6 +2048,13 @@
       errors.push('Give the class a name.');
     } else if (duplicate) {
       errors.push(`You already have a class called ${name}.`);
+    }
+    const fields = elements.classForm.elements;
+    const classDates = fields.hasClassDates.checked
+      ? { startDate: fields.classStartDate.value, endDate: fields.classEndDate.value }
+      : { startDate: '', endDate: '' };
+    if (fields.hasClassDates.checked) {
+      errors.push(...model.validateClassDates(classDates, currentSemester()));
     }
     errors.push(...meetingErrors(meetings));
     const classId = editingClassId || newId('class');
@@ -2062,9 +2082,9 @@
     // One change, so a single Undo removes the class and its new assignments together.
     applyChange(`${verb} ${name}${extra}.`, () => {
       if (editingClassId) {
-        Object.assign(state.classes.find((candidate) => candidate.id === editingClassId), { name, color, meetings });
+        Object.assign(state.classes.find((candidate) => candidate.id === editingClassId), { name, color, meetings, ...classDates });
       } else {
-        state.classes.push({ id: classId, semesterId: state.currentSemesterId, name, color, meetings });
+        state.classes.push({ id: classId, semesterId: state.currentSemesterId, name, color, meetings, ...classDates });
       }
       state.assignments.push(...recurring);
       // The form lists all of this class's exams, so it replaces them.
@@ -3200,6 +3220,9 @@
   document.getElementById('add-rso-event').addEventListener('click', () => addOneTimeRow(elements.rsoEventList));
   document.getElementById('add-class-exam').addEventListener('click', () => addOneTimeRow(elements.classExamList));
   document.getElementById('has-final').addEventListener('change', handleHasFinalChange);
+  document.getElementById('has-class-dates').addEventListener('change', (event) => {
+    elements.classDateFields.hidden = !event.target.checked;
+  });
   elements.rsoForm.addEventListener('submit', handleRsoSubmit);
   elements.rsoCancel.addEventListener('click', stopEditingRso);
   elements.eventForm.addEventListener('submit', handleEventSubmit);
