@@ -364,6 +364,81 @@ const PlannerBuddy = (() => {
     return buddy && buddy.name.trim() ? buddy.name.trim() : 'Your buddy';
   }
 
+  // ---------- Challenging a friend ----------
+
+  const CHALLENGE_VERSION = 1;
+  const CHALLENGE_MAX_ITEMS = 1000;
+
+  // What a challenge link carries: the buddy's look and one week's numbers, and nothing else
+  // from the planner. The state is a view from forSemester, so it must have a buddy.
+  function challengeFor(state, weekStart, todayKey, nowTime) {
+    const { done, total } = PlannerModel.buildWeek(PlannerModel.buildDueList(state), weekStart, todayKey, nowTime).progress;
+    const points = totalPoints(pointsLog(state, todayKey, nowTime));
+    return {
+      name: state.buddy.name.trim(),
+      species: state.buddy.species,
+      color: state.buddy.color,
+      stage: stageFor(points).index,
+      week: weekStart,
+      done,
+      total,
+    };
+  }
+
+  // Letters, digits, - and _ only, so the text survives being pasted into a message.
+  function encodeChallenge(challenge) {
+    const bytes = new TextEncoder().encode(JSON.stringify({ version: CHALLENGE_VERSION, ...challenge }));
+    return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  }
+
+  // A challenge from a link, or null if it isn't a valid one. Anyone can edit a link, so every
+  // value is checked, and only the expected values are kept.
+  function readChallenge(text) {
+    let parsed;
+    try {
+      const binary = atob(text.replaceAll('-', '+').replaceAll('_', '/'));
+      parsed = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (letter) => letter.charCodeAt(0))));
+    } catch {
+      return null;
+    }
+    if (parsed === null || typeof parsed !== 'object' || parsed.version !== CHALLENGE_VERSION) {
+      return null;
+    }
+    const { name, species, color, stage, week, done, total } = parsed;
+    const isValid =
+      typeof name === 'string' &&
+      name.length <= NAME_MAX_LENGTH &&
+      SPECIES.some((candidate) => candidate.id === species) &&
+      COLORS.some((candidate) => candidate.id === color) &&
+      Number.isInteger(stage) &&
+      stage >= 0 &&
+      stage < STAGES.length &&
+      PlannerModel.isValidDateKey(week) &&
+      Number.isInteger(done) &&
+      Number.isInteger(total) &&
+      done >= 0 &&
+      done <= total &&
+      total <= CHALLENGE_MAX_ITEMS;
+    return isValid ? { name, species, color, stage, week, done, total } : null;
+  }
+
+  function challengePercent({ done, total }) {
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+  }
+
+  // 'ahead', 'behind', or 'tied' by share of the week's work done, so more homework isn't an
+  // advantage. null when they can't be compared: different weeks, or either has nothing due.
+  function compareChallenges(mine, theirs) {
+    if (mine.week !== theirs.week || mine.total === 0 || theirs.total === 0) {
+      return null;
+    }
+    const difference = mine.done * theirs.total - theirs.done * mine.total;
+    if (difference === 0) {
+      return 'tied';
+    }
+    return difference > 0 ? 'ahead' : 'behind';
+  }
+
   // ---------- Drawing ----------
 
   const INK = '#4a2e44';
@@ -870,6 +945,11 @@ const PlannerBuddy = (() => {
     moodFor,
     validateName,
     displayName,
+    challengeFor,
+    encodeChallenge,
+    readChallenge,
+    challengePercent,
+    compareChallenges,
     drawBuddy,
     drawAccessory,
   };

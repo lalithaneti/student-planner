@@ -104,6 +104,7 @@
   let selectedDay = todayKey();
 
   const elements = {
+    challengeDialog: document.getElementById('challenge-dialog'),
     backupStatus: document.getElementById('backup-status'),
     restoreBackupInput: document.getElementById('restore-backup'),
     quickAddDialog: document.getElementById('quick-add-dialog'),
@@ -705,7 +706,119 @@
         </svg>
         <div class="buddy-path-buddy">${drawGameBuddy()}</div>
         <div class="buddy-path-chest">${TREASURE_CHEST}</div>
+      </div>
+      ${
+        currentBuddy()
+          ? `<div class="challenge-row">
+              <button type="button" class="secondary-button" data-action="open-challenge">Challenge a friend</button>
+              <span class="buddy-muted">Sends your buddy and this week’s progress, never your assignments.</span>
+            </div>`
+          : ''
+      }`;
+  }
+
+  // ---------- Challenging a friend ----------
+
+  // This week's progress for the viewed semester's buddy, whichever week is on screen.
+  function myChallenge() {
+    return buddy.challengeFor(buddyView(), model.startOfWeek(todayKey()), todayKey(), currentTime());
+  }
+
+  // After the #, so the challenge is never sent to the website, only read by the page.
+  function challengeLink() {
+    return `${location.origin}${location.pathname}#challenge=${buddy.encodeChallenge(myChallenge())}`;
+  }
+
+  function renderChallengeCard(challenge, label) {
+    const percent = buddy.challengePercent(challenge);
+    const progress =
+      challenge.total === 0
+        ? '<span class="buddy-muted">Nothing due this week</span>'
+        : `<span>${challenge.done} of ${challenge.total} done · <strong>${percent}%</strong></span>
+           <span class="progress-bar" aria-hidden="true"><span class="progress-fill" style="width: ${percent}%"></span></span>`;
+    return `<div class="challenge-card">
+        ${buddy.drawBuddy(challenge.stage, 0, 'happy', {}, challenge.color, challenge.species)}
+        <strong>${escapeHtml(label)}</strong>
+        ${progress}
       </div>`;
+  }
+
+  function openChallengeDialog(html) {
+    elements.challengeDialog.innerHTML = html;
+    if (!elements.challengeDialog.open) {
+      elements.challengeDialog.showModal();
+    }
+  }
+
+  // Your buddy and progress, with the link to copy.
+  function showChallengeLink(heading) {
+    const link = challengeLink();
+    openChallengeDialog(`
+      <h2 id="challenge-heading">${heading}</h2>
+      <div class="challenge-cards">${renderChallengeCard(myChallenge(), buddy.displayName(currentBuddy()))}</div>
+      <p class="hint">Send this link. It shows your buddy and this week’s progress as of right now, never your assignments or classes.</p>
+      <input class="challenge-link" id="challenge-link" type="text" readonly value="${link}" aria-label="Challenge link" />
+      <p class="backup-status" id="challenge-status" role="status"></p>
+      <div class="button-row">
+        <button type="button" class="primary-button" data-action="copy-challenge-link">Copy link</button>
+        <button type="button" class="text-button" data-action="close-challenge">Close</button>
+      </div>`);
+  }
+
+  async function copyChallengeLink() {
+    const input = document.getElementById('challenge-link');
+    const status = document.getElementById('challenge-status');
+    try {
+      await navigator.clipboard.writeText(input.value);
+      status.textContent = 'Link copied! Send it to a friend.';
+    } catch {
+      input.select();
+      status.textContent = 'Couldn’t copy automatically, so the link is selected. Copy it from there.';
+    }
+  }
+
+  function challengeVerdict(mine, theirs) {
+    if (mine.week !== theirs.week) {
+      return `This link is from the week of ${weekRangeLabel(theirs.week)}, so it can’t be compared with this week. Ask for a new one!`;
+    }
+    const verdicts = {
+      ahead: 'You’re ahead! 🎉',
+      behind: 'They’re ahead. Time to catch up! 🔥',
+      tied: 'It’s a tie!',
+    };
+    return verdicts[buddy.compareChallenges(mine, theirs)] || 'Nothing to compare yet: one of you has nothing due this week.';
+  }
+
+  // A challenge someone sent: their buddy and progress beside yours, and a way to answer.
+  function showReceivedChallenge(theirs) {
+    const yours = currentBuddy() ? myChallenge() : null;
+    openChallengeDialog(`
+      <h2 id="challenge-heading">${theirs.name ? escapeHtml(theirs.name) : 'A friend'} challenged you!</h2>
+      <div class="challenge-cards">
+        ${renderChallengeCard(theirs, theirs.name || 'Their buddy')}
+        ${yours ? renderChallengeCard(yours, buddy.displayName(currentBuddy())) : ''}
+      </div>
+      <p class="challenge-verdict">${yours ? challengeVerdict(yours, theirs) : 'Pick your Study Buddy on the Study Buddy tab to send one back.'}</p>
+      <div class="button-row">
+        ${yours ? '<button type="button" class="primary-button" data-action="send-challenge-back">Send yours back</button>' : ''}
+        <button type="button" class="text-button" data-action="close-challenge">Close</button>
+      </div>`);
+  }
+
+  // Opens the challenge in the address bar, if there is one, then takes it out so it doesn't
+  // open again on every refresh.
+  function openChallengeFromLink() {
+    const match = location.hash.match(/^#challenge=(.+)$/);
+    if (!match) {
+      return;
+    }
+    history.replaceState(null, '', location.pathname + location.search);
+    const challenge = buddy.readChallenge(match[1]);
+    if (challenge) {
+      showReceivedChallenge(challenge);
+    } else {
+      showToast('That challenge link didn’t work. Ask your friend for a new one.', null);
+    }
   }
 
   // ---------- Breaks ----------
@@ -3083,6 +3196,14 @@
       });
     } else if (action === 'edit-semester') {
       openSemesterDialog();
+    } else if (action === 'open-challenge') {
+      showChallengeLink('Challenge a friend');
+    } else if (action === 'send-challenge-back') {
+      showChallengeLink('Send yours back');
+    } else if (action === 'copy-challenge-link') {
+      copyChallengeLink();
+    } else if (action === 'close-challenge') {
+      elements.challengeDialog.close();
     } else if (action === 'open-quick-add') {
       openQuickAdd();
     } else if (action === 'open-new-semester') {
@@ -3360,8 +3481,11 @@
     }
   });
 
+  window.addEventListener('hashchange', openChallengeFromLink);
+
   renderThemeOptions();
   render();
+  openChallengeFromLink();
   loadWeather();
   setInterval(loadWeather, WEATHER_REFRESH_MS);
 })();

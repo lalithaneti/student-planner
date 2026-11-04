@@ -2690,6 +2690,60 @@ dialog::backdrop {
   width: 100%;
 }
 
+/* ---------- Challenging a friend ---------- */
+
+.challenge-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+
+.challenge-cards {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.challenge-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.challenge-card .buddy-art {
+  width: min(96px, 100%);
+}
+
+.challenge-card .progress-bar {
+  display: block;
+  width: 100%;
+}
+
+.challenge-verdict {
+  margin: 0 0 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.challenge-link {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+#challenge-status {
+  margin-bottom: 12px;
+}
+
 /* ---------- Picking a new semester's buddy, and the Buddy Collection ---------- */
 
 .buddy-color-choices {
