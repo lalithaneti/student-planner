@@ -310,12 +310,48 @@ const PlannerStickers = (() => {
         </g>
         ${holdingHands(70, 130, 166, '#cbe7ff', '#86bfe8')}`,
     },
+    {
+      id: 'rare-hedgehog-sleeping',
+      name: 'Hedgehog',
+      group: 'Rare',
+      rare: true,
+      species: 'hedgehog',
+      color: 'pink',
+      mood: 'sleepy',
+      // Smaller and higher than usual, so it sits on top of the books.
+      buddyPlace: { x: 24, y: -2, size: 152 },
+      prop: `<rect x="40" y="128" width="120" height="20" rx="4" fill="#8fb4ea" stroke="#6588c4" stroke-width="3" />
+        <path d="M52 128 V148 M148 128 V148" stroke="#ffd166" stroke-width="4" />
+        <rect x="30" y="148" width="132" height="20" rx="4" fill="#a3dc95" stroke="#6fb864" stroke-width="3" />
+        <path d="M150 151 H162 V165 H150 Z" fill="#fff8e8" stroke="#6fb864" stroke-width="2" />
+        <rect x="42" y="168" width="116" height="20" rx="4" fill="#ffb3a0" stroke="#e58a75" stroke-width="3" />
+        <path d="M54 168 V188 M146 168 V188" stroke="#fff" stroke-width="4" />`,
+    },
+    {
+      id: 'rare-puppy-homework',
+      name: 'Puppy',
+      group: 'Rare',
+      rare: true,
+      species: 'puppy',
+      color: 'mint',
+      prop: `<g transform="rotate(-5 100 158)">
+          <path d="M76 134 L84 140 L92 133 L100 140 L108 133 L116 140 L124 134 V184 H76 Z" fill="#fffdf8" stroke="#b9ad98" stroke-width="3" stroke-linejoin="round" />
+          <text x="100" y="163" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#f2637e">HW</text>
+          <path d="M84 172 H116" stroke="#c9beab" stroke-width="3" stroke-linecap="round" />
+        </g>
+        <g fill="#fffdf8" stroke="#b9ad98" stroke-width="2" stroke-linejoin="round">
+          <path d="M34 158 L44 154 L46 164 L36 167 Z" />
+          <path d="M150 158 L160 156 L160 166 L151 167 Z" />
+        </g>
+        ${holdingHands(70, 130, 172, '#c6f0da', '#7fcfa6')}`,
+    },
   ];
 
   function drawRareSticker(sticker) {
-    const buddy = PlannerBuddy.drawBuddy(3, 0, 'happy', sticker.wearing || {}, sticker.color, sticker.species).replace(
+    const { x, y, size } = sticker.buddyPlace || { x: 4, y: 4, size: 192 };
+    const buddy = PlannerBuddy.drawBuddy(3, 0, sticker.mood || 'happy', sticker.wearing || {}, sticker.color, sticker.species).replace(
       /<svg [^>]*>/,
-      '<svg x="4" y="4" width="192" height="192" viewBox="0 0 200 200">',
+      `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 200 200">`,
     );
     const shineId = `sticker-shine-${sticker.id}`;
     return `<svg class="sticker-art is-rare" viewBox="-8 -8 216 216" aria-hidden="true" focusable="false">
