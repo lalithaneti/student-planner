@@ -109,6 +109,7 @@
 
   const elements = {
     challengeDialog: document.getElementById('challenge-dialog'),
+    chestDialog: document.getElementById('chest-dialog'),
     backupStatus: document.getElementById('backup-status'),
     restoreBackupInput: document.getElementById('restore-backup'),
     quickAddDialog: document.getElementById('quick-add-dialog'),
@@ -705,6 +706,44 @@
       <circle cx="40" cy="39" r="2.2" fill="#9c5f2e" />
     </svg>`;
 
+  const OPEN_TREASURE_CHEST = `<svg class="treasure-chest" viewBox="0 0 80 70" aria-hidden="true" focusable="false">
+      <ellipse cx="40" cy="64" rx="32" ry="4" fill="#000" opacity="0.1" />
+      <path d="M8 34 C4 6 76 6 72 34 Z" fill="#a9683a" stroke="#9c5f2e" stroke-width="3" stroke-linejoin="round" />
+      <path d="M8 34 H72" stroke="#ffd166" stroke-width="5" />
+      <circle cx="28" cy="32" r="7" fill="#ffd166" stroke="#d99a1f" stroke-width="2" />
+      <circle cx="52" cy="32" r="7" fill="#ffd166" stroke="#d99a1f" stroke-width="2" />
+      <circle cx="40" cy="28" r="8" fill="#ffe08f" stroke="#d99a1f" stroke-width="2" />
+      <rect x="8" y="36" width="64" height="26" rx="4" fill="#c7814a" stroke="#9c5f2e" stroke-width="3" />
+      <path d="M8 36 H72 M30 36 V62 M50 36 V62" stroke="#ffd166" stroke-width="5" />
+    </svg>`;
+
+  // The chest at the end of the trail: shut, shining and tappable once earned, or open.
+  function renderPathChest(chest, spot) {
+    const place = `style="left: ${spot.x}%; top: ${spot.y}%"`;
+    if (chest.status === 'ready') {
+      return `<button type="button" class="buddy-path-chest is-ready" ${place} data-action="open-chest" aria-label="Open this week’s chest">${TREASURE_CHEST}</button>`;
+    }
+    return `<div class="buddy-path-chest" ${place}>${chest.status === 'opened' ? OPEN_TREASURE_CHEST : TREASURE_CHEST}</div>`;
+  }
+
+  // Opens the viewed week's chest and shows what was inside, in one small card.
+  function openWeekChest() {
+    const prize = buddy.openChest(currentBuddy(), weekStart);
+    if (!PlannerStorage.save(state)) {
+      showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
+    }
+    render();
+    elements.chestDialog.innerHTML = `
+      <div class="chest-card">
+        <div class="chest-card-art">${OPEN_TREASURE_CHEST}</div>
+        <h3 id="chest-heading">Week finished!</h3>
+        <p class="chest-card-prize">+${prize.points} bonus points</p>
+        <p class="buddy-muted">${escapeHtml(buddy.displayName(currentBuddy()))} found them in this week’s chest.</p>
+        <button type="button" class="primary-button" data-action="close-chest">Nice!</button>
+      </div>`;
+    elements.chestDialog.showModal();
+  }
+
   // The buddy for the game: the viewed semester's, or a waiting egg if it has none yet.
   function drawGameBuddy() {
     if (!currentBuddy()) {
@@ -733,14 +772,34 @@
         aria-label="${item.done ? 'Mark not done' : 'Mark done'}: ${title}, ${model.formatDate(item.date)}" title="${title} · ${when}">${status === 'done' ? '✓' : index + 1}</button>`;
   }
 
+  // What a finished week's chest is doing, so a shut chest never looks broken.
+  function describeFinishedChest(chest) {
+    if (chest.status === 'opened') {
+      return ` Chest: +${chest.prize.points} points.`;
+    }
+    if (chest.status === 'ready') {
+      return ' Tap the chest to open it.';
+    }
+    if (chest.reason === 'no-buddy') {
+      return ' Pick a buddy on the Study Buddy tab to start earning chests.';
+    }
+    if (chest.reason === 'before-buddy') {
+      const { startDate } = currentBuddy();
+      return todayKey() < startDate
+        ? ` Your buddy’s chests start when it wakes up on ${model.formatMonthDay(startDate)}.`
+        : ' This week was before your buddy started, so it has no chest.';
+    }
+    return '';
+  }
+
   // One thing at a time: the assignment the buddy is standing on, ready to finish.
-  function renderNextUp(stones, buddyStone) {
+  function renderNextUp(stones, buddyStone, chest) {
     if (stones.length === 0) {
       return '<p class="empty">Nothing due this week.</p>';
     }
     if (buddyStone === stones.length) {
       const allDone = stones.every((stone) => stone.status === 'done');
-      return `<p class="next-up-finished">${allDone ? 'All done for this week! 🎉' : 'Nothing left to do this week.'}</p>`;
+      return `<p class="next-up-finished">${allDone ? `All done for this week! 🎉${describeFinishedChest(chest)}` : 'Nothing left to do this week.'}</p>`;
     }
     const { item, status } = stones[buddyStone];
     const statusText = PATH_STATUS_TEXT[status] ? ` · ${PATH_STATUS_TEXT[status]}` : '';
@@ -794,6 +853,7 @@
     const buddySpot = pathPoint(stoneAlong(buddyStone), waves);
     const chestSpot = pathPoint(1, waves);
     const atChest = count > 0 && buddyStone === count;
+    const chest = buddy.chestFor(buddyView(), weekStart);
     return `
       <h3 class="buddy-path-title">Buddy’s Path</h3>
       ${renderWeekNav()}
@@ -803,11 +863,11 @@
             <path d="M${trail}" />
           </svg>
           ${stones.map((stone, index) => renderPathStone(stone, index, stoneAlong(index), waves)).join('')}
-          <div class="buddy-path-chest" style="left: ${chestSpot.x}%; top: ${chestSpot.y}%">${TREASURE_CHEST}</div>
+          ${count > 0 ? renderPathChest(chest, chestSpot) : ''}
           <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%">${drawGameBuddy()}</div>
         </div>
       </div>
-      ${renderNextUp(stones, buddyStone)}
+      ${renderNextUp(stones, buddyStone, chest)}
       ${renderPathList(stones)}
       ${
         currentBuddy()
@@ -2914,6 +2974,13 @@
 
   function renderPointsEntry({ item, points, reason, streakDays, when }) {
     const sign = points > 0 ? `+${points}` : `−${-points}`;
+    if (reason === 'chest') {
+      return `<li class="buddy-log-item is-streak">
+          <span class="buddy-log-points is-gain">${sign}</span>
+          <span class="buddy-log-title">🎁 Week’s chest</span>
+          <span class="buddy-muted">Week ending ${model.formatDate(when.slice(0, 10))}</span>
+        </li>`;
+    }
     if (!item) {
       return `<li class="buddy-log-item is-streak">
           <span class="buddy-log-points is-gain">${sign}</span>
@@ -3084,6 +3151,7 @@
                 <span class="buddy-milestones">${buddy.STREAK_MILESTONES.map(
                   (milestone) => `<span>🔥 ${milestone.days} days <strong class="is-gain">+${milestone.points}</strong></span>`,
                 ).join('')}</span></li>
+              <li><span>Finish a whole week, then open its chest on Buddy’s Path</span> <strong class="is-gain">🎁 Bonus</strong></li>
             </ul>
             <p class="buddy-muted">A day adds to your streak when everything due that day is checked off on time.
               Counts ${escapeHtml(currentSemester().name)} work due from ${model.formatDate(currentBuddy().startDate)} on.</p>
@@ -3206,7 +3274,11 @@
     const pointsBefore = buddyPoints();
     const streakBefore = buddyStreak().current;
     const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
-    applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore), () => {
+    const itemWeek = model.startOfWeek(date);
+    const onThePath = currentTab === 'assignments' && currentView === 'game';
+    const chestReadyText = () =>
+      !onThePath && buddy.chestFor(buddyView(), itemWeek).status === 'ready' ? ' Your week’s chest is ready on Buddy’s Path!' : '';
+    applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore) + chestReadyText(), () => {
       if (currentBuddy()) {
         buddy.recordCheckOff(currentBuddy(), item, nowDone, todayKey(), currentTime());
       }
@@ -3222,6 +3294,10 @@
     if (nowDone) {
       elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
       elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
+      // Finishing the week on the path opens its chest right away.
+      if (onThePath && itemWeek === weekStart && buddy.chestFor(buddyView(), weekStart).status === 'ready') {
+        openWeekChest();
+      }
     }
   }
 
@@ -3475,6 +3551,10 @@
       copyChallengeLink();
     } else if (action === 'close-challenge') {
       elements.challengeDialog.close();
+    } else if (action === 'open-chest') {
+      openWeekChest();
+    } else if (action === 'close-chest') {
+      elements.chestDialog.close();
     } else if (action === 'open-quick-add') {
       openQuickAdd();
     } else if (action === 'open-new-semester') {
@@ -3709,6 +3789,10 @@
         menu.open = false;
       }
     });
+    // A tap on the dim area around the prize card closes it too.
+    if (event.target === elements.chestDialog) {
+      elements.chestDialog.close();
+    }
     const target = event.target.closest('[data-action]');
     if (target && target.dataset.action !== 'toggle-done') {
       handleListAction(target);

@@ -17,6 +17,9 @@ const PlannerBuddy = (() => {
   ];
   const LAST_MILESTONE = STREAK_MILESTONES[STREAK_MILESTONES.length - 1];
 
+  // What a week's chest can hold. Repeats make the bigger prizes rarer.
+  const CHEST_PRIZES = [10, 10, 10, 15, 15, 20, 30];
+
   // Each stage starts at a number of points; growVerb finishes "N more points to …".
   const STAGES = [
     { name: 'Egg', minPoints: 0, growVerb: 'hatch' },
@@ -70,7 +73,7 @@ const PlannerBuddy = (() => {
   // Only work due on or after startDate counts, so things missed before the buddy
   // existed don't count against it. wearing maps a spot to an accessory id.
   function newBuddy(todayKey, color = 'pink', species = 'mochi') {
-    return { name: '', species, color, startDate: todayKey, lateDone: [], wearing: {} };
+    return { name: '', species, color, startDate: todayKey, lateDone: [], wearing: {}, openedChests: [] };
   }
 
   // Each semester has its own buddy in state.buddies, keyed by semester id. A new one
@@ -245,6 +248,48 @@ const PlannerBuddy = (() => {
     return { current, best, level, next: { days: nextDays, points: streakBonus(nextDays) } };
   }
 
+  // Each week's prize comes from the week and the buddy, not from a dice roll, so it looks
+  // random but stays the same however many times the week is unchecked, undone, and redone.
+  function chestPrize(buddy, weekStart) {
+    // FNV-1a, a standard hash, with a final stir: week dates differ by only a digit or two,
+    // and a simpler hash gave the same prize many weeks in a row.
+    let hash = 2166136261;
+    for (const character of `${buddy.startDate}|${buddy.species}|${weekStart}`) {
+      hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    }
+    hash = Math.imul(hash ^ (hash >>> 15), 2246822519);
+    hash ^= hash >>> 13;
+    return { points: CHEST_PRIZES[(hash >>> 0) % CHEST_PRIZES.length] };
+  }
+
+  // Whether a week's work is all checked off, counting only weeks the buddy was around for.
+  function weekIsFinished(state, items, weekStart) {
+    const weekEnd = PlannerModel.addDays(weekStart, 6);
+    const dueThatWeek = items.filter((item) => item.date >= weekStart && item.date <= weekEnd);
+    return dueThatWeek.length > 0 && dueThatWeek.every((item) => item.done) && weekEnd >= state.buddy.startDate;
+  }
+
+  // A week's chest: 'locked' until the week is finished, then 'ready' to open, then 'opened'.
+  // Unchecking work locks an opened chest again until the week is finished again.
+  function chestFor(state, weekStart) {
+    if (!state.buddy) {
+      return { status: 'locked', reason: 'no-buddy' };
+    }
+    if (PlannerModel.addDays(weekStart, 6) < state.buddy.startDate) {
+      return { status: 'locked', reason: 'before-buddy' };
+    }
+    if (!weekIsFinished(state, PlannerModel.buildDueList(state), weekStart)) {
+      return { status: 'locked' };
+    }
+    const prize = chestPrize(state.buddy, weekStart);
+    return { status: (state.buddy.openedChests || []).includes(weekStart) ? 'opened' : 'ready', prize };
+  }
+
+  function openChest(buddy, weekStart) {
+    buddy.openedChests = [...new Set([...(buddy.openedChests || []), weekStart])];
+    return chestPrize(buddy, weekStart);
+  }
+
   // The points each counted assignment date and streak bonus earned or lost, newest first.
   function pointsLog(state, todayKey, nowTime) {
     if (!state.buddy) {
@@ -265,6 +310,14 @@ const PlannerBuddy = (() => {
     // A streak bonus comes after that day's work.
     for (const bonus of streakSummary(state, items, todayKey, nowTime).bonuses) {
       entries.push({ when: `${bonus.date}~`, item: null, points: bonus.points, reason: 'streak', streakDays: bonus.days });
+    }
+    // A chest's bonus counts while its week stays finished, dated the last day of that week.
+    const allItems = PlannerModel.buildDueList(state);
+    for (const weekStart of state.buddy.openedChests || []) {
+      if (weekIsFinished(state, allItems, weekStart)) {
+        const when = `${PlannerModel.addDays(weekStart, 6)}~`;
+        entries.push({ when, item: null, points: chestPrize(state.buddy, weekStart).points, reason: 'chest' });
+      }
     }
     // Plain character order (not localeCompare, which ranks "~" before digits).
     return entries.sort((a, b) => (a.when < b.when ? 1 : a.when > b.when ? -1 : 0));
@@ -937,6 +990,8 @@ const PlannerBuddy = (() => {
     wornAccessories,
     toggleAccessory,
     streakFor,
+    chestFor,
+    openChest,
     pointsLog,
     totalPoints,
     pointsForCheckingOff,

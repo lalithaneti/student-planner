@@ -2753,6 +2753,84 @@ dialog::backdrop {
   width: 100%;
 }
 
+/* An earned chest, waiting to be tapped. */
+button.buddy-path-chest {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.buddy-path-chest.is-ready .treasure-chest {
+  filter: drop-shadow(0 0 8px #ffd166);
+  animation: chest-wiggle 1.6s ease-in-out infinite;
+}
+
+@keyframes chest-wiggle {
+  0%,
+  70%,
+  100% {
+    rotate: 0deg;
+  }
+
+  80% {
+    rotate: -5deg;
+  }
+
+  90% {
+    rotate: 5deg;
+  }
+}
+
+/* The small card a chest's prize shows on. */
+#chest-dialog {
+  width: min(320px, calc(100vw - 32px));
+}
+
+.chest-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.chest-card h3,
+.chest-card p {
+  margin: 0;
+}
+
+.chest-card-art {
+  width: 96px;
+  animation: chest-pop 0.35s ease-out;
+}
+
+.chest-card-prize {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.chest-card .primary-button {
+  margin-top: 8px;
+}
+
+@keyframes chest-pop {
+  from {
+    scale: 0.6;
+  }
+
+  to {
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-path-chest.is-ready .treasure-chest,
+  .chest-card-art {
+    animation: none;
+  }
+}
+
 .next-up {
   display: flex;
   flex-wrap: wrap;
