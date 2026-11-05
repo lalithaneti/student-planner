@@ -3034,6 +3034,21 @@
       </section>`;
   }
 
+  // A first look at the stickers. They don't come from chests yet.
+  function renderStickerPreview() {
+    const items = PlannerStickers.STICKERS.map(
+      (sticker) => `<li class="sticker-item">
+          ${PlannerStickers.drawSticker(sticker)}
+          <strong>${sticker.name}</strong>
+        </li>`,
+    ).join('');
+    return `<section class="home-box">
+        <h3 class="due-heading">Stickers</h3>
+        <p class="buddy-muted">A first look. Soon you’ll find these in your weekly chests.</p>
+        <ul class="sticker-grid">${items}</ul>
+      </section>`;
+  }
+
   // For a semester without a buddy: pick a species (each shown grown up, with ones other
   // semesters already have grayed out), then a color, then start the egg.
   function renderBuddyPicker() {
@@ -3162,6 +3177,7 @@
             ${recent}
           </section>
           ${renderAllSpecies()}
+          ${renderStickerPreview()}
         </div>
       </div>
       ${renderBuddyShelf()}`;

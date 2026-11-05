@@ -2942,6 +2942,34 @@ button.buddy-path-chest {
   margin-bottom: 12px;
 }
 
+/* ---------- Stickers ---------- */
+
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 16px 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sticker-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* White shadows on every side make the die-cut edge of a real sticker. */
+.sticker-art {
+  display: block;
+  width: 84px;
+  filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff)
+    drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
+}
+
 /* ---------- Picking a new semester's buddy, and the Buddy Collection ---------- */
 
 .buddy-color-choices {
