@@ -77,7 +77,7 @@
   let editingClassId = null;
   // The assignment being edited: { id, scope: 'all' | 'date', date }, or null when adding.
   let editingAssignment = null;
-  // Which part of the Add panel is showing: 'assignment', 'class', 'exam', 'break', 'rso', or 'event'.
+  // Which part of the Add panel is showing: 'assignment', 'class', 'exam', 'quiz', 'work', 'break', 'rso', or 'event'.
   let drawerSection = 'assignment';
   let editingExamId = null;
   // The exam panel also adds quizzes: 'exam' or 'quiz'.
@@ -85,6 +85,7 @@
   let editingBreakId = null;
   let editingRsoId = null;
   let editingEventId = null;
+  let editingWorkId = null;
   // Whether the break theme was picked by hand; until then it follows the first day's month.
   let breakThemeChosen = false;
   let showDone = false;
@@ -182,6 +183,16 @@
     finalFields: document.getElementById('final-fields'),
     classDateFields: document.getElementById('class-date-fields'),
     rsoLastsHint: document.getElementById('rso-lasts-hint'),
+    workPanel: document.getElementById('work-panel'),
+    workForm: document.getElementById('work-form'),
+    workClass: document.getElementById('work-class'),
+    workHeading: document.getElementById('work-heading'),
+    workSubmit: document.getElementById('work-submit'),
+    workCancel: document.getElementById('work-cancel'),
+    workErrors: document.getElementById('work-errors'),
+    workDays: document.getElementById('work-days'),
+    workDaysField: document.getElementById('work-days-field'),
+    workDateLabel: document.getElementById('work-date-label'),
     eventPanel: document.getElementById('event-panel'),
     eventForm: document.getElementById('event-form'),
     eventHeading: document.getElementById('event-heading'),
@@ -427,6 +438,11 @@
         : options.slice(0, -1).join('');
     if ([...elements.examClass.options].some((option) => option.value === selectedExamClass)) {
       elements.examClass.value = selectedExamClass;
+    }
+    const selectedWorkClass = elements.workClass.value;
+    elements.workClass.innerHTML = elements.examClass.innerHTML;
+    if ([...elements.workClass.options].some((option) => option.value === selectedWorkClass)) {
+      elements.workClass.value = selectedWorkClass;
     }
   }
 
@@ -1022,6 +1038,33 @@
       </details>`;
   }
 
+  // A work session on the calendar: striped in its class's color and marked WORK. Clicking it
+  // opens a menu to edit or delete it, or for a repeating one, to cancel just that date.
+  function renderWorkBlock(block, startHour) {
+    const { session, plannerClass, date, cancelled } = block;
+    const { height, style } = blockPlacement(block, startHour);
+    const name = `${escapeHtml(plannerClass.name)}${session.note ? ` ${escapeHtml(session.note)}` : ''}`;
+    const details = cancelled ? 'Cancelled' : height >= HOUR_HEIGHT ? escapeHtml(session.location) : '';
+    const dateData = `data-id="${session.id}" data-date="${date}"`;
+    const dayAction = cancelled
+      ? `<button type="button" data-action="restore-work" ${dateData}>Restore work session on ${model.formatDate(date)}</button>`
+      : `<button type="button" class="danger" data-action="cancel-work" ${dateData}>Cancel work session on ${model.formatDate(date)}</button>`;
+    return `
+      <details class="row-menu class-block-slot" style="${style}">
+        <summary class="class-block is-work${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}"
+          title="Work session: ${name}${session.location ? ` · ${escapeHtml(session.location)}` : ''}${cancelled ? ' (cancelled)' : ''}">
+          <span class="class-block-name"><span class="exam-tag">Work</span> ${name}</span>
+          ${details ? `<span class="class-block-details">${details}</span>` : ''}
+          <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
+        </summary>
+        <div class="row-menu-items">
+          <button type="button" data-action="edit-work" data-id="${session.id}">Edit work session…</button>
+          ${session.repeats ? dayAction : ''}
+          <button type="button" class="danger" data-action="delete-work" data-id="${session.id}">Delete ${session.repeats ? 'all dates' : 'work session'}</button>
+        </div>
+      </details>`;
+  }
+
   // A one-time event on the calendar: an RSO's (in its color, named "MedLaunch: Fall social")
   // or a standalone one in its own color. Clicking it opens a menu to edit or delete it.
   function renderEventBlock(block, startHour) {
@@ -1245,6 +1288,12 @@
         return { color: block.plannerClass.color, name: `<span class="exam-tag">${examTag(block.exam)}</span> ${escapeHtml(block.plannerClass.name)} ${escapeHtml(block.exam.title)}`, place: block.exam.location };
       case 'quiz':
         return { color: block.plannerClass.color, name: `<span class="exam-tag">Quiz</span> ${escapeHtml(block.plannerClass.name)} ${escapeHtml(block.quiz.title)}`, place: block.quiz.location };
+      case 'work':
+        return {
+          color: block.plannerClass.color,
+          name: `<span class="exam-tag">Work</span> ${escapeHtml(block.plannerClass.name)}${block.session.note ? ` ${escapeHtml(block.session.note)}` : ''}`,
+          place: block.session.location,
+        };
       case 'rso-meeting':
         return { color: block.rso.color, name: `${escapeHtml(block.rso.name)}${block.meeting.label ? ` ${escapeHtml(block.meeting.label)}` : ''}`, place: block.meeting.location };
       case 'rso-event':
@@ -1397,7 +1446,7 @@
       .map((day) => {
         const showNow = day.date === today && nowTime >= `${String(week.startHour).padStart(2, '0')}:00` && model.timeToMinutes(nowTime) <= week.endHour * 60;
         const nowLine = showNow ? `<div class="now-line" style="top: ${timeOffset(nowTime, week.startHour)}px" aria-hidden="true"></div>` : '';
-        const blockRenderers = { exam: renderExamBlock, quiz: renderExamBlock, 'rso-event': renderEventBlock, event: renderEventBlock };
+        const blockRenderers = { exam: renderExamBlock, quiz: renderExamBlock, work: renderWorkBlock, 'rso-event': renderEventBlock, event: renderEventBlock };
         const blocks = day.blocks.map((block) => (blockRenderers[block.kind] || renderMeetingBlock)(block, week.startHour)).join('');
         return `<div class="calendar-day${day.date === today ? ' is-today' : ''}">${blocks}${nowLine}</div>`;
       })
@@ -1437,6 +1486,7 @@
       assignment: elements.assignmentHeading.textContent,
       exam: elements.examHeading.textContent,
       quiz: elements.examHeading.textContent,
+      work: elements.workHeading.textContent,
       break: 'Breaks',
       rso: 'RSOs',
       event: elements.eventHeading.textContent,
@@ -1444,7 +1494,7 @@
     elements.drawerHeading.textContent = headings[drawerSection];
   }
 
-  // Opens the Add panel showing one section ('assignment', 'class', 'exam', 'quiz', 'break', 'rso', or 'event'), or closes it.
+  // Opens the Add panel showing one section ('assignment', 'class', 'exam', 'quiz', 'work', 'break', 'rso', or 'event'), or closes it.
   function setDrawerOpen(open, section = drawerSection) {
     if (!open && editingAssignment) {
       stopEditingAssignment();
@@ -1461,6 +1511,9 @@
     if (!open && editingEventId) {
       stopEditingEvent();
     }
+    if (!open && editingWorkId) {
+      stopEditingWork();
+    }
     elements.drawer.inert = !open;
     elements.drawer.classList.toggle('is-open', open);
     document.body.classList.toggle('drawer-open', open);
@@ -1476,6 +1529,7 @@
       if ((section === 'exam' || section === 'quiz') && !editingExamId) {
         setExamFormKind(section);
       }
+      elements.workPanel.hidden = section !== 'work';
       elements.breakPanel.hidden = section !== 'break';
       elements.rsoPanel.hidden = section !== 'rso';
       elements.eventPanel.hidden = section !== 'event';
@@ -1485,6 +1539,7 @@
         assignment: elements.assignmentForm.elements.title,
         exam: elements.examForm.elements.title,
         quiz: elements.examForm.elements.title,
+        work: elements.workClass,
         break: elements.breakForm.elements.name,
         rso: elements.rsoForm.elements.name,
         event: elements.eventForm.elements.title,
@@ -1806,6 +1861,7 @@
     elements.rsoColorPicker.innerHTML = renderColorOptions(model.RSO_COLORS);
     elements.eventColorPicker.innerHTML = renderColorOptions(model.RSO_COLORS);
     elements.dayPicker.innerHTML = renderDayOptions(ALL_DAYS, [], 'name="days"');
+    elements.workDays.innerHTML = renderDayOptions(ALL_DAYS, [], 'class="work-day"');
     elements.breakThemePicker.innerHTML = model.BREAK_THEMES.map(
       (theme, index) => `
         <label class="theme-option">
@@ -2293,6 +2349,89 @@
       });
     }
     stopEditingRso();
+  }
+
+  // ---------- Work sessions ----------
+
+  // Repeating sessions pick their days, and their date is the first one they can fall on.
+  function showWorkRepeat(repeats) {
+    elements.workDaysField.hidden = !repeats;
+    elements.workDateLabel.textContent = repeats ? 'Starting' : 'Date';
+    if (repeats && !elements.workForm.elements.date.value) {
+      elements.workForm.elements.date.value = todayKey();
+    }
+  }
+
+  function startEditingWork(id) {
+    const session = state.workSessions.find((candidate) => candidate.id === id);
+    editingWorkId = id;
+    const form = elements.workForm;
+    form.elements.classId.value = session.classId;
+    ['note', 'date', 'startTime', 'endTime', 'location'].forEach((field) => {
+      form.elements[field].value = session[field];
+    });
+    form.elements.repeats.checked = session.repeats;
+    elements.workDays.querySelectorAll('.work-day').forEach((input) => {
+      input.checked = session.days.includes(Number(input.value));
+    });
+    showWorkRepeat(session.repeats);
+    elements.workHeading.textContent = 'Edit work session';
+    elements.workSubmit.textContent = 'Save work session';
+    elements.workCancel.hidden = false;
+    showErrors(elements.workErrors, []);
+    setDrawerOpen(true, 'work');
+  }
+
+  function stopEditingWork() {
+    editingWorkId = null;
+    elements.workForm.reset();
+    showWorkRepeat(false);
+    elements.workHeading.textContent = 'Add work session';
+    elements.workSubmit.textContent = 'Add work session';
+    elements.workCancel.hidden = true;
+    showErrors(elements.workErrors, []);
+    renderClassOptions();
+    renderDrawerHeading();
+  }
+
+  function handleWorkSubmit(event) {
+    event.preventDefault();
+    const form = elements.workForm;
+    const repeats = form.elements.repeats.checked;
+    const fields = {
+      classId: form.elements.classId.value,
+      note: form.elements.note.value.trim(),
+      repeats,
+      date: form.elements.date.value,
+      days: repeats ? checkedDays(elements.workDays, '.work-day') : [],
+      startTime: form.elements.startTime.value,
+      endTime: form.elements.endTime.value,
+      location: form.elements.location.value.trim(),
+    };
+    const errors = model.validateWorkSession(fields);
+    showErrors(elements.workErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    const className = state.classes.find((plannerClass) => plannerClass.id === fields.classId).name;
+    if (editingWorkId) {
+      const session = state.workSessions.find((candidate) => candidate.id === editingWorkId);
+      applyChange(`Saved the work session for ${className}.`, () => Object.assign(session, fields));
+      setDrawerOpen(false);
+    } else {
+      const when = repeats ? `every ${model.formatDays(fields.days)}` : `on ${model.formatDate(fields.date)}`;
+      applyChange(`Added a work session for ${className} ${when}.`, () => {
+        state.workSessions = [
+          ...(state.workSessions || []),
+          { id: newId('work'), semesterId: state.currentSemesterId, cancelledDates: [], ...fields },
+        ];
+      });
+      // Keep the class so adding several sessions for one class is quick.
+      const classId = form.elements.classId.value;
+      form.reset();
+      form.elements.classId.value = classId;
+      showWorkRepeat(false);
+    }
   }
 
   // ---------- Standalone events ----------
@@ -3055,6 +3194,7 @@
       const count = state.assignments.filter((candidate) => candidate.classId === id).length;
       const examCount = (state.exams || []).filter((exam) => exam.classId === id).length;
       const quizCount = (state.quizzes || []).filter((quiz) => quiz.classId === id).length;
+      const workCount = (state.workSessions || []).filter((session) => session.classId === id).length;
       const parts = [];
       if (count > 0) {
         parts.push(`${count} assignment${count === 1 ? '' : 's'}`);
@@ -3064,6 +3204,9 @@
       }
       if (quizCount > 0) {
         parts.push(`${quizCount} quiz${quizCount === 1 ? '' : 'zes'}`);
+      }
+      if (workCount > 0) {
+        parts.push(`${workCount} work session${workCount === 1 ? '' : 's'}`);
       }
       const warning = parts.length > 0 ? ` This also deletes its ${parts.join(' and ')}.` : '';
       if (await askToConfirm(`Delete ${plannerClass.name}?${warning}`, 'Delete class')) {
@@ -3075,6 +3218,7 @@
           state.assignments = state.assignments.filter((candidate) => candidate.classId !== id);
           state.exams = (state.exams || []).filter((exam) => exam.classId !== id);
           state.quizzes = (state.quizzes || []).filter((quiz) => quiz.classId !== id);
+          state.workSessions = (state.workSessions || []).filter((session) => session.classId !== id);
         });
       }
     } else if (action === 'edit-assignment') {
@@ -3131,6 +3275,22 @@
       });
     } else if (action === 'edit-exam') {
       startEditingExam(id);
+    } else if (action === 'edit-work') {
+      startEditingWork(id);
+    } else if (action === 'delete-work') {
+      if (editingWorkId === id) {
+        stopEditingWork();
+      }
+      applyChange('Deleted the work session.', () => {
+        state.workSessions = state.workSessions.filter((candidate) => candidate.id !== id);
+      });
+    } else if (action === 'cancel-work' || action === 'restore-work') {
+      const session = state.workSessions.find((candidate) => candidate.id === id);
+      const cancelling = action === 'cancel-work';
+      applyChange(`${cancelling ? 'Cancelled' : 'Restored'} the work session on ${model.formatDate(date)}.`, () => {
+        const others = session.cancelledDates.filter((cancelledDate) => cancelledDate !== date);
+        session.cancelledDates = cancelling ? [...others, date] : others;
+      });
     } else if (action === 'edit-quiz') {
       startEditingExam(id, 'quiz');
     } else if (action === 'delete-quiz') {
@@ -3158,6 +3318,9 @@
       }
       if (editingEventId) {
         stopEditingEvent();
+      }
+      if (editingWorkId) {
+        stopEditingWork();
       }
       setDrawerOpen(true, target.dataset.section || 'assignment');
     } else if (action === 'set-view') {
@@ -3348,6 +3511,9 @@
   elements.rsoCancel.addEventListener('click', stopEditingRso);
   elements.eventForm.addEventListener('submit', handleEventSubmit);
   elements.eventCancel.addEventListener('click', () => setDrawerOpen(false));
+  elements.workForm.addEventListener('submit', handleWorkSubmit);
+  elements.workCancel.addEventListener('click', () => setDrawerOpen(false));
+  document.getElementById('work-repeats').addEventListener('change', (event) => showWorkRepeat(event.target.checked));
   elements.rsoMeetingList.addEventListener('change', (event) => {
     if (event.target.matches('.meeting-every')) {
       const firstField = event.target.closest('.meeting-row').querySelector('.meeting-first-field');

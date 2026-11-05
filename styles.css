@@ -1581,6 +1581,11 @@ button:focus-visible {
   background: color-mix(in srgb, var(--class-color) 55%, var(--surface));
 }
 
+/* Work sessions: soft stripes set them apart from class meetings, in light and dark mode. */
+.row-menu .class-block.is-work:not(.is-cancelled) {
+  background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / 35%) 0 6px, transparent 6px 12px);
+}
+
 /* One-time events: a dashed outline sets them apart from weekly meetings. */
 .row-menu .class-block.is-event {
   border: 2px dashed var(--class-color);

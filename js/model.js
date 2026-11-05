@@ -657,8 +657,51 @@ const PlannerModel = (() => {
     return errors;
   }
 
-  // Everything on the calendar for one date: class meetings, exams, quizzes, RSO meetings, and
-  // events. An exam replaces its own class's meeting when they overlap (an in-class exam).
+  // ---------- Work sessions ----------
+
+  // Time set aside to work on a class outside of class. Each is one date, or with repeats on,
+  // the chosen weekdays from that date on. Nothing about them counts for the Study Buddy.
+  function workSessionsOf(state) {
+    return (state.workSessions || []).filter((session) => session.semesterId === state.currentSemesterId);
+  }
+
+  // A repeating session keeps going through finals but takes breaks off, and stops with its
+  // class and its semester. A one-time session shows on its date, since it was added for that day.
+  function workSessionFallsOn(state, session, plannerClass, date) {
+    if (!session.repeats) {
+      return session.date === date;
+    }
+    return (
+      date >= session.date &&
+      date <= currentSemesterOf(state).endDate &&
+      session.days.includes(parseDateKey(date).getDay()) &&
+      classRunsOn(plannerClass, date) &&
+      !breakOn(state, date)
+    );
+  }
+
+  // Returns a list of problems with a work session; empty means it is valid.
+  function validateWorkSession(session) {
+    const errors = [];
+    if (!session.classId) {
+      errors.push('Pick the class this work session is for.');
+    }
+    if (!isValidDateKey(session.date)) {
+      errors.push(session.repeats ? 'Pick the date the work session starts repeating.' : 'Pick the date.');
+    }
+    if (session.repeats && session.days.length === 0) {
+      errors.push('Pick at least one day to repeat on.');
+    }
+    if (!isValidTime(session.startTime) || !isValidTime(session.endTime)) {
+      errors.push('Pick a start and end time.');
+    } else if (session.endTime <= session.startTime) {
+      errors.push('The end time must be after the start time.');
+    }
+    return errors;
+  }
+
+  // Everything on the calendar for one date: class meetings, exams, quizzes, work sessions, RSO
+  // meetings, and events. An exam replaces its own class's meeting when they overlap (an in-class exam).
   function calendarBlocksOn(state, date) {
     const classesById = new Map(state.classes.map((plannerClass) => [plannerClass.id, plannerClass]));
     const exams = examsOf(state)
@@ -670,7 +713,18 @@ const PlannerModel = (() => {
     const quizzes = quizzesOf(state)
       .filter((quiz) => quiz.date === date && classesById.has(quiz.classId))
       .map((quiz) => ({ kind: 'quiz', quiz, plannerClass: classesById.get(quiz.classId), date, startTime: quiz.startTime, endTime: quiz.endTime, cancelled: false }));
-    return [...meetings, ...exams, ...quizzes, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const workSessions = workSessionsOf(state)
+      .filter((session) => classesById.has(session.classId) && workSessionFallsOn(state, session, classesById.get(session.classId), date))
+      .map((session) => ({
+        kind: 'work',
+        session,
+        plannerClass: classesById.get(session.classId),
+        date,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        cancelled: isMeetingCancelled(session, date),
+      }));
+    return [...meetings, ...exams, ...quizzes, ...workSessions, ...rsoMeetingsOn(state, date), ...eventsOn(state, date)].sort((a, b) => a.startTime.localeCompare(b.startTime));
   }
 
   // How far ahead the exam countdown looks.
@@ -717,6 +771,7 @@ const PlannerModel = (() => {
       hasMeetings:
         classes.some((plannerClass) => (plannerClass.meetings || []).length > 0) ||
         quizzesOf(state).length > 0 ||
+        workSessionsOf(state).length > 0 ||
         rsosOf(state).some((rso) => rso.meetings.length > 0 || (rso.events || []).length > 0) ||
         (state.events || []).length > 0,
       outsideSemester: addDays(weekStart, 4) < semester.startDate || weekStart > semester.endDate,
@@ -921,6 +976,7 @@ const PlannerModel = (() => {
     validateExam,
     schoolYearEnd,
     validateEvent,
+    validateWorkSession,
     currentRsos,
     nextSemesterGuess,
     validateSemester,

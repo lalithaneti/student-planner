@@ -43,6 +43,7 @@
             <button type="button" role="menuitem" data-action="open-drawer" data-section="class">Class</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="exam">Exam</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="quiz">Quiz</button>
+            <button type="button" role="menuitem" data-action="open-drawer" data-section="work">Work session</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="break">Break</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="rso">RSO</button>
             <button type="button" role="menuitem" data-action="open-drawer" data-section="event">Event</button>
@@ -320,6 +321,51 @@
         </form>
         <h3 class="subheading">Your RSOs</h3>
         <ul class="class-list" id="rso-list"></ul>
+      </section>
+      <section class="panel" id="work-panel" aria-labelledby="work-heading" hidden>
+        <h2 id="work-heading">Add work session</h2>
+        <p class="hint">Time set aside to work on a class. It goes on your Calendar and Home, with no check-off or points.</p>
+        <form id="work-form" novalidate>
+          <label class="field">
+            <span>Class</span>
+            <select name="classId" id="work-class"></select>
+          </label>
+          <label class="field">
+            <span>Note <small>(optional)</small></span>
+            <input name="note" type="text" maxlength="60" placeholder="e.g. Problem set 7" autocomplete="off" />
+          </label>
+          <label class="checkbox-field">
+            <input type="checkbox" name="repeats" id="work-repeats" />
+            <span>Repeat weekly</span>
+          </label>
+          <fieldset class="field" id="work-days-field" hidden>
+            <legend>Repeat on</legend>
+            <div class="day-picker" id="work-days"></div>
+          </fieldset>
+          <label class="field">
+            <span id="work-date-label">Date</span>
+            <input name="date" type="date" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Starts</span>
+              <input name="startTime" type="time" />
+            </label>
+            <label class="field">
+              <span>Ends</span>
+              <input name="endTime" type="time" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Place <small>(optional)</small></span>
+            <input name="location" type="text" maxlength="40" placeholder="e.g. Grainger Library" autocomplete="off" />
+          </label>
+          <ul class="form-errors" id="work-errors" role="alert"></ul>
+          <div class="button-row">
+            <button type="submit" class="primary-button" id="work-submit">Add work session</button>
+            <button type="button" class="text-button" id="work-cancel" hidden>Cancel</button>
+          </div>
+        </form>
       </section>
       <section class="panel" id="event-panel" aria-labelledby="event-heading" hidden>
         <h2 id="event-heading">Add event</h2>
