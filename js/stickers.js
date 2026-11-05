@@ -62,6 +62,32 @@ const PlannerStickers = (() => {
         ${stickerFace(50, 42)}`,
     },
     {
+      id: 'laptop',
+      name: 'Laptop',
+      group: 'School life',
+      art: `<rect x="16" y="14" width="68" height="52" rx="7" fill="#c9cfdc" stroke="#99a2b5" stroke-width="3" />
+        <rect x="23" y="21" width="54" height="38" rx="3" fill="#dcf0ff" stroke="#99a2b5" stroke-width="2" />
+        <path d="M16 66 H84 L95 82 C96 85 94 87 91 87 H9 C6 87 4 85 5 82 Z" fill="#dde1ea" stroke="#99a2b5" stroke-width="3" stroke-linejoin="round" />
+        <path d="M40 79 H60" stroke="#99a2b5" stroke-width="3" stroke-linecap="round" />
+        ${stickerFace(50, 38)}`,
+    },
+    {
+      id: 'calculator',
+      name: 'Calculator',
+      group: 'School life',
+      art: `<rect x="20" y="5" width="60" height="90" rx="10" fill="#b5e3cf" stroke="#7fc0a3" stroke-width="3" />
+        <rect x="27" y="12" width="46" height="28" rx="5" fill="#f4fff4" stroke="#7fc0a3" stroke-width="2.5" />
+        ${stickerFace(50, 24)}
+        <g fill="#fff" stroke="#7fc0a3" stroke-width="2">
+          <rect x="27" y="47" width="12" height="11" rx="3" /><rect x="44" y="47" width="12" height="11" rx="3" />
+          <rect x="27" y="62" width="12" height="11" rx="3" /><rect x="44" y="62" width="12" height="11" rx="3" />
+          <rect x="27" y="77" width="12" height="11" rx="3" /><rect x="44" y="77" width="12" height="11" rx="3" />
+        </g>
+        <g fill="#ffb3c7" stroke="#e58aa5" stroke-width="2">
+          <rect x="61" y="47" width="12" height="11" rx="3" /><rect x="61" y="62" width="12" height="26" rx="3" />
+        </g>`,
+    },
+    {
       id: 'boba',
       name: 'Boba',
       group: 'Snacks',
@@ -110,6 +136,36 @@ const PlannerStickers = (() => {
         ${stickerFace(50, 50)}`,
     },
     {
+      id: 'ramen',
+      name: 'Ramen bowl',
+      group: 'Snacks',
+      art: `<path d="M34 24 C30 18 38 14 34 7 M50 24 C46 18 54 14 50 7" fill="none" stroke="#d9c6bb" stroke-width="4" stroke-linecap="round" />
+        <path d="M60 36 L90 8 M68 38 L96 14" stroke="#c98f5c" stroke-width="4" stroke-linecap="round" />
+        <ellipse cx="50" cy="42" rx="42" ry="13" fill="#ffe3a8" stroke="#e8807f" stroke-width="3" />
+        <path d="M24 42 C29 36 33 48 38 42 C43 36 47 48 52 42" fill="none" stroke="#f2c14e" stroke-width="3.5" stroke-linecap="round" />
+        <circle cx="66" cy="42" r="7" fill="#fff" stroke="#e8d3a0" stroke-width="2" />
+        <circle cx="66" cy="42" r="3.5" fill="#ffb84d" />
+        <path d="M8 44 C10 68 24 88 38 88 H62 C76 88 90 68 92 44 C80 58 20 58 8 44 Z" fill="#ff9d9a" stroke="#e8807f" stroke-width="3" stroke-linejoin="round" />
+        <rect x="36" y="86" width="28" height="7" rx="3" fill="#ff9d9a" stroke="#e8807f" stroke-width="3" />
+        ${stickerFace(50, 68)}`,
+    },
+    {
+      id: 'popcorn',
+      name: 'Popcorn',
+      group: 'Snacks',
+      art: `<g fill="#fff6d6" stroke="#e8c978" stroke-width="2.5">
+          <circle cx="50" cy="15" r="11" /><circle cx="31" cy="23" r="11" /><circle cx="69" cy="23" r="11" />
+          <circle cx="40" cy="30" r="11" /><circle cx="60" cy="30" r="11" /><circle cx="22" cy="34" r="9" /><circle cx="78" cy="34" r="9" />
+        </g>
+        <path d="M18 38 H82 L72 94 H28 Z" fill="#fff" stroke="#e8637b" stroke-width="3" stroke-linejoin="round" />
+        <g fill="#ff8a9c">
+          <path d="M29 38 H40 L43 94 H36 Z" /><path d="M60 38 H71 L64 94 H57 Z" />
+        </g>
+        <path d="M18 38 H82 L72 94 H28 Z" fill="none" stroke="#e8637b" stroke-width="3" stroke-linejoin="round" />
+        <rect x="27" y="52" width="46" height="24" rx="10" fill="#fff" stroke="#e8637b" stroke-width="2" />
+        ${stickerFace(50, 61)}`,
+    },
+    {
       id: 'leaf',
       name: 'Autumn leaf',
       group: 'Nature',
@@ -151,6 +207,27 @@ const PlannerStickers = (() => {
         </g>
         <circle cx="50" cy="50" r="21" fill="#eef8ff" stroke="#8fc7f0" stroke-width="3" />
         ${stickerFace(50, 48)}`,
+    },
+    {
+      id: 'cactus',
+      name: 'Cactus',
+      group: 'Nature',
+      art: `<path d="M34 50 H22 C16 50 13 46 13 40 V30" fill="none" stroke="#6fb864" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M34 50 H22 C16 50 13 46 13 40 V30" fill="none" stroke="#a3dc95" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M66 58 H78 C84 58 87 54 87 48 V38" fill="none" stroke="#6fb864" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M66 58 H78 C84 58 87 54 87 48 V38" fill="none" stroke="#a3dc95" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M30 76 V28 C30 2 70 2 70 28 V76 Z" fill="#a3dc95" stroke="#6fb864" stroke-width="3" stroke-linejoin="round" />
+        <circle cx="50" cy="9" r="5" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2" />
+        <path d="M24 72 H76 L70 95 H30 Z" fill="#f0a77a" stroke="#cf8152" stroke-width="3" stroke-linejoin="round" />
+        <rect x="20" y="68" width="60" height="10" rx="4" fill="#f7bc94" stroke="#cf8152" stroke-width="3" />
+        ${stickerFace(50, 40)}`,
+    },
+    {
+      id: 'cloud',
+      name: 'Cloud',
+      group: 'Nature',
+      art: `<path d="M26 80 C10 80 3 68 6 57 C9 46 20 42 27 45 C28 30 42 21 55 25 C66 28 72 37 72 45 C84 42 96 50 96 63 C96 74 87 80 76 80 Z" fill="#f4faff" stroke="#a9cdec" stroke-width="3" stroke-linejoin="round" />
+        ${stickerFace(50, 57)}`,
     },
   ];
 
