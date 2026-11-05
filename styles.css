@@ -2645,16 +2645,20 @@ dialog::backdrop {
 }
 
 .buddy-path {
-  position: relative;
-  height: 220px;
+  height: 240px;
   margin-top: 12px;
-  overflow: hidden;
+  overflow: auto hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
-/* The trail stretches to fill the box, so its line keeps the same thickness at any width. */
+.buddy-path-track {
+  position: relative;
+  height: 100%;
+}
+
+/* The trail stretches to fill the track, so its line keeps the same thickness at any width. */
 .buddy-path-trail {
   position: absolute;
   inset: 0;
@@ -2667,32 +2671,143 @@ dialog::backdrop {
   stroke: color-mix(in srgb, var(--accent) 30%, var(--surface));
   stroke-width: 22;
   stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
-/* Placed on the trail's ends, which sit at 14% and 86% across (see the path in app.js). */
-.buddy-path-buddy,
+.path-stone,
+.path-stone-mini {
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--class-color);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.path-stone {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: transform 0.15s ease;
+}
+
+.path-stone:hover {
+  transform: translate(-50%, -50%) scale(1.12);
+}
+
+.path-stone-mini {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+  font-size: 0.8rem;
+}
+
+/* Done stones light up in the class color. */
+.path-stone.is-done,
+.path-list-item.is-done .path-stone-mini {
+  background: var(--class-color);
+  color: #1c2024; /* Dark text stays readable on the light pastel class colors. */
+}
+
+.path-stone.is-done {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--class-color) 35%, transparent);
+}
+
+/* Work past its due time fades, but stays on the path. */
+.path-stone.is-overdue,
+.path-stone.is-missed {
+  opacity: 0.55;
+}
+
+/* The buddy stands just above its stone. */
+.buddy-path-buddy {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  width: 76px;
+  transform: translate(-50%, calc(-100% - 8px));
+}
+
+/* Next to the chest once there are no stones left to do. */
+.buddy-path-buddy.is-at-chest {
+  transform: translate(calc(-50% - 62px), -85%);
+}
+
 .buddy-path-chest {
   position: absolute;
+  width: 64px;
   transform: translate(-50%, -85%);
-}
-
-.buddy-path-buddy {
-  left: 14%;
-  top: 70%;
-  width: min(96px, 19%);
-}
-
-.buddy-path-chest {
-  left: 86%;
-  top: 62%;
-  width: min(72px, 15%);
 }
 
 .buddy-path-buddy .buddy-art,
 .treasure-chest {
   display: block;
   width: 100%;
+}
+
+.next-up {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--class-color);
+  border-radius: 12px;
+}
+
+.next-up-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-up-label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.next-up-text .due-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.next-up-finished {
+  margin: 12px 0 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+.path-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.path-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.path-list-item > span:last-child {
+  display: grid;
+  min-width: 0;
 }
 
 /* ---------- Challenging a friend ---------- */
@@ -2997,8 +3112,9 @@ dialog::backdrop {
   font-size: 0.9rem;
 }
 
-/* A happy hop on Home when something is checked off: crouch, jump, squish on landing. */
-.buddy-card-art.is-hopping .buddy-art {
+/* A happy hop when something is checked off: crouch, jump, squish on landing. */
+.buddy-card-art.is-hopping .buddy-art,
+.buddy-path-buddy.is-hopping .buddy-art {
   transform-origin: 50% 100%;
   animation: buddy-hop 0.9s ease-out;
 }
@@ -3025,7 +3141,8 @@ dialog::backdrop {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .buddy-card-art.is-hopping .buddy-art {
+  .buddy-card-art.is-hopping .buddy-art,
+  .buddy-path-buddy.is-hopping .buddy-art {
     animation: none;
   }
 }

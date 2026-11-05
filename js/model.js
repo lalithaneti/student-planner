@@ -379,6 +379,18 @@ const PlannerModel = (() => {
     return { overdue, items: dayItems, progress, completed };
   }
 
+  // One week as Buddy's Path: its assignment dates in due order as stones, and which stone the
+  // buddy stands on: the first still to do. Missed work can't be finished in time, so the buddy
+  // doesn't wait on it. buddyStone equals stones.length once none are left, which puts it at the chest.
+  function buildPathWeek(items, weekStart, todayKey, nowTime = '00:00') {
+    const weekEnd = addDays(weekStart, 6);
+    const stones = items
+      .filter((item) => item.date >= weekStart && item.date <= weekEnd)
+      .map((item) => ({ item, status: itemStatus(item, todayKey, nowTime) }));
+    const next = stones.findIndex((stone) => stone.status !== 'done' && stone.status !== 'missed');
+    return { stones, buddyStone: next === -1 ? stones.length : next };
+  }
+
   // Pulls one date out of a repeating assignment into its own one-time assignment,
   // keeping whether it was done. This is how "edit only this date" works.
   function detachOccurrence(series, date, newAssignmentId) {
@@ -965,6 +977,7 @@ const PlannerModel = (() => {
     startOfWeek,
     buildWeek,
     buildDay,
+    buildPathWeek,
     detachOccurrence,
     newRecurringAssignment,
     quickAddDays,

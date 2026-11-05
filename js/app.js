@@ -54,6 +54,7 @@
   const WEATHER_REFRESH_MS = 30 * 60 * 1000;
   const LOCATION_TIMEOUT_MS = 15 * 1000;
   const VIEW_STORAGE_KEY = 'student-planner-view';
+  const PATH_LIST_STORAGE_KEY = 'student-planner-path-list';
   // Height of one hour on the calendar, in pixels.
   const HOUR_HEIGHT = 56;
   const MEETING_DAYS = [1, 2, 3, 4, 5];
@@ -98,6 +99,8 @@
   // What's chosen so far in the Study Buddy picker, before the egg is started.
   let buddyPick = { species: 'mochi', color: 'pink' };
   let currentView = loadSavedPreference(VIEW_STORAGE_KEY, ['day', 'week', 'game']);
+  // Whether Buddy's Path's full list is showing, under its Next up card.
+  let pathListShown = loadSavedPreference(PATH_LIST_STORAGE_KEY, ['hidden', 'shown']) === 'shown';
   // The app always opens on Home.
   let currentTab = 'home';
   let weekStart = model.startOfWeek(todayKey());
@@ -509,6 +512,7 @@
     const items = model.buildDueList(state);
     if (currentView === 'game') {
       elements.dueList.innerHTML = renderGameView();
+      scrollPathToBuddy();
     } else if (items.length === 0) {
       elements.dueList.innerHTML = renderEmptyPlanner();
     } else {
@@ -710,19 +714,101 @@
     return drawCurrentBuddy(where, buddyMood(), buddyStreak());
   }
 
-  // The week as a winding trail, with the buddy at the start and a chest at the end.
-  // The assignments become stepping stones along it in the next step.
+  // Busy weeks scroll sideways, so each stone keeps this much room (px).
+  const PATH_STONE_SPACING = 72;
+  const PATH_SAMPLES = 80;
+  const PATH_STATUS_TEXT = { done: 'Done', overdue: 'Overdue', missed: 'Missed', upcoming: '' };
+
+  // A spot along the trail, from 0 (start) to 1 (the chest), as percentages of the track.
+  function pathPoint(along, waves) {
+    return { x: 8 + along * 78, y: 58 + 20 * Math.sin(along * waves * 2 * Math.PI) };
+  }
+
+  function renderPathStone({ item, status }, index, along, waves) {
+    const { x, y } = pathPoint(along, waves);
+    const when = `${model.formatDate(item.date)}, ${model.formatTime(item.time)}`;
+    const title = escapeHtml(item.assignment.title);
+    return `<button type="button" class="path-stone is-${status}" style="left: ${x}%; top: ${y}%; --class-color: ${itemColor(item)}"
+        data-action="toggle-stone" data-id="${item.assignment.id}" data-date="${item.date}" data-done="${item.done}"
+        aria-label="${item.done ? 'Mark not done' : 'Mark done'}: ${title}, ${model.formatDate(item.date)}" title="${title} · ${when}">${status === 'done' ? '✓' : index + 1}</button>`;
+  }
+
+  // One thing at a time: the assignment the buddy is standing on, ready to finish.
+  function renderNextUp(stones, buddyStone) {
+    if (stones.length === 0) {
+      return '<p class="empty">Nothing due this week.</p>';
+    }
+    if (buddyStone === stones.length) {
+      const allDone = stones.every((stone) => stone.status === 'done');
+      return `<p class="next-up-finished">${allDone ? 'All done for this week! 🎉' : 'Nothing left to do this week.'}</p>`;
+    }
+    const { item, status } = stones[buddyStone];
+    const statusText = PATH_STATUS_TEXT[status] ? ` · ${PATH_STATUS_TEXT[status]}` : '';
+    return `<section class="next-up" style="--class-color: ${itemColor(item)}" aria-label="Next up">
+        <span class="next-up-text">
+          <span class="next-up-label">Next up</span>
+          ${renderTitle(item.assignment)}
+          <span class="buddy-muted">${renderClassTag(item)} · ${model.formatDate(item.date)}, ${model.formatTime(item.time)}${statusText}</span>
+        </span>
+        <button type="button" class="primary-button next-up-done" data-action="next-up-done" data-id="${item.assignment.id}" data-date="${item.date}"
+          aria-label="Done: ${escapeHtml(item.assignment.title)}, ${model.formatDate(item.date)}">Done</button>
+      </section>`;
+  }
+
+  // The names to go with the stones' numbers, hidden until asked for so a busy week stays calm.
+  // Each has a checkbox too, for a stone that has scrolled out of view.
+  function renderPathList(stones) {
+    if (stones.length === 0) {
+      return '';
+    }
+    const toggle = renderToggle('toggle-path-list', pathListShown, pathListShown ? 'Hide list' : `Show all (${stones.length})`);
+    if (!pathListShown) {
+      return toggle;
+    }
+    const rows = stones.map(({ item, status }, index) => {
+      const statusText = PATH_STATUS_TEXT[status] ? ` · ${PATH_STATUS_TEXT[status]}` : '';
+      return `<li class="path-list-item is-${status}" style="--class-color: ${itemColor(item)}">
+          ${renderCheckbox(item)}
+          <span class="path-stone-mini" aria-hidden="true">${index + 1}</span>
+          <span>
+            <strong>${escapeHtml(item.assignment.title)}</strong>
+            <span class="buddy-muted">${renderClassTag(item)} · ${model.formatDate(item.date)}, ${model.formatTime(item.time)}${statusText}</span>
+          </span>
+        </li>`;
+    });
+    return `${toggle}<ol class="path-list">${rows.join('')}</ol>`;
+  }
+
+  // The week as a winding trail: one stone per assignment, the buddy on the next one to do, and
+  // a chest at the end.
   function renderGameView() {
+    const { stones, buddyStone } = model.buildPathWeek(model.buildDueList(state), weekStart, todayKey(), currentTime());
+    const count = stones.length;
+    // Longer weeks get more bends, so a long trail still winds.
+    const waves = Math.max(1.25, count / 4);
+    const stoneAlong = (index) => (count === 0 ? 0 : index / count);
+    const trail = Array.from({ length: PATH_SAMPLES + 1 }, (_, sample) => {
+      const { x, y } = pathPoint(sample / PATH_SAMPLES, waves);
+      return `${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).join(' L');
+    const buddySpot = pathPoint(stoneAlong(buddyStone), waves);
+    const chestSpot = pathPoint(1, waves);
+    const atChest = count > 0 && buddyStone === count;
     return `
       <h3 class="buddy-path-title">Buddy’s Path</h3>
       ${renderWeekNav()}
-      <div class="buddy-path">
-        <svg class="buddy-path-trail" viewBox="0 0 600 160" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          <path d="M84 112 C165 40 240 150 320 92 S468 40 516 100" />
-        </svg>
-        <div class="buddy-path-buddy">${drawGameBuddy()}</div>
-        <div class="buddy-path-chest">${TREASURE_CHEST}</div>
+      <div class="buddy-path" id="buddy-path">
+        <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px">
+          <svg class="buddy-path-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M${trail}" />
+          </svg>
+          ${stones.map((stone, index) => renderPathStone(stone, index, stoneAlong(index), waves)).join('')}
+          <div class="buddy-path-chest" style="left: ${chestSpot.x}%; top: ${chestSpot.y}%">${TREASURE_CHEST}</div>
+          <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%">${drawGameBuddy()}</div>
+        </div>
       </div>
+      ${renderNextUp(stones, buddyStone)}
+      ${renderPathList(stones)}
       ${
         currentBuddy()
           ? `<div class="challenge-row">
@@ -731,6 +817,12 @@
             </div>`
           : ''
       }`;
+  }
+
+  // On a trail too long for the screen, brings the buddy into view.
+  function scrollPathToBuddy() {
+    const path = document.getElementById('buddy-path');
+    path.scrollLeft = path.querySelector('.buddy-path-buddy').offsetLeft - path.clientWidth / 3;
   }
 
   // ---------- Challenging a friend ----------
@@ -3109,33 +3201,49 @@
 
   // ---------- Clicks in lists ----------
 
+  function setAssignmentDone(assignment, date, nowDone) {
+    const item = { assignment, date, time: assignment.dueTime };
+    const pointsBefore = buddyPoints();
+    const streakBefore = buddyStreak().current;
+    const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
+    applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore), () => {
+      if (currentBuddy()) {
+        buddy.recordCheckOff(currentBuddy(), item, nowDone, todayKey(), currentTime());
+      }
+      if (assignment.kind === 'once') {
+        assignment.done = nowDone;
+      } else if (nowDone) {
+        assignment.doneDates.push(date);
+      } else {
+        assignment.doneDates = assignment.doneDates.filter((doneDate) => doneDate !== date);
+      }
+    });
+    // Home's card and the path were just redrawn, so the hop plays once on each new buddy.
+    if (nowDone) {
+      elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
+      elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
+    }
+  }
+
   async function handleListAction(target) {
     const action = target.dataset.action;
     const { id, date } = target.dataset;
     const assignment = id ? findAssignment(id) : null;
 
     if (action === 'toggle-done') {
-      const nowDone = target.checked;
-      const item = { assignment, date, time: assignment.dueTime };
-      const pointsBefore = buddyPoints();
-      const streakBefore = buddyStreak().current;
-      const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
-      applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore), () => {
-        if (currentBuddy()) {
-          buddy.recordCheckOff(currentBuddy(), item, nowDone, todayKey(), currentTime());
-        }
-        if (assignment.kind === 'once') {
-          assignment.done = nowDone;
-        } else if (nowDone) {
-          assignment.doneDates.push(date);
-        } else {
-          assignment.doneDates = assignment.doneDates.filter((doneDate) => doneDate !== date);
-        }
-      });
-      // The Home card was just redrawn, so the hop plays once on the new buddy.
-      if (nowDone) {
-        elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
-      }
+      setAssignmentDone(assignment, date, target.checked);
+    } else if (action === 'toggle-stone') {
+      setAssignmentDone(assignment, date, target.dataset.done !== 'true');
+      // The path was just redrawn, so keep the keyboard on the same stone.
+      elements.dueList.querySelector(`.path-stone[data-id="${id}"][data-date="${date}"]`)?.focus({ preventScroll: true });
+    } else if (action === 'next-up-done') {
+      setAssignmentDone(assignment, date, true);
+      // The card was just redrawn for the next assignment, so keep the keyboard on its button.
+      elements.dueList.querySelector('.next-up-done')?.focus({ preventScroll: true });
+    } else if (action === 'toggle-path-list') {
+      pathListShown = !pathListShown;
+      savePreference(PATH_LIST_STORAGE_KEY, pathListShown ? 'shown' : 'hidden');
+      renderDueList();
     } else if (action === 'wear-accessory') {
       const accessory = buddy.ACCESSORIES.find((candidate) => candidate.id === target.dataset.accessory);
       const name = buddy.displayName(currentBuddy());
