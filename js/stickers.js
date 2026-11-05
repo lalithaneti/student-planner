@@ -279,10 +279,41 @@ const PlannerStickers = (() => {
         <path d="M79 153 l2.5 5.5 6 0.6 -4.5 4 1.3 5.9 -5.3 -3 -5.3 3 1.3 -5.9 -4.5 -4 6 -0.6 Z" fill="#ffd166" />
         ${holdingHands(58, 142, 166, '#ffd9bf', '#f0a77a')}`,
     },
+    {
+      id: 'rare-chick-graduate',
+      name: 'Chick',
+      group: 'Rare',
+      rare: true,
+      species: 'chick',
+      color: 'lemon',
+      wearing: { head: 'graduation-cap' },
+      prop: `<g transform="rotate(-8 100 164)">
+          <rect x="62" y="150" width="76" height="26" rx="13" fill="#fff" stroke="#b08d4f" stroke-width="3" />
+          <ellipse cx="136" cy="163" rx="5" ry="11" fill="#f2e5c8" stroke="#b08d4f" stroke-width="2.5" />
+          <rect x="93" y="148" width="14" height="30" rx="3" fill="#ff8fa8" stroke="#e8637b" stroke-width="2.5" />
+        </g>
+        ${holdingHands(72, 122, 168, '#fff3b8', '#e0c252')}`,
+    },
+    {
+      id: 'rare-penguin-boba',
+      name: 'Penguin',
+      group: 'Rare',
+      rare: true,
+      species: 'penguin',
+      color: 'sky',
+      prop: `<path d="M120 146 L144 112" stroke="#ff9ebd" stroke-width="8" stroke-linecap="round" />
+        <path d="M70 148 H130 L123 188 C122 192 120 194 116 194 H84 C80 194 78 192 77 188 Z" fill="#f0d3ad" stroke="#d3a878" stroke-width="3" stroke-linejoin="round" />
+        <rect x="66" y="141" width="68" height="9" rx="4.5" fill="#fff" stroke="#d3a878" stroke-width="3" />
+        <g fill="#5a3a4a">
+          <circle cx="88" cy="184" r="5" /><circle cx="100" cy="186" r="5" /><circle cx="112" cy="184" r="5" />
+          <circle cx="94" cy="175" r="5" /><circle cx="106" cy="175" r="5" />
+        </g>
+        ${holdingHands(70, 130, 166, '#cbe7ff', '#86bfe8')}`,
+    },
   ];
 
   function drawRareSticker(sticker) {
-    const buddy = PlannerBuddy.drawBuddy(3, 0, 'happy', {}, sticker.color, sticker.species).replace(
+    const buddy = PlannerBuddy.drawBuddy(3, 0, 'happy', sticker.wearing || {}, sticker.color, sticker.species).replace(
       /<svg [^>]*>/,
       '<svg x="4" y="4" width="192" height="192" viewBox="0 0 200 200">',
     );

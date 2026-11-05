@@ -616,6 +616,11 @@ const PlannerBuddy = (() => {
       fill="#e8457f" opacity="0.88" stroke="#b8305f" stroke-width="2" />
      <ellipse cx="${x - 7}" cy="114" rx="3.5" ry="2.2" fill="#fff" opacity="0.8" />`;
   const ACCESSORY_ART = {
+    // Not an unlockable accessory: only the chick's rare sticker wears it, for now.
+    'graduation-cap': `<path d="M70 64 V78 C70 90 130 90 130 78 V64 Z" fill="#46527a" stroke="#333d60" stroke-width="3" stroke-linejoin="round" />
+      <path d="M100 38 L152 58 L100 78 L48 58 Z" fill="#5f6f96" stroke="#333d60" stroke-width="3" stroke-linejoin="round" />
+      <path d="M100 58 L140 66 V88" fill="none" stroke="#ffd166" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="140" cy="92" r="5" fill="#ffd166" stroke="#d99a1f" stroke-width="1.5" />`,
     bow: `<g transform="translate(132 72) rotate(18)">
         <path d="M0 0 C-6 -15 -26 -15 -24 0 C-26 15 -6 15 0 0 Z" fill="#ff86b6" stroke="#e0558c" stroke-width="2.5" />
         <path d="M0 0 C6 -15 26 -15 24 0 C26 15 6 15 0 0 Z" fill="#ff86b6" stroke="#e0558c" stroke-width="2.5" />
