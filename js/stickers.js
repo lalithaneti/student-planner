@@ -38,6 +38,30 @@ const PlannerStickers = (() => {
         ${stickerFace(47, 60)}`,
     },
     {
+      id: 'a-plus',
+      name: 'A+ paper',
+      group: 'School life',
+      art: `<g transform="rotate(-6 50 50)">
+          <path d="M20 8 H64 L80 24 V88 C80 91 78 92 76 92 H24 C22 92 20 91 20 88 Z" fill="#fffdf8" stroke="#d8cfc4" stroke-width="3" stroke-linejoin="round" />
+          <path d="M64 8 V24 H80 Z" fill="#ece4d8" stroke="#d8cfc4" stroke-width="3" stroke-linejoin="round" />
+          <text x="46" y="50" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700" fill="#f2637e">A+</text>
+          ${stickerFace(50, 68)}
+        </g>`,
+    },
+    {
+      id: 'backpack',
+      name: 'Backpack',
+      group: 'School life',
+      art: `<path d="M38 22 C38 4 62 4 62 22" fill="none" stroke="#7f95d8" stroke-width="6" stroke-linecap="round" />
+        <rect x="9" y="42" width="14" height="36" rx="7" fill="#90a6e6" stroke="#7f95d8" stroke-width="3" />
+        <rect x="77" y="42" width="14" height="36" rx="7" fill="#90a6e6" stroke="#7f95d8" stroke-width="3" />
+        <rect x="18" y="18" width="64" height="76" rx="20" fill="#aebff2" stroke="#7f95d8" stroke-width="3" />
+        <rect x="28" y="62" width="44" height="25" rx="8" fill="#c8d4f8" stroke="#7f95d8" stroke-width="3" />
+        <path d="M34 71 H66" stroke="#7f95d8" stroke-width="2.5" stroke-linecap="round" />
+        <rect x="46" y="70" width="8" height="8" rx="2" fill="#ffd166" stroke="#d99a1f" stroke-width="1.5" />
+        ${stickerFace(50, 42)}`,
+    },
+    {
       id: 'boba',
       name: 'Boba',
       group: 'Snacks',
@@ -65,6 +89,27 @@ const PlannerStickers = (() => {
         ${stickerFace(50, 56)}`,
     },
     {
+      id: 'donut',
+      name: 'Donut',
+      group: 'Snacks',
+      art: `<path fill-rule="evenodd" d="M50 7 A43 43 0 1 1 49.9 7 Z M50 26 A9 9 0 1 0 50.1 26 Z" fill="#e8b98a" stroke="#c98f5c" stroke-width="3" />
+        <path fill-rule="evenodd" d="M50 11 C62 9 74 14 81 25 C88 34 89 46 85 56 C82 64 74 62 68 68 C62 74 56 79 48 76 C40 73 33 77 26 71 C18 64 12 56 12 45 C12 33 20 21 31 15 C37 12 44 12 50 11 Z M50 26 A9 9 0 1 0 50.1 26 Z" fill="#ffa9c4" stroke="#ef86a8" stroke-width="2" />
+        <g stroke-width="3" stroke-linecap="round">
+          <path d="M28 28 L32 32" stroke="#fff3b0" /><path d="M70 22 L66 27" stroke="#b6e3ff" />
+          <path d="M77 42 L72 43" stroke="#fff" /><path d="M23 46 L27 42" stroke="#b6e3ff" />
+        </g>
+        <circle cx="50" cy="33" r="13" fill="#fff" stroke="#ef86a8" stroke-width="2.5" />
+        ${stickerFace(50, 62)}`,
+    },
+    {
+      id: 'onigiri',
+      name: 'Onigiri',
+      group: 'Snacks',
+      art: `<path d="M50 7 C60 7 94 62 94 77 C94 90 82 93 70 93 H30 C18 93 6 90 6 77 C6 62 40 7 50 7 Z" fill="#fffdf8" stroke="#d6d0c6" stroke-width="3" stroke-linejoin="round" />
+        <path d="M32 72 H68 V93 H32 Z" fill="#3f5350" stroke="#2f403e" stroke-width="2.5" stroke-linejoin="round" />
+        ${stickerFace(50, 50)}`,
+    },
+    {
       id: 'leaf',
       name: 'Autumn leaf',
       group: 'Nature',
@@ -82,6 +127,30 @@ const PlannerStickers = (() => {
           <circle cx="32" cy="36" r="7" /><circle cx="56" cy="26" r="8" /><circle cx="74" cy="42" r="5.5" /><circle cx="48" cy="47" r="4" />
         </g>
         ${stickerFace(50, 72)}`,
+    },
+    {
+      id: 'cherry-blossom',
+      name: 'Cherry blossom',
+      group: 'Nature',
+      art: `${[0, 72, 144, 216, 288]
+        .map(
+          (angle) => `<path transform="rotate(${angle} 50 52)" d="M50 52 C26 40 26 14 42 7 L50 16 L58 7 C74 14 74 40 50 52 Z" fill="#ffc4d8" stroke="#f093b3" stroke-width="3" stroke-linejoin="round" />`,
+        )
+        .join('')}
+        <circle cx="50" cy="52" r="20" fill="#fff1f6" stroke="#f093b3" stroke-width="2" />
+        ${stickerFace(50, 50)}`,
+    },
+    {
+      id: 'snowflake',
+      name: 'Snowflake',
+      group: 'Nature',
+      art: `<g fill="none" stroke="#8fc7f0" stroke-width="6" stroke-linecap="round">
+          ${[0, 60, 120, 180, 240, 300]
+            .map((angle) => `<path transform="rotate(${angle} 50 50)" d="M50 50 V7 M50 20 L40 10 M50 20 L60 10" />`)
+            .join('')}
+        </g>
+        <circle cx="50" cy="50" r="21" fill="#eef8ff" stroke="#8fc7f0" stroke-width="3" />
+        ${stickerFace(50, 48)}`,
     },
   ];
 
