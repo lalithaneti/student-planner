@@ -231,9 +231,84 @@ const PlannerStickers = (() => {
     },
   ];
 
+  // Small hands, drawn over the buddy's body so it looks like they're holding a prop.
+  function holdingHands(leftX, rightX, y, color, outline) {
+    return [leftX, rightX]
+      .map((x) => `<ellipse cx="${x}" cy="${y}" rx="11" ry="9" fill="${color}" stroke="${outline}" stroke-width="2.5" />`)
+      .join('');
+  }
+
+  const SPARKLE = 'M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10 Z';
+
+  function drawSparkle(x, y, size) {
+    return `<path transform="translate(${x} ${y}) scale(${size})" d="${SPARKLE}" fill="#fff8d6" stroke="#e8b93f" stroke-width="1.2" stroke-linejoin="round" />`;
+  }
+
+  // Rare stickers: a grown-up buddy doing something, on a shiny rainbow circle.
+  const RARE_STICKERS = [
+    {
+      id: 'rare-bunny-phone',
+      name: 'Bunny',
+      group: 'Rare',
+      rare: true,
+      species: 'bunny',
+      color: 'lavender',
+      prop: `<rect x="84" y="144" width="32" height="42" rx="7" fill="#5f6f96" stroke="#46527a" stroke-width="3" />
+        <circle cx="93" cy="152" r="3.5" fill="#2f3a5c" />
+        <path d="M100 174 C92 167 94 162 100 166 C106 162 108 167 100 174 Z" fill="#ffb3c7" />
+        ${holdingHands(82, 118, 170, '#ddd2ff', '#ab97ea')}
+        <g transform="translate(150 66)">
+          <path d="M-20 -14 H20 C24 -14 26 -12 26 -8 V8 C26 12 24 14 20 14 H-6 L-16 24 L-14 14 H-20 C-24 14 -26 12 -26 8 V-8 C-26 -12 -24 -14 -20 -14 Z" fill="#fff" stroke="#c7bdeb" stroke-width="2.5" stroke-linejoin="round" />
+          <path d="M0 8 C-11 -1 -7 -9 0 -4 C7 -9 11 -1 0 8 Z" fill="#ff8fa8" />
+        </g>`,
+    },
+    {
+      id: 'rare-fox-book',
+      name: 'Fox',
+      group: 'Rare',
+      rare: true,
+      species: 'fox',
+      color: 'peach',
+      prop: `<g fill="none" stroke="#6b4a3a" stroke-width="3.5">
+          <circle cx="78" cy="108" r="15" fill="#fff" fill-opacity="0.25" />
+          <circle cx="122" cy="108" r="15" fill="#fff" fill-opacity="0.25" />
+          <path d="M93 106 Q100 101 107 106" />
+        </g>
+        <path d="M100 150 C88 142 72 142 58 146 V182 C72 178 88 178 100 186 C112 178 128 178 142 182 V146 C128 142 112 142 100 150 Z" fill="#8fb4ea" stroke="#6588c4" stroke-width="3" stroke-linejoin="round" />
+        <path d="M100 150 V186" stroke="#6588c4" stroke-width="3" />
+        <path d="M79 153 l2.5 5.5 6 0.6 -4.5 4 1.3 5.9 -5.3 -3 -5.3 3 1.3 -5.9 -4.5 -4 6 -0.6 Z" fill="#ffd166" />
+        ${holdingHands(58, 142, 166, '#ffd9bf', '#f0a77a')}`,
+    },
+  ];
+
+  function drawRareSticker(sticker) {
+    const buddy = PlannerBuddy.drawBuddy(3, 0, 'happy', {}, sticker.color, sticker.species).replace(
+      /<svg [^>]*>/,
+      '<svg x="4" y="4" width="192" height="192" viewBox="0 0 200 200">',
+    );
+    const shineId = `sticker-shine-${sticker.id}`;
+    return `<svg class="sticker-art is-rare" viewBox="-8 -8 216 216" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="${shineId}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffd6e6" /><stop offset="0.25" stop-color="#fff0b8" />
+            <stop offset="0.5" stop-color="#c9f5dc" /><stop offset="0.75" stop-color="#c7e4ff" />
+            <stop offset="1" stop-color="#e3d2ff" />
+          </linearGradient>
+        </defs>
+        <circle cx="100" cy="100" r="100" fill="url(#${shineId})" stroke="#e8b93f" stroke-width="4" />
+        <path d="M34 150 L150 34 L176 60 L60 176 Z" fill="#fff" opacity="0.35" />
+        ${buddy}
+        <svg x="4" y="4" width="192" height="192" viewBox="0 0 200 200">${sticker.prop}</svg>
+        ${drawSparkle(30, 44, 1.2)}${drawSparkle(176, 128, 1)}${drawSparkle(22, 142, 0.8)}
+      </svg>`;
+  }
+
   function drawSticker(sticker) {
+    if (sticker.rare) {
+      return drawRareSticker(sticker);
+    }
     return `<svg class="sticker-art" viewBox="-4 -4 108 108" aria-hidden="true" focusable="false">${sticker.art}</svg>`;
   }
 
-  return { STICKERS, drawSticker };
+  return { STICKERS, RARE_STICKERS, drawSticker };
 })();

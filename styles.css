@@ -2970,6 +2970,22 @@ button.buddy-path-chest {
     drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
 }
 
+/* A rare sticker's edge is gold instead of white. */
+.sticker-art.is-rare {
+  width: 96px;
+  filter: drop-shadow(0 0 5px rgb(232 185 63 / 75%)) drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
+}
+
+.sticker-rare-label {
+  color: #b5860f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dark .sticker-rare-label {
+  color: #f2c94c;
+}
+
 /* ---------- Picking a new semester's buddy, and the Buddy Collection ---------- */
 
 .buddy-color-choices {

@@ -3036,12 +3036,15 @@
 
   // A first look at the stickers. They don't come from chests yet.
   function renderStickerPreview() {
-    const items = PlannerStickers.STICKERS.map(
-      (sticker) => `<li class="sticker-item">
+    const items = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS]
+      .map(
+        (sticker) => `<li class="sticker-item">
           ${PlannerStickers.drawSticker(sticker)}
           <strong>${sticker.name}</strong>
+          ${sticker.rare ? '<span class="sticker-rare-label">✨ Rare</span>' : ''}
         </li>`,
-    ).join('');
+      )
+      .join('');
     return `<section class="home-box">
         <h3 class="due-heading">Stickers</h3>
         <p class="buddy-muted">A first look. Soon you’ll find these in your weekly chests.</p>
