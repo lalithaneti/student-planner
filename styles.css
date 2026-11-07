@@ -2645,12 +2645,115 @@ dialog::backdrop {
 }
 
 .buddy-path {
+  /* The scene's colors: a sunny day, or an evening in dark mode. */
+  --scene-sky-top: #a9dcff;
+  --scene-sky-bottom: #e6f6ff;
+  --scene-hill-far: #b8e2a8;
+  --scene-hill-near: #9fd88f;
+  --scene-tree: #6fbf73;
+  --scene-pine: #4fa36b;
+  --scene-bush: #86cf7e;
+  --scene-cloud: #ffffff;
+  --scene-sun: #ffe08a;
+
   height: 240px;
   margin-top: 12px;
   overflow: auto hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  background: linear-gradient(var(--scene-sky-top), var(--scene-sky-bottom) 55%);
+}
+
+.dark .buddy-path {
+  --scene-sky-top: #1d2547;
+  --scene-sky-bottom: #4a4f86;
+  --scene-hill-far: #3b5a4a;
+  --scene-hill-near: #2f4d3d;
+  --scene-tree: #3f7a55;
+  --scene-pine: #2f6346;
+  --scene-bush: #457f57;
+  --scene-cloud: #8d93c4;
+  --scene-sun: #f4f1d0;
+}
+
+/* Everything in the scene sits behind the trail and can't be tapped. */
+.buddy-path-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.scene-hills {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scene-hill-far {
+  fill: var(--scene-hill-far);
+}
+
+.scene-hill-near {
+  fill: var(--scene-hill-near);
+}
+
+/* Trees stand on the far hill, with their bottoms just below its top. */
+.scene-tree {
+  position: absolute;
+  top: 44%;
+  transform: translate(-50%, -88%);
+}
+
+.scene-tree svg,
+.scene-cloud svg {
+  display: block;
+  width: 100%;
+}
+
+.scene-cloud {
+  position: absolute;
+  width: 64px;
+  opacity: 0.9;
+  animation: cloud-drift 24s ease-in-out infinite alternate;
+}
+
+@keyframes cloud-drift {
+  from {
+    translate: -14px 0;
+  }
+
+  to {
+    translate: 14px 0;
+  }
+}
+
+/* The sun by day, the moon in dark mode, in the top corner where the trail starts. */
+.scene-sun {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--scene-sun);
+  box-shadow: 0 0 18px 6px color-mix(in srgb, var(--scene-sun) 55%, transparent);
+}
+
+.scene-flower {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--flower);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--flower) 45%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-cloud {
+    animation: none;
+  }
 }
 
 .buddy-path-track {
@@ -2947,7 +3050,7 @@ button.buddy-path-chest {
   position: absolute;
   z-index: 0;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* Name above the buddy, so it never covers a stone's number. */
   align-items: center;
   width: 56px;
   opacity: 0.55;

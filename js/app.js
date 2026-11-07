@@ -870,6 +870,64 @@
     return `${toggle}<ol class="path-list">${rows.join('')}</ol>`;
   }
 
+  // ---------- The scene behind the trail ----------
+  // Sky, two rows of hills, trees on the far hill, clouds, and flowers in the front grass. Hills
+  // stretch with the track; trees, clouds, and flowers keep their size and spread along it.
+
+  const SCENE_HILLS = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="scene-hill-far" d="M0 46 C10 38 20 36 32 42 C44 48 54 36 66 37 C78 38 88 46 100 41 V100 H0 Z" />
+      <path class="scene-hill-near" d="M0 58 C14 52 26 54 40 57 C56 61 70 50 84 53 C92 55 96 57 100 56 V100 H0 Z" />
+    </svg>`;
+
+  const SCENE_TREES = [
+    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="38" width="6" height="20" rx="2" fill="#a0714f" />
+      <circle cx="20" cy="26" r="16" fill="var(--scene-tree)" /><circle cx="12" cy="32" r="10" fill="var(--scene-tree)" /><circle cx="28" cy="32" r="10" fill="var(--scene-tree)" />
+      <circle cx="15" cy="20" r="5" fill="#fff" opacity="0.18" /></svg>`,
+    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="44" width="6" height="14" rx="2" fill="#a0714f" />
+      <path d="M20 4 L36 46 H4 Z" fill="var(--scene-pine)" stroke="var(--scene-pine)" stroke-width="3" stroke-linejoin="round" /></svg>`,
+    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M6 58 C2 40 12 30 20 30 C28 30 38 40 34 58 Z" fill="var(--scene-bush)" />
+      <circle cx="14" cy="42" r="2.5" fill="#ffb3c7" /><circle cx="25" cy="38" r="2.5" fill="#fff3b0" /><circle cx="27" cy="48" r="2.5" fill="#ffb3c7" /></svg>`,
+  ];
+
+  const SCENE_CLOUD = `<svg viewBox="0 0 60 30" aria-hidden="true" focusable="false">
+      <path d="M12 26 C4 26 2 18 8 15 C8 8 18 6 22 11 C25 4 38 4 40 12 C48 10 56 16 52 24 C51 26 49 26 48 26 Z" fill="var(--scene-cloud)" /></svg>`;
+
+  const SCENE_FLOWER_COLORS = ['#ffb3c7', '#fff3b0', '#ffffff', '#d4c6ff'];
+
+  // A steady, varied-looking number from 0 to 1 for each decoration, so the scene doesn't
+  // reshuffle every time the page redraws.
+  function sceneJitter(index, salt) {
+    const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  function renderScenery(stoneCount) {
+    const spots = Math.max(6, stoneCount + 2);
+    const trees = Array.from({ length: spots }, (_, index) => {
+      const x = ((index + 0.3 + sceneJitter(index, 1) * 0.5) / spots) * 100;
+      const size = 34 + Math.round(sceneJitter(index, 2) * 18);
+      const art = SCENE_TREES[Math.floor(sceneJitter(index, 3) * SCENE_TREES.length)];
+      return `<div class="scene-tree" style="left: ${x.toFixed(1)}%; width: ${size}px">${art}</div>`;
+    }).join('');
+    const clouds = Array.from({ length: Math.ceil(spots / 2) }, (_, index) => {
+      const x = ((index + sceneJitter(index, 4)) / Math.ceil(spots / 2)) * 100;
+      const y = 6 + sceneJitter(index, 5) * 16;
+      return `<div class="scene-cloud" style="left: ${x.toFixed(1)}%; top: ${y.toFixed(1)}%; animation-delay: -${Math.round(sceneJitter(index, 6) * 20)}s">${SCENE_CLOUD}</div>`;
+    }).join('');
+    const flowers = Array.from({ length: spots * 2 }, (_, index) => {
+      const x = ((index + sceneJitter(index, 7)) / (spots * 2)) * 100;
+      const color = SCENE_FLOWER_COLORS[index % SCENE_FLOWER_COLORS.length];
+      return `<span class="scene-flower" style="left: ${x.toFixed(1)}%; bottom: ${(4 + sceneJitter(index, 8) * 10).toFixed(1)}px; --flower: ${color}"></span>`;
+    }).join('');
+    return `<div class="buddy-path-scene" aria-hidden="true">
+        <span class="scene-sun"></span>
+        ${clouds}
+        ${SCENE_HILLS}
+        ${trees}
+        ${flowers}
+      </div>`;
+  }
+
   // The week as a winding trail: one stone per assignment, the buddy on the next one to do, and
   // a chest at the end.
   function renderGameView() {
@@ -891,6 +949,7 @@
       ${renderWeekNav()}
       <div class="buddy-path" id="buddy-path">
         <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px">
+          ${renderScenery(count)}
           <svg class="buddy-path-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
             <path d="M${trail}" />
           </svg>
