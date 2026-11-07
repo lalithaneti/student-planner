@@ -2655,6 +2655,9 @@ dialog::backdrop {
   --scene-bush: #86cf7e;
   --scene-cloud: #ffffff;
   --scene-sun: #ffe08a;
+  --cobble-edge: #a99a86;
+  --cobble-mortar: #cbbfae;
+  --cobble-stone: #ece4d7;
 
   height: 240px;
   margin-top: 12px;
@@ -2674,6 +2677,9 @@ dialog::backdrop {
   --scene-bush: #457f57;
   --scene-cloud: #8d93c4;
   --scene-sun: #f4f1d0;
+  --cobble-edge: #3d3a48;
+  --cobble-mortar: #5a5666;
+  --cobble-stone: #8a8598;
 }
 
 /* Everything in the scene sits behind the trail and can't be tapped. */
@@ -2771,11 +2777,41 @@ dialog::backdrop {
 
 .buddy-path-trail path {
   fill: none;
-  stroke: color-mix(in srgb, var(--accent) 30%, var(--surface));
-  stroke-width: 22;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+
+.buddy-path-trail .cobble-edge {
+  stroke: var(--cobble-edge);
+  stroke-width: 30;
+}
+
+.buddy-path-trail .cobble-bed {
+  stroke: var(--cobble-mortar);
+  stroke-width: 26;
+}
+
+.cobble-stones {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.cobble-stone {
+  fill: var(--cobble-stone);
+  stroke: var(--cobble-edge);
+  stroke-width: 0.8;
+}
+
+.cobble-stone.is-light {
+  fill: color-mix(in srgb, var(--cobble-stone) 70%, #fff);
+}
+
+.cobble-stone.is-dark {
+  fill: color-mix(in srgb, var(--cobble-stone) 80%, var(--cobble-edge));
 }
 
 .path-stone,

@@ -516,6 +516,8 @@
     const items = model.buildDueList(state);
     if (currentView === 'game') {
       elements.dueList.innerHTML = renderGameView();
+      cobbleObserver.disconnect();
+      cobbleObserver.observe(elements.dueList.querySelector('.buddy-path-track'));
       scrollPathToBuddy();
     } else if (items.length === 0) {
       elements.dueList.innerHTML = renderEmptyPlanner();
@@ -928,6 +930,66 @@
       </div>`;
   }
 
+  // A cobblestone path: a dark edge and a mortar bed that stretch with the trail, then rounded
+  // stones laid on top at their real size once the page knows how big the track is.
+  function renderCobbleBed(trail) {
+    return `<path class="cobble-edge" d="M${trail}" /><path class="cobble-bed" d="M${trail}" />`;
+  }
+
+  // The cobblestones are laid at real size, so they're laid again whenever the track's size
+  // changes: when it's first shown, and when the window is resized.
+  const cobbleObserver = new ResizeObserver(() => layCobblestones());
+
+  const COBBLE_SPACING = 11; // px between stones along the path
+  const COBBLE_ROW_OFFSETS = [-7.5, 0, 7.5]; // px across the path
+
+  // Lays the stones along the drawn trail, in three staggered rows across it, each a slightly
+  // different size and shade. Runs again when the window is resized.
+  function layCobblestones() {
+    const track = elements.dueList.querySelector('.buddy-path-track');
+    const layer = track && track.querySelector('.cobble-stones');
+    if (!layer) {
+      return;
+    }
+    const width = track.clientWidth;
+    const height = track.clientHeight;
+    // A hidden tab has no size yet; the observer below lays them once it's shown.
+    if (width === 0 || height === 0) {
+      return;
+    }
+    const waves = Number(track.dataset.waves);
+    const point = (along) => {
+      const { x, y } = pathPoint(along, waves);
+      return { x: (x / 100) * width, y: (y / 100) * height };
+    };
+    // Walks the trail in small steps, dropping a stone every COBBLE_SPACING pixels.
+    const stones = [];
+    let previous = point(0);
+    let travelled = 0;
+    let placed = 0;
+    for (let step = 1; step <= 600; step += 1) {
+      const next = point(step / 600);
+      travelled += Math.hypot(next.x - previous.x, next.y - previous.y);
+      while (travelled >= COBBLE_SPACING * placed) {
+        const angle = Math.atan2(next.y - previous.y, next.x - previous.x);
+        COBBLE_ROW_OFFSETS.forEach((offset, row) => {
+          const stagger = row === 1 ? COBBLE_SPACING / 2 : 0;
+          const x = next.x - Math.sin(angle) * offset + Math.cos(angle) * stagger;
+          const y = next.y + Math.cos(angle) * offset + Math.sin(angle) * stagger;
+          const jitter = sceneJitter(placed * 3 + row, 9);
+          stones.push(
+            `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(4.2 + jitter * 1.2).toFixed(1)}" ry="${(3.1 + jitter).toFixed(1)}"
+              transform="rotate(${((angle * 180) / Math.PI).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" class="cobble-stone${jitter > 0.66 ? ' is-light' : jitter < 0.25 ? ' is-dark' : ''}" />`,
+          );
+        });
+        placed += 1;
+      }
+      previous = next;
+    }
+    layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    layer.innerHTML = stones.join('');
+  }
+
   // The week as a winding trail: one stone per assignment, the buddy on the next one to do, and
   // a chest at the end.
   function renderGameView() {
@@ -948,11 +1010,12 @@
       <h3 class="buddy-path-title">Buddy’s Path</h3>
       ${renderWeekNav()}
       <div class="buddy-path" id="buddy-path">
-        <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px">
+        <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px" data-waves="${waves}">
           ${renderScenery(count)}
           <svg class="buddy-path-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-            <path d="M${trail}" />
+            ${renderCobbleBed(trail)}
           </svg>
+          <svg class="cobble-stones" aria-hidden="true" focusable="false"></svg>
           ${stones.map((stone, index) => renderPathStone(stone, index, stoneAlong(index), waves)).join('')}
           ${count > 0 ? renderPathChest(chest, chestSpot) : ''}
           ${(state.friends || [])
