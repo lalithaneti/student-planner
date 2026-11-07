@@ -258,16 +258,76 @@ const PlannerBuddy = (() => {
 
   // Each week's prize comes from the week and the buddy, not from a dice roll, so it looks
   // random but stays the same however many times the week is unchecked, undone, and redone.
-  function chestPrize(buddy, weekStart) {
-    // FNV-1a, a standard hash, with a final stir: week dates differ by only a digit or two,
-    // and a simpler hash gave the same prize many weeks in a row.
+  // FNV-1a, a standard hash, with a final stir: week dates differ by only a digit or two,
+  // and a simpler hash gave the same prize many weeks in a row.
+  function mixHash(text) {
     let hash = 2166136261;
-    for (const character of `${buddy.startDate}|${buddy.species}|${weekStart}`) {
+    for (const character of text) {
       hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
     }
     hash = Math.imul(hash ^ (hash >>> 15), 2246822519);
     hash ^= hash >>> 13;
-    return { points: CHEST_PRIZES[(hash >>> 0) % CHEST_PRIZES.length] };
+    return hash >>> 0;
+  }
+
+  function chestPrize(buddy, weekStart) {
+    return { points: CHEST_PRIZES[mixHash(`${buddy.startDate}|${buddy.species}|${weekStart}`) % CHEST_PRIZES.length] };
+  }
+
+  // ---------- Chest-only accessories ----------
+  // About one chest in this many also holds an accessory, while any are left to find.
+  // state.foundAccessories lists each one found and the chest it came from; every buddy can wear them.
+  const CHEST_ACCESSORY_CHANCE = 8;
+
+  function foundAccessories(state) {
+    return state.foundAccessories || [];
+  }
+
+  // Every opened chest, in every semester, oldest week first.
+  function allOpenedChests(state) {
+    return Object.entries(state.buddies || {})
+      .flatMap(([semesterId, buddy]) => (buddy.openedChests || []).map((weekStart) => ({ semesterId, weekStart })))
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart) || a.semesterId.localeCompare(b.semesterId));
+  }
+
+  // The accessory a chest holds, or null. A chest holds one by luck (about one in eight), or
+  // for sure once eight chests have gone by for each one found, so a semester is never left
+  // with none. Which accessory depends only on the ones already found, so Undo and reopening
+  // give the same one back.
+  function pickChestAccessory(state, semesterId, weekStart) {
+    const hash = mixHash(`accessory|${semesterId}|${weekStart}`);
+    const chestNumber = allOpenedChests(state).filter((chest) => chest.weekStart <= weekStart).length;
+    const lucky = hash % CHEST_ACCESSORY_CHANCE === 0;
+    const due = chestNumber >= (foundAccessories(state).length + 1) * CHEST_ACCESSORY_CHANCE;
+    if (!lucky && !due) {
+      return null;
+    }
+    const owned = new Set(foundAccessories(state).map((entry) => entry.id));
+    const left = ACCESSORIES.filter((accessory) => accessory.fromChest && !owned.has(accessory.id));
+    return left.length === 0 ? null : left[Math.floor(hash / CHEST_ACCESSORY_CHANCE) % left.length];
+  }
+
+  // Gives a chest's accessory (once) and returns it, or null if this chest has none.
+  function giveChestAccessory(state, semesterId, weekStart) {
+    const already = foundAccessories(state).find((entry) => entry.semesterId === semesterId && entry.weekStart === weekStart);
+    if (already) {
+      return ACCESSORIES.find((accessory) => accessory.id === already.id);
+    }
+    const accessory = pickChestAccessory(state, semesterId, weekStart);
+    if (accessory) {
+      state.foundAccessories = [...foundAccessories(state), { id: accessory.id, semesterId, weekStart }];
+    }
+    return accessory;
+  }
+
+  // Chests opened before accessories came from chests get their chance, oldest week first.
+  function giveMissedAccessories(state) {
+    const chests = allOpenedChests(state);
+    const before = foundAccessories(state).length;
+    for (const { semesterId, weekStart } of chests) {
+      giveChestAccessory(state, semesterId, weekStart);
+    }
+    return foundAccessories(state).length - before;
   }
 
   // Whether a week's work is all checked off, counting only weeks the buddy was around for.
@@ -1037,6 +1097,9 @@ const PlannerBuddy = (() => {
     streakFor,
     chestFor,
     openChest,
+    foundAccessories,
+    giveChestAccessory,
+    giveMissedAccessories,
     pointsLog,
     totalPoints,
     pointsForCheckingOff,

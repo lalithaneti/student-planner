@@ -2985,6 +2985,18 @@ button.buddy-path-chest {
   color: var(--text-muted);
 }
 
+.chest-card-accessory {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.chest-card-accessory .accessory-art {
+  width: 72px;
+}
+
 .chest-card-sticker {
   display: flex;
   flex-direction: column;

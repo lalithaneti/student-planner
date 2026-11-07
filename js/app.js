@@ -69,7 +69,8 @@
   const filledInSpecies = buddy.fillInSpecies(state);
   // Chests opened before the sticker book existed get their stickers now.
   const gaveMissedStickers = PlannerStickers.giveMissedStickers(state) > 0;
-  if (movedBuddy || filledInSpecies || gaveMissedStickers) {
+  const gaveMissedAccessories = buddy.giveMissedAccessories(state) > 0;
+  if (movedBuddy || filledInSpecies || gaveMissedStickers || gaveMissedAccessories) {
     PlannerStorage.save(state);
   }
   // Planners that already have classes skip the Getting started card on Home.
@@ -733,6 +734,7 @@
     const grownUp = buddy.stageFor(buddyPoints()).index === buddy.STAGES.length - 1;
     const prize = buddy.openChest(currentBuddy(), weekStart, grownUp);
     const sticker = PlannerStickers.giveSticker(state, state.currentSemesterId, weekStart);
+    const accessory = buddy.giveChestAccessory(state, state.currentSemesterId, weekStart);
     if (!PlannerStorage.save(state)) {
       showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
     }
@@ -748,6 +750,15 @@
             : `<p>${escapeHtml(buddy.displayName(currentBuddy()))} is all grown up! No bonus points needed.</p>`
         }
         ${renderChestSticker(sticker)}
+        ${
+          accessory
+            ? `<div class="chest-card-accessory">
+                ${buddy.drawAccessory(accessory.id)}
+                <span>🎁 New accessory: <strong>${accessory.name}</strong></span>
+                <span class="buddy-muted">Wear it from the Study Buddy tab.</span>
+              </div>`
+            : ''
+        }
         <button type="button" class="primary-button" data-action="close-chest">Nice!</button>
       </div>`;
     elements.chestDialog.showModal();
@@ -2917,7 +2928,7 @@
 
   // Chest-only accessories found so far, which every buddy can wear.
   function foundAccessoryIds() {
-    return state.foundAccessories || [];
+    return buddy.foundAccessories(state).map((entry) => entry.id);
   }
 
   function buddyWearing(streak) {
@@ -3860,6 +3871,7 @@
     buddy.moveToSemesterBuddies(state, todayKey());
     buddy.fillInSpecies(state);
     PlannerStickers.giveMissedStickers(state);
+    buddy.giveMissedAccessories(state);
     // Undo would put back this tab's older copy, so it's only offered right after a change made here.
     elements.toast.hidden = true;
     render();
