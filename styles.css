@@ -2942,6 +2942,68 @@ button.buddy-path-chest {
   margin-bottom: 12px;
 }
 
+/* A friend's buddy racing on your trail: see-through, smaller, and behind yours. */
+.buddy-path-friend {
+  position: absolute;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  opacity: 0.55;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% + 6px));
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.buddy-path-friend .buddy-art {
+  display: block;
+  width: 100%;
+}
+
+.friends {
+  margin-top: 16px;
+}
+
+.friends-heading {
+  margin: 0 0 8px;
+}
+
+.friend-list {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.friend-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.friend-card .buddy-art {
+  flex: none;
+  width: 52px;
+}
+
+.friend-text {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.challenge-saved {
+  margin: 0 0 12px;
+  text-align: center;
+}
+
 /* ---------- Stickers ---------- */
 
 .sticker-grid {

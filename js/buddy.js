@@ -550,8 +550,11 @@ const PlannerBuddy = (() => {
     if (parsed === null || typeof parsed !== 'object' || parsed.version !== CHALLENGE_VERSION) {
       return null;
     }
-    const { name, species, color, stage, week, done, total } = parsed;
+    const { name, species, color, stage, week, done, total, from } = parsed;
+    // Links from before friends were saved have no sender id; newer ones must have a plain one.
+    const fromIsValid = from === undefined || (typeof from === 'string' && /^[a-z0-9]{8,24}$/.test(from));
     const isValid =
+      fromIsValid &&
       typeof name === 'string' &&
       name.length <= NAME_MAX_LENGTH &&
       SPECIES.some((candidate) => candidate.id === species) &&
@@ -565,7 +568,41 @@ const PlannerBuddy = (() => {
       done >= 0 &&
       done <= total &&
       total <= CHALLENGE_MAX_ITEMS;
-    return isValid ? { name, species, color, stage, week, done, total } : null;
+    if (!isValid) {
+      return null;
+    }
+    return from === undefined ? { name, species, color, stage, week, done, total } : { name, species, color, stage, week, done, total, from };
+  }
+
+  // ---------- Friends ----------
+  // Each challenge opened is kept in state.friends as { key, challenge }, one per friend, so it's
+  // still on the Game page later. A friend is known by the sender id in their links, or for
+  // older links by their buddy's name, species, and color.
+
+  function friendKey(challenge) {
+    return challenge.from ? `id:${challenge.from}` : `buddy:${challenge.name}|${challenge.species}|${challenge.color}`;
+  }
+
+  // Saves a friend's challenge: 'added', 'updated', 'older' (a newer one is already saved, so
+  // it's kept), or 'self' (your own link, which isn't saved).
+  function saveFriend(state, challenge, myId) {
+    if (challenge.from && challenge.from === myId) {
+      return 'self';
+    }
+    const key = friendKey(challenge);
+    const friends = state.friends || [];
+    const saved = friends.find((friend) => friend.key === key);
+    if (saved && saved.challenge.week > challenge.week) {
+      return 'older';
+    }
+    state.friends = saved
+      ? friends.map((friend) => (friend.key === key ? { key, challenge } : friend))
+      : [...friends, { key, challenge }];
+    return saved ? 'updated' : 'added';
+  }
+
+  function removeFriend(state, key) {
+    state.friends = (state.friends || []).filter((friend) => friend.key !== key);
   }
 
   function challengePercent({ done, total }) {
@@ -1128,6 +1165,9 @@ const PlannerBuddy = (() => {
     readChallenge,
     challengePercent,
     compareChallenges,
+    friendKey,
+    saveFriend,
+    removeFriend,
     drawBuddy,
     drawAccessory,
   };

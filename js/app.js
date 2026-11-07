@@ -896,6 +896,10 @@
           </svg>
           ${stones.map((stone, index) => renderPathStone(stone, index, stoneAlong(index), waves)).join('')}
           ${count > 0 ? renderPathChest(chest, chestSpot) : ''}
+          ${(state.friends || [])
+            .filter((friend) => friend.challenge.week === weekStart)
+            .map((friend) => renderFriendGhost(friend, waves))
+            .join('')}
           <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%">${drawGameBuddy()}</div>
         </div>
       </div>
@@ -908,7 +912,53 @@
               <span class="buddy-muted">Sends your buddy and this week’s progress, never your assignments.</span>
             </div>`
           : ''
-      }`;
+      }
+      ${renderFriends()}`;
+  }
+
+  // A friend's buddy on your trail, see-through, as far along as they were when they sent
+  // their link. Only for the week their link is from.
+  function renderFriendGhost({ challenge }, waves) {
+    const along = challenge.total === 0 ? 0 : challenge.done / challenge.total;
+    const { x, y } = pathPoint(along, waves);
+    const name = challenge.name || 'Friend';
+    return `<div class="buddy-path-friend" style="left: ${x}%; top: ${y}%" title="${escapeHtml(name)}: ${buddy.challengePercent(challenge)}%">
+        ${buddy.drawBuddy(challenge.stage, 0, 'happy', {}, challenge.color, challenge.species)}
+        <span>${escapeHtml(name)}</span>
+      </div>`;
+  }
+
+  // Everyone whose challenge link you've opened, with their progress for the viewed week.
+  function renderFriends() {
+    const friends = state.friends || [];
+    if (friends.length === 0) {
+      return '';
+    }
+    const cards = friends
+      .map(({ key, challenge }) => {
+        const name = challenge.name || 'A friend';
+        const progress =
+          challenge.week !== weekStart
+            ? `<span class="buddy-muted">Last link: week of ${weekRangeLabel(challenge.week)}</span>`
+            : challenge.total === 0
+              ? '<span class="buddy-muted">Nothing due this week</span>'
+              : `<span>${challenge.done} of ${challenge.total} done · <strong>${buddy.challengePercent(challenge)}%</strong></span>`;
+        return `<li class="friend-card">
+            ${buddy.drawBuddy(challenge.stage, 0, 'happy', {}, challenge.color, challenge.species)}
+            <span class="friend-text">
+              <strong>${escapeHtml(name)}</strong>
+              ${progress}
+            </span>
+            <button type="button" class="text-button" data-action="remove-friend" data-key="${escapeHtml(key)}"
+              aria-label="Remove ${escapeHtml(name)} from Friends">Remove</button>
+          </li>`;
+      })
+      .join('');
+    return `<section class="friends" aria-label="Friends">
+        <h4 class="friends-heading">Friends</h4>
+        <ul class="friend-list">${cards}</ul>
+        <p class="buddy-muted">As of each friend’s last link. Ask for a new one to see their latest.</p>
+      </section>`;
   }
 
   // On a trail too long for the screen, brings the buddy into view.
@@ -919,9 +969,20 @@
 
   // ---------- Challenging a friend ----------
 
+  // A random id for this planner's links, made once, so friends who get several of your links
+  // see one of you, not several. It says nothing about you.
+  function myChallengeId() {
+    if (!state.challengeId) {
+      const bytes = crypto.getRandomValues(new Uint8Array(8));
+      state.challengeId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+      PlannerStorage.save(state);
+    }
+    return state.challengeId;
+  }
+
   // This week's progress for the viewed semester's buddy, whichever week is on screen.
   function myChallenge() {
-    return buddy.challengeFor(buddyView(), model.startOfWeek(todayKey()), todayKey(), currentTime());
+    return { ...buddy.challengeFor(buddyView(), model.startOfWeek(todayKey()), todayKey(), currentTime()), from: myChallengeId() };
   }
 
   // After the #, so the challenge is never sent to the website, only read by the page.
@@ -965,6 +1026,33 @@
       </div>`);
   }
 
+  // Sends your challenge in as few taps as the device allows: its share menu (phones, Safari),
+  // else straight to the clipboard, else the box with the link to copy by hand.
+  async function sendChallenge(heading) {
+    const link = challengeLink();
+    if (elements.challengeDialog.open) {
+      elements.challengeDialog.close();
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Study Buddy challenge', text: 'Can you finish more of your week than me? 🐾', url: link });
+        showToast('Challenge sent! 🎉', null);
+      } catch (error) {
+        // Closing the share menu without picking anyone isn't a problem worth a message.
+        if (error.name !== 'AbortError') {
+          showChallengeLink(heading);
+        }
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast('Link copied! Paste it to your friend.', null);
+    } catch {
+      showChallengeLink(heading);
+    }
+  }
+
   async function copyChallengeLink() {
     const input = document.getElementById('challenge-link');
     const status = document.getElementById('challenge-status');
@@ -989,8 +1077,15 @@
     return verdicts[buddy.compareChallenges(mine, theirs)] || 'Nothing to compare yet: one of you has nothing due this week.';
   }
 
+  const FRIEND_SAVED_TEXT = {
+    added: 'Saved to Friends on your Game page.',
+    updated: 'Updated on your Game page.',
+    older: 'You already have a newer link from them, so your Game page keeps that one.',
+    self: 'This is your own link, so it isn’t saved to Friends.',
+  };
+
   // A challenge someone sent: their buddy and progress beside yours, and a way to answer.
-  function showReceivedChallenge(theirs) {
+  function showReceivedChallenge(theirs, savedAs) {
     const yours = currentBuddy() ? myChallenge() : null;
     openChallengeDialog(`
       <h2 id="challenge-heading">${theirs.name ? escapeHtml(theirs.name) : 'A friend'} challenged you!</h2>
@@ -999,6 +1094,7 @@
         ${yours ? renderChallengeCard(yours, buddy.displayName(currentBuddy())) : ''}
       </div>
       <p class="challenge-verdict">${yours ? challengeVerdict(yours, theirs) : 'Pick your Study Buddy on the Study Buddy tab to send one back.'}</p>
+      <p class="hint challenge-saved">${FRIEND_SAVED_TEXT[savedAs]}</p>
       <div class="button-row">
         ${yours ? '<button type="button" class="primary-button" data-action="send-challenge-back">Send yours back</button>' : ''}
         <button type="button" class="text-button" data-action="close-challenge">Close</button>
@@ -1015,7 +1111,12 @@
     history.replaceState(null, '', location.pathname + location.search);
     const challenge = buddy.readChallenge(match[1]);
     if (challenge) {
-      showReceivedChallenge(challenge);
+      const savedAs = buddy.saveFriend(state, challenge, state.challengeId);
+      if (savedAs === 'added' || savedAs === 'updated') {
+        PlannerStorage.save(state);
+        render();
+      }
+      showReceivedChallenge(challenge, savedAs);
     } else {
       showToast('That challenge link didn’t work. Ask your friend for a new one.', null);
     }
@@ -3603,13 +3704,16 @@
     } else if (action === 'edit-semester') {
       openSemesterDialog();
     } else if (action === 'open-challenge') {
-      showChallengeLink('Challenge a friend');
+      sendChallenge('Challenge a friend');
     } else if (action === 'send-challenge-back') {
-      showChallengeLink('Send yours back');
+      sendChallenge('Send yours back');
     } else if (action === 'copy-challenge-link') {
       copyChallengeLink();
     } else if (action === 'close-challenge') {
       elements.challengeDialog.close();
+    } else if (action === 'remove-friend') {
+      const friend = (state.friends || []).find((candidate) => candidate.key === target.dataset.key);
+      applyChange(`Removed ${friend.challenge.name || 'your friend'} from Friends`, () => buddy.removeFriend(state, friend.key));
     } else if (action === 'open-chest') {
       openWeekChest();
     } else if (action === 'close-chest') {
