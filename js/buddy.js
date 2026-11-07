@@ -270,14 +270,29 @@ const PlannerBuddy = (() => {
     return hash >>> 0;
   }
 
+  // mixHash, stirred much more (MurmurHash3's final step). Accessory luck uses this, since mixHash
+  // alone gave different semesters lucky weeks on the same dates. (Chest points keep using
+  // mixHash so prizes already earned don't change.)
+  function strongHash(text) {
+    let hash = mixHash(text);
+    hash ^= hash >>> 16;
+    hash = Math.imul(hash, 0x85ebca6b);
+    hash ^= hash >>> 13;
+    hash = Math.imul(hash, 0xc2b2ae35);
+    hash ^= hash >>> 16;
+    return hash >>> 0;
+  }
+
   function chestPrize(buddy, weekStart) {
     return { points: CHEST_PRIZES[mixHash(`${buddy.startDate}|${buddy.species}|${weekStart}`) % CHEST_PRIZES.length] };
   }
 
   // ---------- Chest-only accessories ----------
-  // About one chest in this many also holds an accessory, while any are left to find.
+  // About one chest in LUCKY_CHANCE also holds an accessory by luck, while any are left to find,
+  // and one is guaranteed once GUARANTEE_EVERY chests have gone by for each one found.
   // state.foundAccessories lists each one found and the chest it came from; every buddy can wear them.
-  const CHEST_ACCESSORY_CHANCE = 8;
+  const LUCKY_CHANCE = 4;
+  const GUARANTEE_EVERY = 8;
 
   function foundAccessories(state) {
     return state.foundAccessories || [];
@@ -290,21 +305,21 @@ const PlannerBuddy = (() => {
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart) || a.semesterId.localeCompare(b.semesterId));
   }
 
-  // The accessory a chest holds, or null. A chest holds one by luck (about one in eight), or
+  // The accessory a chest holds, or null. A chest holds one by luck (about one in four), or
   // for sure once eight chests have gone by for each one found, so a semester is never left
   // with none. Which accessory depends only on the ones already found, so Undo and reopening
   // give the same one back.
   function pickChestAccessory(state, semesterId, weekStart) {
-    const hash = mixHash(`accessory|${semesterId}|${weekStart}`);
+    const hash = strongHash(`accessory|${semesterId}|${weekStart}`);
     const chestNumber = allOpenedChests(state).filter((chest) => chest.weekStart <= weekStart).length;
-    const lucky = hash % CHEST_ACCESSORY_CHANCE === 0;
-    const due = chestNumber >= (foundAccessories(state).length + 1) * CHEST_ACCESSORY_CHANCE;
+    const lucky = hash % LUCKY_CHANCE === 0;
+    const due = chestNumber >= (foundAccessories(state).length + 1) * GUARANTEE_EVERY;
     if (!lucky && !due) {
       return null;
     }
     const owned = new Set(foundAccessories(state).map((entry) => entry.id));
     const left = ACCESSORIES.filter((accessory) => accessory.fromChest && !owned.has(accessory.id));
-    return left.length === 0 ? null : left[Math.floor(hash / CHEST_ACCESSORY_CHANCE) % left.length];
+    return left.length === 0 ? null : left[Math.floor(hash / LUCKY_CHANCE) % left.length];
   }
 
   // Gives a chest's accessory (once) and returns it, or null if this chest has none.
