@@ -44,6 +44,13 @@ const PlannerBuddy = (() => {
     { id: 'flower-crown', name: 'Flower crown', spot: 'head', streakDays: 14 },
     { id: 'party-hat', name: 'Party hat', spot: 'head', streakDays: 21 },
     { id: 'crown', name: 'Gold crown', spot: 'head', streakDays: 30 },
+    // Chest-only: these never unlock by streak, only by turning up in a week's chest.
+    { id: 'graduation-cap', name: 'Graduation cap', spot: 'head', fromChest: true },
+    // Wider than the usual head view, so both ear cups show in the wardrobe.
+    { id: 'headphones', name: 'Headphones', spot: 'head', fromChest: true, viewBox: '28 34 144 92' },
+    { id: 'strawberry-hat', name: 'Strawberry hat', spot: 'head', fromChest: true },
+    { id: 'star-glasses', name: 'Star glasses', spot: 'face', fromChest: true },
+    { id: 'lanyard', name: 'Lanyard', spot: 'neck', fromChest: true },
   ];
 
   // The mochi blob comes in these colors, picked when a semester's buddy is started.
@@ -141,16 +148,17 @@ const PlannerBuddy = (() => {
     return { ...state, currentSemesterId: semesterId, buddy: (state.buddies || {})[semesterId] || null };
   }
 
-  function isUnlocked(accessory, bestStreak) {
-    return bestStreak >= accessory.streakDays;
+  // Streak accessories unlock by best streak; chest-only ones once found (foundIds).
+  function isUnlocked(accessory, bestStreak, foundIds = []) {
+    return accessory.fromChest ? foundIds.includes(accessory.id) : bestStreak >= accessory.streakDays;
   }
 
   // What the buddy has on, spot by spot, leaving out anything not unlocked.
-  function wornAccessories(buddy, bestStreak) {
+  function wornAccessories(buddy, bestStreak, foundIds = []) {
     const worn = {};
     for (const [spot, id] of Object.entries((buddy && buddy.wearing) || {})) {
       const accessory = ACCESSORIES.find((candidate) => candidate.id === id);
-      if (accessory && isUnlocked(accessory, bestStreak)) {
+      if (accessory && isUnlocked(accessory, bestStreak, foundIds)) {
         worn[spot] = id;
       }
     }
@@ -625,8 +633,17 @@ const PlannerBuddy = (() => {
     `<path transform="translate(${x} 108)" d="M0 6 C-2 -2 -16 -2 -16 8 C-16 16 -6 20 0 26 C6 20 16 16 16 8 C16 -2 2 -2 0 6 Z"
       fill="#e8457f" opacity="0.88" stroke="#b8305f" stroke-width="2" />
      <ellipse cx="${x - 7}" cy="114" rx="3.5" ry="2.2" fill="#fff" opacity="0.8" />`;
+  // A star-shaped lens for the star glasses, centered on (x, 116).
+  function starLens(x) {
+    const points = Array.from({ length: 10 }, (_, index) => {
+      const angle = (Math.PI / 5) * index - Math.PI / 2;
+      const radius = index % 2 === 0 ? 18 : 8.5;
+      return `${(x + radius * Math.cos(angle)).toFixed(1)} ${(116 + radius * Math.sin(angle)).toFixed(1)}`;
+    });
+    return `<path d="M${points.join(' L')} Z" fill="#ffe08f" fill-opacity="0.55" stroke="#e8a93f" stroke-width="3" stroke-linejoin="round" />`;
+  }
+
   const ACCESSORY_ART = {
-    // Not an unlockable accessory: only the chick's rare sticker wears it, for now.
     'graduation-cap': `<path d="M70 64 V78 C70 90 130 90 130 78 V64 Z" fill="#46527a" stroke="#333d60" stroke-width="3" stroke-linejoin="round" />
       <path d="M100 38 L152 58 L100 78 L48 58 Z" fill="#5f6f96" stroke="#333d60" stroke-width="3" stroke-linejoin="round" />
       <path d="M100 58 L140 66 V88" fill="none" stroke="#ffd166" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -657,6 +674,19 @@ const PlannerBuddy = (() => {
     scarf: `<g transform="translate(0 -12)"><path d="M34 142 Q100 166 166 142 L168 158 Q100 182 32 158 Z" fill="#ff9f6e" stroke="#e07a45" stroke-width="2.5" />
       <path d="M58 150 L54 165 M82 156 L80 172 M106 158 L106 174 M130 155 L132 171 M152 148 L156 163" stroke="#fff3e8" stroke-width="5" />
       <path d="M134 160 L150 190 L134 194 L124 164 Z" fill="#ff9f6e" stroke="#e07a45" stroke-width="2.5" stroke-linejoin="round" /></g>`,
+    headphones: `<path d="M48 104 C44 34 156 34 152 104" fill="none" stroke="#7f95d8" stroke-width="8" stroke-linecap="round" />
+      <rect x="34" y="88" width="24" height="34" rx="11" fill="#aebff2" stroke="#7f95d8" stroke-width="3" />
+      <rect x="142" y="88" width="24" height="34" rx="11" fill="#aebff2" stroke="#7f95d8" stroke-width="3" />
+      <path d="M46 96 V114 M154 96 V114" stroke="#ffb3c7" stroke-width="5" stroke-linecap="round" />`,
+    'strawberry-hat': `<path d="M64 76 C60 42 140 42 136 76 C120 70 80 70 64 76 Z" fill="#ff8a9c" stroke="#e8637b" stroke-width="3" stroke-linejoin="round" />
+      <g fill="#ffe9a8"><ellipse cx="82" cy="60" rx="2" ry="3" /><ellipse cx="100" cy="54" rx="2" ry="3" /><ellipse cx="118" cy="60" rx="2" ry="3" /><ellipse cx="91" cy="68" rx="2" ry="3" /><ellipse cx="109" cy="68" rx="2" ry="3" /></g>
+      <path d="M100 46 C92 44 84 40 82 34 C90 34 94 36 97 39 C96 34 98 28 100 24 C102 28 104 34 103 39 C106 36 110 34 118 34 C116 40 108 44 100 46 Z" fill="#9ddc8f" stroke="#6fb864" stroke-width="2.5" stroke-linejoin="round" />`,
+    'star-glasses': `${starLens(80)}${starLens(120)}
+      <path d="M96 114 Q100 110 104 114 M63 112 L48 106 M137 112 L152 106" fill="none" stroke="#e8a93f" stroke-width="3" stroke-linecap="round" />`,
+    lanyard: `<path d="M66 138 L96 166 M134 138 L104 166" stroke="#8fb4ea" stroke-width="5" stroke-linecap="round" />
+      <rect x="86" y="162" width="28" height="24" rx="4" fill="#fff" stroke="#6588c4" stroke-width="2.5" />
+      <rect x="90" y="167" width="9" height="10" rx="2" fill="#ffc6da" />
+      <path d="M102 169 H110 M102 175 H108" stroke="#b9c3d6" stroke-width="2.5" stroke-linecap="round" />`,
     'bow-tie': `<path d="M100 156 L82 146 L82 166 Z M100 156 L118 146 L118 166 Z" fill="#6f8cff" stroke="#4f6be0" stroke-width="2.5" stroke-linejoin="round" />
       <circle cx="100" cy="156" r="5" fill="#4f6be0" />`,
   };
@@ -678,7 +708,7 @@ const PlannerBuddy = (() => {
 
   function drawAccessory(accessoryId) {
     const accessory = ACCESSORIES.find((candidate) => candidate.id === accessoryId);
-    return `<svg class="accessory-art" viewBox="${SPOT_VIEW_BOXES[accessory.spot]}" aria-hidden="true" focusable="false">${ACCESSORY_ART[accessoryId]}</svg>`;
+    return `<svg class="accessory-art" viewBox="${accessory.viewBox || SPOT_VIEW_BOXES[accessory.spot]}" aria-hidden="true" focusable="false">${ACCESSORY_ART[accessoryId]}</svg>`;
   }
 
   // Each drawing gets its own gradient ids: a gradient defined inside a hidden tab

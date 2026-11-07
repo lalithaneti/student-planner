@@ -2915,8 +2915,13 @@
     return `${name} is cheering you on: ${dueLeft} thing${dueLeft === 1 ? '' : 's'} left today ✨`;
   }
 
+  // Chest-only accessories found so far, which every buddy can wear.
+  function foundAccessoryIds() {
+    return state.foundAccessories || [];
+  }
+
   function buddyWearing(streak) {
-    return buddy.wornAccessories(currentBuddy(), streak.best);
+    return buddy.wornAccessories(currentBuddy(), streak.best, foundAccessoryIds());
   }
 
   // One button per accessory in each spot: tap to put on or take off. Locked ones say what unlocks them.
@@ -2925,11 +2930,11 @@
     return buddy.ACCESSORY_SPOTS.map((spot) => {
       const buttons = buddy.ACCESSORIES.filter((accessory) => accessory.spot === spot.id)
         .map((accessory) => {
-          if (!buddy.isUnlocked(accessory, streak.best)) {
+          if (!buddy.isUnlocked(accessory, streak.best, foundAccessoryIds())) {
             return `<button type="button" class="wardrobe-item is-locked" disabled>
                 ${buddy.drawAccessory(accessory.id)}
                 <span>${accessory.name}</span>
-                <span class="buddy-muted">🔒 ${accessory.streakDays}-day streak</span>
+                <span class="buddy-muted">${accessory.fromChest ? '🎁 Find in a chest' : `🔒 ${accessory.streakDays}-day streak`}</span>
               </button>`;
           }
           const worn = wearing[spot.id] === accessory.id;
@@ -3126,7 +3131,7 @@
         const where = buddy.stageFor(points);
         const best = buddy.streakFor(view, today, nowTime).best;
         return `<li class="buddy-shelf-item">
-            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best), view.buddy.color, view.buddy.species)}
+            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best, foundAccessoryIds()), view.buddy.color, view.buddy.species)}
             <strong>${escapeHtml(buddy.displayName(view.buddy))}</strong>
             <span>${escapeHtml(semester.name)}</span>
             <span class="buddy-muted">${where.stage.name} · ${points} point${points === 1 ? '' : 's'}</span>
