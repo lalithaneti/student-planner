@@ -281,13 +281,23 @@ const PlannerBuddy = (() => {
     if (!weekIsFinished(state, PlannerModel.buildDueList(state), weekStart)) {
       return { status: 'locked' };
     }
-    const prize = chestPrize(state.buddy, weekStart);
+    const prize = givesNoPoints(state.buddy, weekStart) ? { points: 0 } : chestPrize(state.buddy, weekStart);
     return { status: (state.buddy.openedChests || []).includes(weekStart) ? 'opened' : 'ready', prize };
   }
 
-  function openChest(buddy, weekStart) {
+  // Chests opened once the buddy was grown up, which give no bonus points.
+  function givesNoPoints(buddy, weekStart) {
+    return (buddy.chestsWithoutPoints || []).includes(weekStart);
+  }
+
+  // A grown-up buddy has nothing left to grow into, so its chests give no bonus points.
+  // Chests opened before it grew up keep the points they gave.
+  function openChest(buddy, weekStart, grownUp = false) {
     buddy.openedChests = [...new Set([...(buddy.openedChests || []), weekStart])];
-    return chestPrize(buddy, weekStart);
+    if (grownUp && !(buddy.chestsWithoutPoints || []).includes(weekStart)) {
+      buddy.chestsWithoutPoints = [...(buddy.chestsWithoutPoints || []), weekStart];
+    }
+    return givesNoPoints(buddy, weekStart) ? { points: 0 } : chestPrize(buddy, weekStart);
   }
 
   // The points each counted assignment date and streak bonus earned or lost, newest first.
@@ -314,7 +324,7 @@ const PlannerBuddy = (() => {
     // A chest's bonus counts while its week stays finished, dated the last day of that week.
     const allItems = PlannerModel.buildDueList(state);
     for (const weekStart of state.buddy.openedChests || []) {
-      if (weekIsFinished(state, allItems, weekStart)) {
+      if (weekIsFinished(state, allItems, weekStart) && !givesNoPoints(state.buddy, weekStart)) {
         const when = `${PlannerModel.addDays(weekStart, 6)}~`;
         entries.push({ when, item: null, points: chestPrize(state.buddy, weekStart).points, reason: 'chest' });
       }

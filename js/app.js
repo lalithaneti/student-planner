@@ -728,7 +728,8 @@
 
   // Opens the viewed week's chest and shows what was inside, in one small card.
   function openWeekChest() {
-    const prize = buddy.openChest(currentBuddy(), weekStart);
+    const grownUp = buddy.stageFor(buddyPoints()).index === buddy.STAGES.length - 1;
+    const prize = buddy.openChest(currentBuddy(), weekStart, grownUp);
     if (!PlannerStorage.save(state)) {
       showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
     }
@@ -737,8 +738,12 @@
       <div class="chest-card">
         <div class="chest-card-art">${OPEN_TREASURE_CHEST}</div>
         <h3 id="chest-heading">Week finished!</h3>
-        <p class="chest-card-prize">+${prize.points} bonus points</p>
-        <p class="buddy-muted">${escapeHtml(buddy.displayName(currentBuddy()))} found them in this week’s chest.</p>
+        ${
+          prize.points > 0
+            ? `<p class="chest-card-prize">+${prize.points} bonus points</p>
+               <p class="buddy-muted">${escapeHtml(buddy.displayName(currentBuddy()))} found them in this week’s chest.</p>`
+            : `<p>${escapeHtml(buddy.displayName(currentBuddy()))} is all grown up! No bonus points needed.</p>`
+        }
         <button type="button" class="primary-button" data-action="close-chest">Nice!</button>
       </div>`;
     elements.chestDialog.showModal();
@@ -775,7 +780,7 @@
   // What a finished week's chest is doing, so a shut chest never looks broken.
   function describeFinishedChest(chest) {
     if (chest.status === 'opened') {
-      return ` Chest: +${chest.prize.points} points.`;
+      return chest.prize.points > 0 ? ` Chest: +${chest.prize.points} points.` : ' Chest opened.';
     }
     if (chest.status === 'ready') {
       return ' Tap the chest to open it.';
@@ -3169,7 +3174,7 @@
                 <span class="buddy-milestones">${buddy.STREAK_MILESTONES.map(
                   (milestone) => `<span>🔥 ${milestone.days} days <strong class="is-gain">+${milestone.points}</strong></span>`,
                 ).join('')}</span></li>
-              <li><span>Finish a whole week, then open its chest on Buddy’s Path</span> <strong class="is-gain">🎁 Bonus</strong></li>
+              <li><span>Finish a whole week, then open its chest on Buddy’s Path (until grown up)</span> <strong class="is-gain">🎁 Bonus</strong></li>
             </ul>
             <p class="buddy-muted">A day adds to your streak when everything due that day is checked off on time.
               Counts ${escapeHtml(currentSemester().name)} work due from ${model.formatDate(currentBuddy().startDate)} on.</p>
