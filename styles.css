@@ -2976,6 +2976,23 @@ button.buddy-path-chest {
   filter: drop-shadow(0 0 5px rgb(232 185 63 / 75%)) drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
 }
 
+/* A sticker not found yet: a plain gray shape, the same in light and dark mode. */
+.sticker-item.is-missing .sticker-art {
+  filter: brightness(0) invert(0.55) opacity(0.4);
+}
+
+.sticker-item.is-missing strong {
+  color: var(--text-muted);
+}
+
+.chest-card-sticker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
 .sticker-rare-label {
   color: #b5860f;
   font-size: 0.75rem;

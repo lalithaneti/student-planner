@@ -67,7 +67,9 @@
   // Buddies from before species existed get one: the oldest stays a mochi, later ones get new species.
   const movedBuddy = buddy.moveToSemesterBuddies(state, model.toDateKey(new Date()));
   const filledInSpecies = buddy.fillInSpecies(state);
-  if (movedBuddy || filledInSpecies) {
+  // Chests opened before the sticker book existed get their stickers now.
+  const gaveMissedStickers = PlannerStickers.giveMissedStickers(state) > 0;
+  if (movedBuddy || filledInSpecies || gaveMissedStickers) {
     PlannerStorage.save(state);
   }
   // Planners that already have classes skip the Getting started card on Home.
@@ -730,6 +732,7 @@
   function openWeekChest() {
     const grownUp = buddy.stageFor(buddyPoints()).index === buddy.STAGES.length - 1;
     const prize = buddy.openChest(currentBuddy(), weekStart, grownUp);
+    const sticker = PlannerStickers.giveSticker(state, state.currentSemesterId, weekStart);
     if (!PlannerStorage.save(state)) {
       showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
     }
@@ -744,9 +747,22 @@
                <p class="buddy-muted">${escapeHtml(buddy.displayName(currentBuddy()))} found them in this week’s chest.</p>`
             : `<p>${escapeHtml(buddy.displayName(currentBuddy()))} is all grown up! No bonus points needed.</p>`
         }
+        ${renderChestSticker(sticker)}
         <button type="button" class="primary-button" data-action="close-chest">Nice!</button>
       </div>`;
     elements.chestDialog.showModal();
+  }
+
+  // The chest card's sticker, or a note once the book is full.
+  function renderChestSticker(sticker) {
+    if (!sticker) {
+      return '<p class="buddy-muted">Your sticker book is full!</p>';
+    }
+    return `<div class="chest-card-sticker">
+        ${PlannerStickers.drawSticker(sticker)}
+        <span>${sticker.rare ? '✨ Rare sticker' : 'New sticker'}: <strong>${sticker.name}</strong></span>
+        <span class="buddy-muted">Added to your sticker book.</span>
+      </div>`;
   }
 
   // The buddy for the game: the viewed semester's, or a waiting egg if it has none yet.
@@ -3039,20 +3055,23 @@
       </section>`;
   }
 
-  // A first look at the stickers. They don't come from chests yet.
-  function renderStickerPreview() {
-    const items = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS]
-      .map(
-        (sticker) => `<li class="sticker-item">
+  // Every sticker in a fixed order: found ones in color, the rest as gray shapes to find.
+  function renderStickerBook() {
+    const found = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
+    const all = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS];
+    const items = all
+      .map((sticker) => {
+        const label = found.has(sticker.id) ? sticker.name : '?';
+        return `<li class="sticker-item${found.has(sticker.id) ? '' : ' is-missing'}" aria-label="${found.has(sticker.id) ? sticker.name : 'Not found yet'}">
           ${PlannerStickers.drawSticker(sticker)}
-          <strong>${sticker.name}</strong>
+          <strong>${label}</strong>
           ${sticker.rare ? '<span class="sticker-rare-label">✨ Rare</span>' : ''}
-        </li>`,
-      )
+        </li>`;
+      })
       .join('');
     return `<section class="home-box">
-        <h3 class="due-heading">Stickers</h3>
-        <p class="buddy-muted">A first look. Soon you’ll find these in your weekly chests.</p>
+        <h3 class="due-heading">Sticker book</h3>
+        <p class="buddy-muted"><strong>${found.size} of ${all.length}</strong> found. Each week’s chest on Buddy’s Path holds a new one.</p>
         <ul class="sticker-grid">${items}</ul>
       </section>`;
   }
@@ -3185,7 +3204,7 @@
             ${recent}
           </section>
           ${renderAllSpecies()}
-          ${renderStickerPreview()}
+          ${renderStickerBook()}
         </div>
       </div>
       ${renderBuddyShelf()}`;
@@ -3835,6 +3854,7 @@
     state = PlannerStorage.load(new Date()).state;
     buddy.moveToSemesterBuddies(state, todayKey());
     buddy.fillInSpecies(state);
+    PlannerStickers.giveMissedStickers(state);
     // Undo would put back this tab's older copy, so it's only offered right after a change made here.
     elements.toast.hidden = true;
     render();

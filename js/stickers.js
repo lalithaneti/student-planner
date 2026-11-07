@@ -377,5 +377,68 @@ const PlannerStickers = (() => {
     return `<svg class="sticker-art" viewBox="-4 -4 108 108" aria-hidden="true" focusable="false">${sticker.art}</svg>`;
   }
 
-  return { STICKERS, RARE_STICKERS, drawSticker };
+  // ---------- The sticker book ----------
+  // One book for every semester: state.stickerBook.found lists each sticker found, with the
+  // chest (semester and week) it came from. Each chest gives one sticker, never a duplicate.
+
+  // About one chest in this many gives a rare sticker, while any are left to find.
+  const RARE_CHANCE = 6;
+
+  function findSticker(id) {
+    return [...STICKERS, ...RARE_STICKERS].find((sticker) => sticker.id === id) || null;
+  }
+
+  function foundStickers(state) {
+    return (state.stickerBook && state.stickerBook.found) || [];
+  }
+
+  // A number from a chest's semester and week, so its sticker looks random but is the same
+  // every time that chest is opened with the same stickers already found (after Undo, say).
+  function chestHash(text) {
+    let hash = 2166136261;
+    for (const character of text) {
+      hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+    }
+    hash = Math.imul(hash ^ (hash >>> 15), 2246822519);
+    return (hash ^ (hash >>> 13)) >>> 0;
+  }
+
+  // The sticker a chest holds, or null once every sticker has been found.
+  function pickSticker(state, semesterId, weekStart) {
+    const owned = new Set(foundStickers(state).map((entry) => entry.id));
+    const commonLeft = STICKERS.filter((sticker) => !owned.has(sticker.id));
+    const rareLeft = RARE_STICKERS.filter((sticker) => !owned.has(sticker.id));
+    const hash = chestHash(`${semesterId}|${weekStart}`);
+    const wantsRare = hash % RARE_CHANCE === 0;
+    const pool = (wantsRare && rareLeft.length > 0) || commonLeft.length === 0 ? rareLeft : commonLeft;
+    return pool.length === 0 ? null : pool[Math.floor(hash / RARE_CHANCE) % pool.length];
+  }
+
+  // Puts a chest's sticker in the book (once) and returns it, or null if the book is full.
+  function giveSticker(state, semesterId, weekStart) {
+    const already = foundStickers(state).find((entry) => entry.semesterId === semesterId && entry.weekStart === weekStart);
+    if (already) {
+      return findSticker(already.id);
+    }
+    const sticker = pickSticker(state, semesterId, weekStart);
+    if (sticker) {
+      state.stickerBook = { found: [...foundStickers(state), { id: sticker.id, semesterId, weekStart }] };
+    }
+    return sticker;
+  }
+
+  // Chests opened before the sticker book existed get their stickers, oldest week first.
+  // Returns how many were given.
+  function giveMissedStickers(state) {
+    const chests = Object.entries(state.buddies || {})
+      .flatMap(([semesterId, buddy]) => (buddy.openedChests || []).map((weekStart) => ({ semesterId, weekStart })))
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    const before = foundStickers(state).length;
+    for (const { semesterId, weekStart } of chests) {
+      giveSticker(state, semesterId, weekStart);
+    }
+    return foundStickers(state).length - before;
+  }
+
+  return { STICKERS, RARE_STICKERS, drawSticker, findSticker, foundStickers, giveSticker, giveMissedStickers };
 })();
