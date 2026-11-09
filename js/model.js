@@ -673,8 +673,10 @@ const PlannerModel = (() => {
   }
 
   // Every RSO meeting on one date (not on a break), including cancelled ones.
+  // RSOs take breaks and finals days off (reading days still meet). Their one-time events
+  // still show, since those were added for that day.
   function rsoMeetingsOn(state, date) {
-    if (breakOn(state, date)) {
+    if (breakOn(state, date) || finalsDayKind(state, date) === 'finals') {
       return [];
     }
     const meetings = [];
