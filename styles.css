@@ -1558,6 +1558,23 @@ button:focus-visible {
 }
 
 .row-menu .class-block:hover,
+/* One-time blocks can be dragged up and down to a new time with a mouse. */
+@media (pointer: fine) {
+  .class-block[data-move-kind] {
+    cursor: grab;
+  }
+}
+
+.class-block-slot.is-dragging {
+  z-index: 3;
+  opacity: 0.85;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 25%);
+}
+
+.class-block-slot.is-dragging .class-block {
+  cursor: grabbing;
+}
+
 .row-menu[open] .class-block {
   background: color-mix(in srgb, var(--class-color) 55%, var(--surface));
 }

@@ -112,6 +112,9 @@
 
   const elements = {
     challengeDialog: document.getElementById('challenge-dialog'),
+    timeDialog: document.getElementById('time-dialog'),
+    timeForm: document.getElementById('time-form'),
+    timeErrors: document.getElementById('time-errors'),
     chestDialog: document.getElementById('chest-dialog'),
     backupStatus: document.getElementById('backup-status'),
     restoreBackupInput: document.getElementById('restore-backup'),
@@ -1383,6 +1386,15 @@
     };
   }
 
+  // Lets a one-time block be dragged to a new time, and adds Change time… to its menu.
+  function movableData(kind, id, rsoId = '') {
+    return `data-move-kind="${kind}" data-move-id="${id}"${rsoId ? ` data-move-rso="${rsoId}"` : ''}`;
+  }
+
+  function changeTimeButton(kind, id, rsoId = '') {
+    return `<button type="button" data-action="change-time" ${movableData(kind, id, rsoId)}>Change time…</button>`;
+  }
+
   function examTag(exam) {
     return exam.isFinal ? 'Final' : 'Exam';
   }
@@ -1397,13 +1409,14 @@
     const details = height >= HOUR_HEIGHT && exam.location ? `<span class="class-block-details">${escapeHtml(exam.location)}</span>` : '';
     return `
       <details class="row-menu class-block-slot" style="${style}">
-        <summary class="class-block is-exam" style="--class-color: ${plannerClass.color}"
+        <summary class="class-block is-exam" style="--class-color: ${plannerClass.color}" ${movableData(kind, exam.id)}
           title="${escapeHtml(plannerClass.name)} ${title}${exam.location ? ` · ${escapeHtml(exam.location)}` : ''}">
           <span class="class-block-name"><span class="exam-tag">${kind === 'quiz' ? 'Quiz' : examTag(exam)}</span> ${escapeHtml(plannerClass.name)} ${title}</span>
           ${details}
           <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
         </summary>
         <div class="row-menu-items">
+          ${changeTimeButton(kind, exam.id)}
           <button type="button" data-action="edit-${kind}" data-id="${exam.id}">Edit ${kind}…</button>
           <button type="button" class="danger" data-action="delete-${kind}" data-id="${exam.id}">Delete ${kind}</button>
         </div>
@@ -1458,13 +1471,14 @@
       : `<button type="button" class="danger" data-action="cancel-work" ${dateData}>Cancel work session on ${model.formatDate(date)}</button>`;
     return `
       <details class="row-menu class-block-slot" style="${style}">
-        <summary class="class-block is-work${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}"
+        <summary class="class-block is-work${cancelled ? ' is-cancelled' : ''}" style="--class-color: ${plannerClass.color}" ${session.repeats ? '' : movableData('work', session.id)}
           title="Work session: ${name}${session.location ? ` · ${escapeHtml(session.location)}` : ''}${cancelled ? ' (cancelled)' : ''}">
           <span class="class-block-name"><span class="exam-tag">Work</span> ${name}</span>
           ${details ? `<span class="class-block-details">${details}</span>` : ''}
           <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
         </summary>
         <div class="row-menu-items">
+          ${session.repeats ? '' : changeTimeButton('work', session.id)}
           <button type="button" data-action="edit-work" data-id="${session.id}">Edit work session…</button>
           ${session.repeats ? dayAction : ''}
           <button type="button" class="danger" data-action="delete-work" data-id="${session.id}">Delete ${session.repeats ? 'all dates' : 'work session'}</button>
@@ -1482,17 +1496,127 @@
     const eventData = rso ? `data-rso-id="${rso.id}" data-id="${event.id}"` : `data-id="${event.id}"`;
     return `
       <details class="row-menu class-block-slot" style="${style}">
-        <summary class="class-block is-event" style="--class-color: ${rso ? rso.color : event.color}"
+        <summary class="class-block is-event" style="--class-color: ${rso ? rso.color : event.color}" ${movableData(rso ? 'rso-event' : 'event', event.id, rso ? rso.id : '')}
           title="${name}${event.location ? ` · ${escapeHtml(event.location)}` : ''}">
           <span class="class-block-name">${name}</span>
           ${details}
           <span class="class-block-time">${model.formatTimeRange(block.startTime, block.endTime)}</span>
         </summary>
         <div class="row-menu-items">
+          ${changeTimeButton(rso ? 'rso-event' : 'event', event.id, rso ? rso.id : '')}
           <button type="button" data-action="${rso ? 'edit-rso' : 'edit-event'}" data-id="${rso ? rso.id : event.id}">Edit ${rso ? escapeHtml(rso.name) : 'event'}…</button>
           <button type="button" class="danger" data-action="delete-event" ${eventData}>Delete event</button>
         </div>
       </details>`;
+  }
+
+  // ---------- Moving one-time things on the Calendar ----------
+
+  function movableItemFrom(element) {
+    const { moveKind, moveId, moveRso } = element.dataset;
+    return model.findMovableItem(state, moveKind, moveId, moveRso);
+  }
+
+  // What to call it in messages: its title, or for a work session (which has none) its class.
+  function movableItemName(item) {
+    if (item.title) {
+      return item.title;
+    }
+    const plannerClass = state.classes.find((candidate) => candidate.id === item.classId);
+    return `${plannerClass ? plannerClass.name : 'Your'} work session`;
+  }
+
+  function moveItemTo(item, startTime, endTime) {
+    applyChange(`Moved ${movableItemName(item)} to ${model.formatTimeRange(startTime, endTime)}`, () => {
+      item.startTime = startTime;
+      item.endTime = endTime;
+    });
+  }
+
+  // Dragging a block up or down with a mouse or pen moves it in 15-minute steps, keeping its
+  // length. Touch screens scroll instead, and use Change time… from the block's menu.
+  const DRAG_STEP_MINUTES = 15;
+  const DRAG_START_DISTANCE = 4; // px before a press counts as a drag rather than a click
+  let blockDrag = null;
+
+  function startBlockDrag(event) {
+    const block = event.target.closest('.class-block[data-move-kind]');
+    if (!block || event.pointerType === 'touch' || event.button !== 0 || !movableItemFrom(block)) {
+      return;
+    }
+    const slot = block.closest('.class-block-slot');
+    blockDrag = { block, slot, startY: event.clientY, top: parseFloat(slot.style.top), moved: false, times: null };
+    block.setPointerCapture(event.pointerId);
+  }
+
+  function moveBlockDrag(event) {
+    if (!blockDrag) {
+      return;
+    }
+    const dy = event.clientY - blockDrag.startY;
+    if (!blockDrag.moved && Math.abs(dy) < DRAG_START_DISTANCE) {
+      return;
+    }
+    blockDrag.moved = true;
+    blockDrag.slot.classList.add('is-dragging');
+    const item = movableItemFrom(blockDrag.block);
+    const stepMinutes = Math.round((dy / HOUR_HEIGHT) * (60 / DRAG_STEP_MINUTES)) * DRAG_STEP_MINUTES;
+    const times = model.shiftedTimes(item.startTime, item.endTime, model.timeToMinutes(item.startTime) + stepMinutes);
+    const shift = model.timeToMinutes(times.startTime) - model.timeToMinutes(item.startTime);
+    blockDrag.slot.style.top = `${blockDrag.top + (shift / 60) * HOUR_HEIGHT}px`;
+    blockDrag.block.querySelector('.class-block-time').textContent = model.formatTimeRange(times.startTime, times.endTime);
+    blockDrag.times = times;
+  }
+
+  function endBlockDrag() {
+    if (!blockDrag) {
+      return;
+    }
+    const { block, moved, times } = blockDrag;
+    blockDrag = null;
+    if (!moved) {
+      return;
+    }
+    // A drag shouldn't also open the block's menu when the button comes up.
+    block.addEventListener('click', (clickEvent) => clickEvent.preventDefault(), { capture: true, once: true });
+    const item = movableItemFrom(block);
+    if (times && item && times.startTime !== item.startTime) {
+      moveItemTo(item, times.startTime, times.endTime);
+    } else {
+      renderCalendar();
+    }
+  }
+
+  // Change time…: a small box with just the start and end, for touch screens or exact times.
+  let timeDialogTarget = null;
+
+  function openTimeDialog(button) {
+    const item = movableItemFrom(button);
+    timeDialogTarget = { kind: button.dataset.moveKind, id: button.dataset.moveId, rso: button.dataset.moveRso };
+    elements.timeForm.reset();
+    elements.timeForm.elements.startTime.value = item.startTime;
+    elements.timeForm.elements.endTime.value = item.endTime;
+    document.getElementById('time-dialog-what').textContent = `${movableItemName(item)} · ${model.formatDate(item.date)}`;
+    showErrors(elements.timeErrors, []);
+    button.closest('details')?.removeAttribute('open');
+    elements.timeDialog.showModal();
+    elements.timeForm.elements.startTime.focus();
+  }
+
+  function handleTimeSubmit(event) {
+    event.preventDefault();
+    const startTime = elements.timeForm.elements.startTime.value;
+    const endTime = elements.timeForm.elements.endTime.value;
+    const errors = model.validateTimes(startTime, endTime);
+    showErrors(elements.timeErrors, errors);
+    if (errors.length > 0) {
+      return;
+    }
+    const item = model.findMovableItem(state, timeDialogTarget.kind, timeDialogTarget.id, timeDialogTarget.rso);
+    elements.timeDialog.close();
+    if (item && (startTime !== item.startTime || endTime !== item.endTime)) {
+      moveItemTo(item, startTime, endTime);
+    }
   }
 
   // "Now: MATH 241 Lecture until 10:50 AM · Altgeld 314", or the next class coming up.
@@ -3723,6 +3847,8 @@
           state.rsos = state.rsos.filter((candidate) => candidate.id !== id);
         });
       }
+    } else if (action === 'change-time') {
+      openTimeDialog(target);
     } else if (action === 'edit-event') {
       startEditingEvent(id);
     } else if (action === 'delete-event') {
@@ -3961,6 +4087,15 @@
   elements.examCancel.addEventListener('click', () => setDrawerOpen(false));
   elements.classCancel.addEventListener('click', stopEditingClass);
   elements.semesterButton.addEventListener('click', openSemesterDialog);
+  elements.timeForm.addEventListener('submit', handleTimeSubmit);
+  document.getElementById('time-cancel').addEventListener('click', () => elements.timeDialog.close());
+  elements.calendar.addEventListener('pointerdown', startBlockDrag);
+  elements.calendar.addEventListener('pointermove', moveBlockDrag);
+  elements.calendar.addEventListener('pointerup', endBlockDrag);
+  elements.calendar.addEventListener('pointercancel', () => {
+    blockDrag = null;
+    renderCalendar();
+  });
   elements.quickAddForm.addEventListener('submit', handleQuickAddSubmit);
   elements.quickAddForm.addEventListener('change', handleQuickAddChange);
   document.getElementById('quick-add-cancel').addEventListener('click', () => elements.quickAddDialog.close());

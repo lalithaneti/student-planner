@@ -441,6 +441,43 @@ const PlannerModel = (() => {
     return hours * 60 + minutes;
   }
 
+  function minutesToTime(totalMinutes) {
+    return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+  }
+
+  // ---------- Moving one-time things on the Calendar ----------
+
+  // The one-time thing behind a calendar block that can be moved: an exam, quiz, one-date work
+  // session, or event (standalone or an RSO's). null for anything else, including repeating
+  // things, where "move this one" and "move them all" would be different questions.
+  function findMovableItem(state, kind, id, rsoId) {
+    const lists = {
+      exam: state.exams,
+      quiz: state.quizzes,
+      work: state.workSessions,
+      event: state.events,
+      'rso-event': ((state.rsos || []).find((rso) => rso.id === rsoId) || {}).events,
+    };
+    const item = (lists[kind] || []).find((candidate) => candidate.id === id) || null;
+    return item && kind === 'work' && item.repeats ? null : item;
+  }
+
+  // New times for something moved to start at newStartMinutes, keeping its length and staying
+  // within the day.
+  function shiftedTimes(startTime, endTime, newStartMinutes) {
+    const length = timeToMinutes(endTime) - timeToMinutes(startTime);
+    const start = Math.min(Math.max(newStartMinutes, 0), 24 * 60 - 1 - length);
+    return { startTime: minutesToTime(start), endTime: minutesToTime(start + length) };
+  }
+
+  // Returns a list of problems with new start and end times; empty means they're fine.
+  function validateTimes(startTime, endTime) {
+    if (!startTime || !endTime) {
+      return ['Pick a start and an end time.'];
+    }
+    return endTime <= startTime ? ['The end time has to be after the start time.'] : [];
+  }
+
   // Whether a weekly meeting happens on a date's weekday. An every-other-week meeting
   // (every: 2) also needs the date to be its first meeting or an even number of weeks after.
   function meetsOn(meeting, date) {
@@ -984,6 +1021,10 @@ const PlannerModel = (() => {
     usualDueTime,
     gettingStartedSteps,
     timeToMinutes,
+    minutesToTime,
+    findMovableItem,
+    shiftedTimes,
+    validateTimes,
     validateMeeting,
     buildCalendarWeek,
     validateExam,

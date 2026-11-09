@@ -531,6 +531,28 @@
       </form>
     </dialog>
 
+    <dialog id="time-dialog" aria-labelledby="time-dialog-heading">
+      <form id="time-form" novalidate>
+        <h2 id="time-dialog-heading">Change time</h2>
+        <p class="hint" id="time-dialog-what"></p>
+        <div class="field-row">
+          <label class="field">
+            <span>Starts</span>
+            <input name="startTime" type="time" required />
+          </label>
+          <label class="field">
+            <span>Ends</span>
+            <input name="endTime" type="time" required />
+          </label>
+        </div>
+        <ul class="form-errors" id="time-errors" role="alert"></ul>
+        <div class="button-row">
+          <button type="submit" class="primary-button">Save</button>
+          <button type="button" class="text-button" id="time-cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="challenge-dialog" aria-labelledby="challenge-heading"></dialog>
 
     <dialog id="chest-dialog" aria-labelledby="chest-heading"></dialog>
