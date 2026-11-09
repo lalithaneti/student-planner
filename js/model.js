@@ -225,6 +225,27 @@ const PlannerModel = (() => {
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
   }
 
+  // Whether a break covers Monday through Friday of the week starting on weekStart.
+  function coversSchoolWeek(schoolBreak, weekStart) {
+    return schoolBreak.startDate <= weekStart && addDays(weekStart, 4) <= schoolBreak.endDate;
+  }
+
+  // Whether a break covers at least one whole school week anywhere.
+  function hasFullSchoolWeek(schoolBreak) {
+    const start = startOfWeek(schoolBreak.startDate);
+    const firstMonday = start === schoolBreak.startDate ? start : addDays(start, 7);
+    return coversSchoolWeek(schoolBreak, firstMonday);
+  }
+
+  // The breaks whose banner shows on the week starting weekStart. A break long enough to have a
+  // whole school week shows its banner only on those weeks, so a break that starts on a Friday
+  // doesn't put a banner on the week before (that Friday still counts as a break day). A short
+  // break with no whole week shows on the week it falls in.
+  function bannerBreaks(state, weekStart) {
+    const week = Array.from({ length: 7 }, (_, offset) => addDays(weekStart, offset));
+    return breaksDuring(state, week).filter((schoolBreak) => !hasFullSchoolWeek(schoolBreak) || coversSchoolWeek(schoolBreak, weekStart));
+  }
+
   // The break happening now ({ ongoing: true, daysLeft }), or else the next one coming up
   // ({ ongoing: false, daysUntil }), however far away. null if there are none left.
   function upcomingBreak(state, todayKey) {
@@ -1008,6 +1029,7 @@ const PlannerModel = (() => {
     breakOn,
     finalsDayKind,
     breaksDuring,
+    bannerBreaks,
     upcomingBreak,
     guessBreakTheme,
     validateBreak,

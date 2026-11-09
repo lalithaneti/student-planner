@@ -1355,7 +1355,7 @@
 
   // Banners for every break covering any of the given dates, then the finals title if finals are among them.
   function renderBreakBanners(dates) {
-    const breakBanners = model.breaksDuring(state, dates).map(renderBreakBanner).join('');
+    const breakBanners = model.bannerBreaks(state, model.startOfWeek(dates[0])).map(renderBreakBanner).join('');
     const finalsTitle = dates.some((date) => model.finalsDayKind(state, date) === 'finals') ? renderFinalsTitle() : '';
     return breakBanners + finalsTitle;
   }
