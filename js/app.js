@@ -798,7 +798,8 @@
   // A spot along the trail, from 0 (start) to 1 (the chest), as percentages of the track.
   function pathPoint(along, waves) {
     // Starts a little in from the left, so the buddy standing before the first flag fits.
-    return { x: 12 + along * 74, y: 58 + 20 * Math.sin(along * waves * 2 * Math.PI) };
+    // A little lower than the middle, leaving the top of the sky for the progress bar.
+    return { x: 12 + along * 74, y: 62 + 18 * Math.sin(along * waves * 2 * Math.PI) };
   }
 
   function renderPathStone({ item, status }, index, along, waves) {
@@ -1037,6 +1038,8 @@
     return `
       <h3 class="buddy-path-title">Buddy’s Path</h3>
       ${renderWeekNav()}
+      <div class="buddy-path-frame">
+      ${renderPathHud(stones, chest)}
       <div class="buddy-path" id="buddy-path">
         <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px" data-waves="${waves}">
           ${renderScenery(count)}
@@ -1052,6 +1055,7 @@
             .join('')}
           <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%" data-along="${stoneAlong(buddyStone)}">${drawGameBuddy()}</div>
         </div>
+      </div>
       </div>
       ${renderNextUp(stones, buddyStone, chest)}
       ${renderPathList(stones)}
@@ -1109,6 +1113,30 @@
         <ul class="friend-list">${cards}</ul>
         <p class="buddy-muted">As of each friend’s last link. Ask for a new one to see their latest.</p>
       </section>`;
+  }
+
+  // The game-style bar over the sky: the week's progress, the chest, and the buddy's points.
+  // It sits outside the scrolling path, so it stays put on a long week.
+  function renderPathHud(stones, chest) {
+    const done = stones.filter((stone) => stone.status === 'done').length;
+    const total = stones.length;
+    const progress =
+      total === 0
+        ? '<span class="hud-progress">Nothing due</span>'
+        : `<span class="hud-progress" aria-label="${done} of ${total} done this week">⭐ <strong class="hud-count">${done} / ${total}</strong>
+            <span class="hud-bar" aria-hidden="true"><span style="width: ${(done / total) * 100}%"></span></span></span>`;
+    const chestLabels = { locked: 'Chest: finish the week to open it', ready: 'Chest: ready to open!', opened: 'Chest: opened' };
+    const chestIcon =
+      total === 0
+        ? ''
+        : `<span class="hud-chest is-${chest.status}" title="${chestLabels[chest.status]}" aria-label="${chestLabels[chest.status]}">${chest.status === 'opened' ? OPEN_TREASURE_CHEST : TREASURE_CHEST}</span>`;
+    let buddyText = '';
+    if (currentBuddy()) {
+      const points = buddyPoints();
+      const grown = buddy.stageFor(points).index === buddy.STAGES.length - 1;
+      buddyText = `<span class="hud-buddy">${escapeHtml(buddy.displayName(currentBuddy()))} · <strong class="hud-points">${points}</strong> ✨${grown ? ' 🌼' : ''}</span>`;
+    }
+    return `<div class="buddy-path-hud">${progress}${chestIcon}${buddyText}</div>`;
   }
 
   // ---------- The buddy hopping along the path ----------
@@ -3785,6 +3813,8 @@
       if (!buddyMoves) {
         elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
       }
+      // The bar's count and points pop once to show they went up.
+      elements.dueList.querySelector('.buddy-path-hud')?.classList.add('is-bumped');
       // Only the one just finished raises its flag (or lights its lantern); the others are already up.
       elements.dueList.querySelector(`.path-stone[data-id="${assignment.id}"][data-date="${date}"]`)?.classList.add('is-rising');
     }

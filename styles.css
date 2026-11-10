@@ -2699,6 +2699,103 @@ dialog::backdrop {
   --cobble-stone: #8a8598;
 }
 
+/* The path and the progress bar over it. */
+.buddy-path-frame {
+  position: relative;
+  margin-top: 12px;
+}
+
+.buddy-path-frame .buddy-path {
+  margin-top: 0;
+}
+
+.buddy-path-hud {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+  font-size: 0.85rem;
+}
+
+.hud-progress,
+.hud-buddy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 15%);
+  white-space: nowrap;
+}
+
+.hud-bar {
+  display: block;
+  width: 56px;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+}
+
+.hud-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #f2b33d;
+  transition: width 0.5s ease;
+}
+
+.hud-chest {
+  width: 30px;
+  flex: none;
+}
+
+.hud-chest .treasure-chest {
+  display: block;
+  width: 100%;
+}
+
+.hud-chest.is-locked {
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+.hud-chest.is-ready .treasure-chest {
+  filter: drop-shadow(0 0 5px #ffd166);
+}
+
+.buddy-path-hud.is-bumped .hud-count,
+.buddy-path-hud.is-bumped .hud-points {
+  display: inline-block;
+  animation: hud-bump 0.45s ease-out;
+}
+
+@keyframes hud-bump {
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+@media (max-width: 420px) {
+  .hud-bar {
+    width: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy-path-hud.is-bumped .hud-count,
+  .buddy-path-hud.is-bumped .hud-points {
+    animation: none;
+  }
+}
+
 /* Everything in the scene sits behind the trail and can't be tapped. */
 .buddy-path-scene {
   position: absolute;
