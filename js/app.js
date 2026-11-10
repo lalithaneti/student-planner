@@ -1050,7 +1050,7 @@
             .filter((friend) => friend.challenge.week === weekStart)
             .map((friend) => renderFriendGhost(friend, waves))
             .join('')}
-          <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%">${drawGameBuddy()}</div>
+          <div class="buddy-path-buddy${atChest ? ' is-at-chest' : ''}" style="left: ${buddySpot.x}%; top: ${buddySpot.y}%" data-along="${stoneAlong(buddyStone)}">${drawGameBuddy()}</div>
         </div>
       </div>
       ${renderNextUp(stones, buddyStone, chest)}
@@ -1109,6 +1109,61 @@
         <ul class="friend-list">${cards}</ul>
         <p class="buddy-muted">As of each friend’s last link. Ask for a new one to see their latest.</p>
       </section>`;
+  }
+
+  // ---------- The buddy hopping along the path ----------
+
+  const HOP_MS_PER_STEP = 420; // about how long it takes to hop from one flag to the next
+  const HOP_HEIGHT = 14; // px
+
+  function prefersReducedMotion() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  // Where the buddy stands on the path right now (0 = start, 1 = the chest), or null when the
+  // path isn't showing.
+  function pathBuddyAlong() {
+    const element = elements.dueList.querySelector('.buddy-path-buddy');
+    return element ? Number(element.dataset.along) : null;
+  }
+
+  // Moves the just-redrawn buddy from where it was (fromAlong) to its new spot, hopping along the
+  // curve of the path, and keeps it in view. Calls done when it lands. Reduce motion skips the hop.
+  function hopBuddyAlongPath(fromAlong, done = () => {}) {
+    const element = elements.dueList.querySelector('.buddy-path-buddy');
+    const track = elements.dueList.querySelector('.buddy-path-track');
+    const toAlong = element ? Number(element.dataset.along) : null;
+    if (!element || fromAlong === null || fromAlong === toAlong || prefersReducedMotion()) {
+      done();
+      return;
+    }
+    const waves = Number(track.dataset.waves);
+    const stoneCount = track.querySelectorAll('.path-stone').length || 1;
+    const steps = Math.abs(toAlong - fromAlong) * stoneCount;
+    const duration = Math.min(1600, Math.max(500, steps * HOP_MS_PER_STEP));
+    const hops = Math.max(2, Math.round(steps * 2));
+    const path = document.getElementById('buddy-path');
+    // Until it lands, the buddy stands like it does on the path, even when it's heading for the chest.
+    const atChest = element.classList.contains('is-at-chest');
+    element.classList.remove('is-at-chest');
+    const started = performance.now();
+    const frame = (now) => {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = progress < 0.5 ? 2 * progress * progress : 1 - (-2 * progress + 2) ** 2 / 2;
+      const { x, y } = pathPoint(fromAlong + (toAlong - fromAlong) * eased, waves);
+      element.style.left = `${x}%`;
+      element.style.top = `${y}%`;
+      element.style.translate = `0 ${-Math.abs(Math.sin(progress * hops * Math.PI)) * HOP_HEIGHT}px`;
+      path.scrollLeft = element.offsetLeft - path.clientWidth / 3;
+      if (progress < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        element.style.translate = '';
+        element.classList.toggle('is-at-chest', atChest);
+        done();
+      }
+    };
+    requestAnimationFrame(frame);
   }
 
   // On a trail too long for the screen, brings the buddy into view.
@@ -3707,6 +3762,7 @@
     const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
     const itemWeek = model.startOfWeek(date);
     const onThePath = currentTab === 'assignments' && currentView === 'game';
+    const buddyWasAt = onThePath ? pathBuddyAlong() : null;
     const chestReadyText = () =>
       !onThePath && buddy.chestFor(buddyView(), itemWeek).status === 'ready' ? ' Your week’s chest is ready on Buddy’s Path!' : '';
     applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore) + chestReadyText(), () => {
@@ -3721,16 +3777,23 @@
         assignment.doneDates = assignment.doneDates.filter((doneDate) => doneDate !== date);
       }
     });
-    // Home's card and the path were just redrawn, so the hop plays once on each new buddy.
+    // Home's card and the path were just redrawn. On the path the buddy hops along to its new
+    // spot (forward or back); elsewhere it does a little hop in place.
+    const buddyMoves = onThePath && buddyWasAt !== null && pathBuddyAlong() !== buddyWasAt;
     if (nowDone) {
       elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
-      elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
+      if (!buddyMoves) {
+        elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
+      }
       // Only the one just finished raises its flag (or lights its lantern); the others are already up.
       elements.dueList.querySelector(`.path-stone[data-id="${assignment.id}"][data-date="${date}"]`)?.classList.add('is-rising');
-      // Finishing the week on the path opens its chest right away.
-      if (onThePath && itemWeek === weekStart && buddy.chestFor(buddyView(), weekStart).status === 'ready') {
-        openWeekChest();
-      }
+    }
+    // Finishing the week on the path opens its chest once the buddy gets there.
+    const opensChest = nowDone && onThePath && itemWeek === weekStart && buddy.chestFor(buddyView(), weekStart).status === 'ready';
+    if (buddyMoves) {
+      hopBuddyAlongPath(buddyWasAt, opensChest ? openWeekChest : undefined);
+    } else if (opensChest) {
+      openWeekChest();
     }
   }
 
