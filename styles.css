@@ -2831,65 +2831,191 @@ dialog::backdrop {
   fill: color-mix(in srgb, var(--cobble-stone) 80%, var(--cobble-edge));
 }
 
-.path-stone,
-.path-stone-mini {
-  display: grid;
-  place-items: center;
-  border: 3px solid var(--class-color);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 700;
-}
-
+/* A checkpoint stands with the foot of its post on the path. */
 .path-stone {
   position: absolute;
   width: 40px;
-  height: 40px;
+  height: 60px;
   padding: 0;
-  font: inherit;
-  font-weight: 700;
+  border: 0;
+  background: none;
   cursor: pointer;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -88%);
   transition: transform 0.15s ease;
 }
 
 .path-stone:hover {
-  transform: translate(-50%, -50%) scale(1.12);
+  transform: translate(-50%, -88%) scale(1.1);
 }
 
+.path-stone svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Flags by day, lanterns in dark mode. */
+.checkpoint-lantern,
+.dark .checkpoint-flag {
+  display: none !important;
+}
+
+.dark .checkpoint-lantern {
+  display: block !important;
+}
+
+/* A flag waits halfway up its post, rises to the top and waves once done, droops when
+   overdue, and goes gray when missed. */
+.flag-cloth {
+  transform-box: view-box;
+  transform-origin: 11px 32px;
+  transition: transform 0.4s ease;
+}
+
+.path-stone.is-done .flag-cloth {
+  transform: translateY(-26px);
+  animation: flag-wave 2.4s ease-in-out infinite;
+}
+
+.path-stone.is-overdue .flag-cloth {
+  transform: rotate(22deg);
+}
+
+.path-stone.is-missed {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.path-stone.is-missed .flag-cloth {
+  transform: rotate(40deg);
+}
+
+/* The checkpoint just finished: its flag climbs the post, or its lantern flares up. */
+.path-stone.is-rising .flag-cloth {
+  animation:
+    flag-rise 0.6s ease-out,
+    flag-wave 2.4s ease-in-out 0.6s infinite;
+}
+
+.path-stone.is-rising .lantern-glow {
+  animation: lantern-light 0.8s ease-out;
+}
+
+@keyframes flag-rise {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-26px);
+  }
+}
+
+@keyframes lantern-light {
+  0% {
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes flag-wave {
+  0%,
+  100% {
+    transform: translateY(-26px) skewY(0deg);
+  }
+
+  50% {
+    transform: translateY(-26px) skewY(-6deg);
+  }
+}
+
+/* A lantern is dark until done, then glows; overdue ones flicker dimly. */
+.lantern-glass {
+  fill: #2b2b3c;
+}
+
+.lantern-number {
+  fill: #c9c6dc;
+}
+
+.lantern-glow {
+  fill: #ffd76a;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.path-stone.is-done .lantern-glass {
+  fill: #ffd76a;
+}
+
+.path-stone.is-done .lantern-number {
+  fill: #5a3d10;
+}
+
+.path-stone.is-done .lantern-glow {
+  opacity: 0.35;
+}
+
+.path-stone.is-overdue .lantern-glass {
+  fill: #6e5a2c;
+  animation: lantern-flicker 1.8s steps(2, end) infinite;
+}
+
+@keyframes lantern-flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .path-stone.is-done .flag-cloth,
+  .path-stone.is-rising .flag-cloth,
+  .path-stone.is-rising .lantern-glow,
+  .path-stone.is-overdue .lantern-glass {
+    animation: none;
+  }
+}
+
+/* The small numbers in the list under the path. */
 .path-stone-mini {
+  display: grid;
   flex: none;
+  place-items: center;
   width: 28px;
   height: 28px;
-  border-width: 2px;
+  border: 2px solid var(--class-color);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
   font-size: 0.8rem;
+  font-weight: 700;
 }
 
-/* Done stones light up in the class color. */
-.path-stone.is-done,
 .path-list-item.is-done .path-stone-mini {
   background: var(--class-color);
   color: #1c2024; /* Dark text stays readable on the light pastel class colors. */
 }
 
-.path-stone.is-done {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--class-color) 35%, transparent);
-}
-
-/* Work past its due time fades, but stays on the path. */
-.path-stone.is-overdue,
-.path-stone.is-missed {
-  opacity: 0.55;
-}
-
-/* The buddy stands just above its stone. */
+/* The buddy stands on the path just before its checkpoint, so the flag stays in view. */
 .buddy-path-buddy {
   position: absolute;
   z-index: 1;
   pointer-events: none;
   width: 76px;
-  transform: translate(-50%, calc(-100% - 8px));
+  transform: translate(calc(-50% - 30px), calc(-100% + 8px));
 }
 
 /* Next to the chest once there are no stones left to do. */

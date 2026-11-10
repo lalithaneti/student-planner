@@ -797,7 +797,8 @@
 
   // A spot along the trail, from 0 (start) to 1 (the chest), as percentages of the track.
   function pathPoint(along, waves) {
-    return { x: 8 + along * 78, y: 58 + 20 * Math.sin(along * waves * 2 * Math.PI) };
+    // Starts a little in from the left, so the buddy standing before the first flag fits.
+    return { x: 12 + along * 74, y: 58 + 20 * Math.sin(along * waves * 2 * Math.PI) };
   }
 
   function renderPathStone({ item, status }, index, along, waves) {
@@ -806,7 +807,7 @@
     const title = escapeHtml(item.assignment.title);
     return `<button type="button" class="path-stone is-${status}" style="left: ${x}%; top: ${y}%; --class-color: ${itemColor(item)}"
         data-action="toggle-stone" data-id="${item.assignment.id}" data-date="${item.date}" data-done="${item.done}"
-        aria-label="${item.done ? 'Mark not done' : 'Mark done'}: ${title}, ${model.formatDate(item.date)}" title="${title} · ${when}">${status === 'done' ? '✓' : index + 1}</button>`;
+        aria-label="${item.done ? 'Mark not done' : 'Mark done'}: ${title}, ${model.formatDate(item.date)}" title="${title} · ${when}">${drawCheckpoint(index + 1)}</button>`;
   }
 
   // What a finished week's chest is doing, so a shut chest never looks broken.
@@ -827,6 +828,30 @@
         : ' This week was before your buddy started, so it has no chest.';
     }
     return '';
+  }
+
+  // A checkpoint beside the path: a flag on a post by day, a lantern by night (dark mode). Both are
+  // drawn and the stylesheet shows the one that fits; finishing raises the flag or lights the lantern.
+  function drawCheckpoint(number) {
+    return `<svg class="checkpoint-flag" viewBox="0 0 40 60" aria-hidden="true" focusable="false">
+        <rect x="7" y="4" width="4" height="56" rx="2" fill="#a0714f" />
+        <circle cx="9" cy="4" r="3" fill="#ffd166" />
+        <g class="flag-cloth">
+          <path d="M11 32 H37 L31 40 L37 48 H11 Z" fill="var(--class-color)" stroke="color-mix(in srgb, var(--class-color) 60%, #000)" stroke-width="1.5" stroke-linejoin="round" />
+          <text x="22" y="44" text-anchor="middle" font-size="11" font-weight="700" fill="#1c2024">${number}</text>
+        </g>
+      </svg>
+      <svg class="checkpoint-lantern" viewBox="0 0 40 60" aria-hidden="true" focusable="false">
+        <rect x="7" y="8" width="4" height="52" rx="2" fill="#6b5a4e" />
+        <path d="M9 10 H27 V16" fill="none" stroke="#6b5a4e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        <g class="lantern">
+          <circle class="lantern-glow" cx="27" cy="29" r="15" />
+          <rect x="21" y="16" width="12" height="3" rx="1.5" fill="var(--class-color)" />
+          <rect class="lantern-glass" x="19" y="19" width="16" height="20" rx="4" stroke="var(--class-color)" stroke-width="2.5" />
+          <rect x="21" y="39" width="12" height="3" rx="1.5" fill="var(--class-color)" />
+          <text x="27" y="33" text-anchor="middle" font-size="10" font-weight="700" class="lantern-number">${number}</text>
+        </g>
+      </svg>`;
   }
 
   // One thing at a time: the assignment the buddy is standing on, ready to finish.
@@ -3700,6 +3725,8 @@
     if (nowDone) {
       elements.home.querySelector('.buddy-card-art')?.classList.add('is-hopping');
       elements.dueList.querySelector('.buddy-path-buddy')?.classList.add('is-hopping');
+      // Only the one just finished raises its flag (or lights its lantern); the others are already up.
+      elements.dueList.querySelector(`.path-stone[data-id="${assignment.id}"][data-date="${date}"]`)?.classList.add('is-rising');
       // Finishing the week on the path opens its chest right away.
       if (onThePath && itemWeek === weekStart && buddy.chestFor(buddyView(), weekStart).status === 'ready') {
         openWeekChest();
