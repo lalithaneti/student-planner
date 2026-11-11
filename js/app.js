@@ -289,6 +289,17 @@
     listElement.innerHTML = errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('');
   }
 
+  // What's being edited can disappear before Save: Undo removes it, or another tab deletes it.
+  // Returns true, after closing the form and saying so, when it's gone and the edit can't be saved.
+  function editTargetIsGone(item, noun) {
+    if (item) {
+      return false;
+    }
+    setDrawerOpen(false);
+    showToast(`That ${noun} was deleted, so your changes couldn’t be saved.`, null);
+    return true;
+  }
+
   // Applies a change, saves it, redraws, and shows a message with Undo. The message can
   // be a function, for messages that depend on the result of the change.
   function applyChange(message, change) {
@@ -3022,6 +3033,9 @@
   function saveAssignmentEdit(fields) {
     const { id, scope, date } = editingAssignment;
     const assignment = findAssignment(id);
+    if (editTargetIsGone(assignment, 'assignment')) {
+      return;
+    }
     applyChange(`Saved “${fields.title}”.`, () => {
       if (scope === 'date') {
         const single = model.detachOccurrence(assignment, date, newId('assignment'));
@@ -3087,7 +3101,10 @@
       return;
     }
     if (editingBreakId) {
-      const schoolBreak = state.breaks.find((candidate) => candidate.id === editingBreakId);
+      const schoolBreak = (state.breaks || []).find((candidate) => candidate.id === editingBreakId);
+      if (editTargetIsGone(schoolBreak, 'break')) {
+        return;
+      }
       applyChange(`Saved ${fields.name}.`, () => Object.assign(schoolBreak, fields));
     } else {
       applyChange(`Added ${fields.name} ${BREAK_THEME_STYLES[fields.theme].emoji}`, () => {
@@ -3175,6 +3192,9 @@
     }
     if (editingExamId) {
       const exam = examList(kind).find((candidate) => candidate.id === editingExamId);
+      if (editTargetIsGone(exam, kind)) {
+        return;
+      }
       applyChange(`Saved ${fields.title}.`, () => Object.assign(exam, fields));
       setDrawerOpen(false);
     } else {
@@ -3250,7 +3270,12 @@
     const duplicate = currentClasses().some(
       (plannerClass) => plannerClass.id !== editingClassId && plannerClass.name.toLowerCase() === name.toLowerCase(),
     );
-    const previousMeetings = editingClassId ? state.classes.find((candidate) => candidate.id === editingClassId).meetings || [] : [];
+    const editedClass = editingClassId ? state.classes.find((candidate) => candidate.id === editingClassId) : null;
+    if (editingClassId && editTargetIsGone(editedClass, 'class')) {
+      stopEditingClass();
+      return;
+    }
+    const previousMeetings = editedClass ? editedClass.meetings || [] : [];
     const meetings = readMeetingsKeepingCancellations(elements.meetingList, previousMeetings);
     const errors = [];
     if (!name) {
@@ -3291,7 +3316,7 @@
     // One change, so a single Undo removes the class and its new assignments together.
     applyChange(`${verb} ${name}${extra}.`, () => {
       if (editingClassId) {
-        Object.assign(state.classes.find((candidate) => candidate.id === editingClassId), { name, color, meetings, ...classDates });
+        Object.assign(editedClass, { name, color, meetings, ...classDates });
       } else {
         state.classes.push({ id: classId, semesterId: state.currentSemesterId, name, color, meetings, ...classDates });
       }
@@ -3361,7 +3386,11 @@
     event.preventDefault();
     const form = elements.rsoForm;
     const name = form.elements.name.value.trim();
-    const existing = editingRsoId ? state.rsos.find((candidate) => candidate.id === editingRsoId) : null;
+    const existing = editingRsoId ? (state.rsos || []).find((candidate) => candidate.id === editingRsoId) : null;
+    // Without this, an RSO deleted mid-edit would be saved again as a brand-new one.
+    if (editingRsoId && editTargetIsGone(existing, 'RSO')) {
+      return;
+    }
     const meetings = readMeetingsKeepingCancellations(elements.rsoMeetingList, existing ? existing.meetings : []);
     const events = readOneTimeRows(elements.rsoEventList);
     const errors = [];
@@ -3455,7 +3484,10 @@
     }
     const className = state.classes.find((plannerClass) => plannerClass.id === fields.classId).name;
     if (editingWorkId) {
-      const session = state.workSessions.find((candidate) => candidate.id === editingWorkId);
+      const session = (state.workSessions || []).find((candidate) => candidate.id === editingWorkId);
+      if (editTargetIsGone(session, 'work session')) {
+        return;
+      }
       applyChange(`Saved the work session for ${className}.`, () => Object.assign(session, fields));
       setDrawerOpen(false);
     } else {
@@ -3518,7 +3550,10 @@
       return;
     }
     if (editingEventId) {
-      const standalone = state.events.find((candidate) => candidate.id === editingEventId);
+      const standalone = (state.events || []).find((candidate) => candidate.id === editingEventId);
+      if (editTargetIsGone(standalone, 'event')) {
+        return;
+      }
       applyChange(`Saved ${fields.title}.`, () => Object.assign(standalone, fields));
       setDrawerOpen(false);
     } else {

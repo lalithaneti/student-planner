@@ -1005,6 +1005,11 @@ const PlannerModel = (() => {
         errors.push('Pick when the repeating assignment starts and ends.');
       } else if (assignment.startDate > assignment.endDate) {
         errors.push('The end date must be after the start date.');
+      } else if (assignment.days.length > 0 && occurrenceDates({ ...assignment, skippedDates: [] }).length === 0) {
+        // Without a single due date it would never show anywhere, so it couldn't be found to fix.
+        errors.push(
+          `None of the days you picked fall between ${formatMonthDay(assignment.startDate)} and ${formatMonthDay(assignment.endDate)}. Pick another day or widen the dates.`,
+        );
       }
     }
     return errors;
