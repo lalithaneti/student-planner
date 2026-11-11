@@ -98,6 +98,8 @@
   let weather = { status: 'loading' };
   // The greeting slides in once when the app opens, not again at each minute's redraw.
   let greetingHasArrived = false;
+  // Which break the Home countdown card is showing, when there are two to slide between.
+  let breakSlideIndex = 0;
   let resolveChoice = null;
   // What's chosen so far in the Study Buddy picker, before the egg is started.
   let buddyPick = { species: 'mochi', color: 'pink' };
@@ -902,28 +904,75 @@
   }
 
   // ---------- The scene behind the trail ----------
-  // Sky, two rows of hills, trees on the far hill, clouds, and flowers in the front grass. Hills
-  // stretch with the track; trees, clouds, and flowers keep their size and spread along it.
+  // Sky, hills, trees on the far hill, clouds, and little things in the front grass, all set by the
+  // semester's path theme. Hills stretch with the track; trees, clouds, and the rest keep their
+  // size and spread along it. Colors come from the stylesheet, by theme and light or dark mode.
 
-  const SCENE_HILLS = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  const MEADOW_HILLS = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
       <path class="scene-hill-far" d="M0 46 C10 38 20 36 32 42 C44 48 54 36 66 37 C78 38 88 46 100 41 V100 H0 Z" />
       <path class="scene-hill-near" d="M0 58 C14 52 26 54 40 57 C56 61 70 50 84 53 C92 55 96 57 100 56 V100 H0 Z" />
     </svg>`;
 
-  const SCENE_TREES = [
-    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="38" width="6" height="20" rx="2" fill="#a0714f" />
+  // The sea at the horizon with a few wave lines, then a sandy beach.
+  const BEACH_HILLS = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="scene-hill-far" d="M0 40 H100 V100 H0 Z" />
+      <path class="scene-waves" d="M4 45 q3 -2 6 0 t6 0 M30 49 q3 -2 6 0 t6 0 M60 44 q3 -2 6 0 t6 0 M82 50 q3 -2 6 0 t6 0" />
+      <path class="scene-hill-near" d="M0 56 C18 52 34 55 50 53 C66 51 84 55 100 52 V100 H0 Z" />
+    </svg>`;
+
+  const ROUND_TREE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="38" width="6" height="20" rx="2" fill="#a0714f" />
       <circle cx="20" cy="26" r="16" fill="var(--scene-tree)" /><circle cx="12" cy="32" r="10" fill="var(--scene-tree)" /><circle cx="28" cy="32" r="10" fill="var(--scene-tree)" />
-      <circle cx="15" cy="20" r="5" fill="#fff" opacity="0.18" /></svg>`,
-    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="44" width="6" height="14" rx="2" fill="#a0714f" />
-      <path d="M20 4 L36 46 H4 Z" fill="var(--scene-pine)" stroke="var(--scene-pine)" stroke-width="3" stroke-linejoin="round" /></svg>`,
-    `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M6 58 C2 40 12 30 20 30 C28 30 38 40 34 58 Z" fill="var(--scene-bush)" />
-      <circle cx="14" cy="42" r="2.5" fill="#ffb3c7" /><circle cx="25" cy="38" r="2.5" fill="#fff3b0" /><circle cx="27" cy="48" r="2.5" fill="#ffb3c7" /></svg>`,
-  ];
+      <circle cx="15" cy="20" r="5" fill="#fff" opacity="0.18" /></svg>`;
+  const PINE_TREE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="44" width="6" height="14" rx="2" fill="#a0714f" />
+      <path d="M20 4 L36 46 H4 Z" fill="var(--scene-pine)" stroke="var(--scene-pine)" stroke-width="3" stroke-linejoin="round" /></svg>`;
+  const FLOWER_BUSH = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M6 58 C2 40 12 30 20 30 C28 30 38 40 34 58 Z" fill="var(--scene-bush)" />
+      <circle cx="14" cy="42" r="2.5" fill="#ffb3c7" /><circle cx="25" cy="38" r="2.5" fill="#fff3b0" /><circle cx="27" cy="48" r="2.5" fill="#ffb3c7" /></svg>`;
+  const PALM_TREE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false">
+      <path d="M22 58 C22 44 18 30 22 16" fill="none" stroke="#b98b5e" stroke-width="4" stroke-linecap="round" />
+      <g fill="var(--scene-tree)"><path d="M22 15 C14 8 6 10 2 16 C10 13 16 14 22 17 Z" /><path d="M22 15 C30 8 38 10 40 17 C32 13 27 14 22 17 Z" />
+      <path d="M22 15 C20 6 12 2 7 4 C13 6 18 10 22 17 Z" /><path d="M22 15 C26 6 33 3 37 6 C31 7 26 10 22 17 Z" /></g>
+      <circle cx="20" cy="18" r="2.4" fill="#8a5f3a" /><circle cx="24" cy="18.5" r="2.4" fill="#8a5f3a" /></svg>`;
+  const BEACH_UMBRELLA = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false">
+      <path d="M20 26 V58" stroke="#e8e0d0" stroke-width="2.5" />
+      <path d="M2 28 C4 14 36 14 38 28 Z" fill="#ff8a9c" /><path d="M14 28 C14 16 26 16 26 28 Z" fill="#fff" /><path d="M2 28 C4 14 36 14 38 28" fill="none" stroke="#e8637b" stroke-width="1.5" /></svg>`;
+  const SNOWY_PINE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="44" width="6" height="14" rx="2" fill="#8a6a55" />
+      <path d="M20 4 L36 46 H4 Z" fill="var(--scene-pine)" stroke="var(--scene-pine)" stroke-width="3" stroke-linejoin="round" />
+      <path d="M20 4 L27 22 C24 20 22 23 20 21 C18 23 15 20 13 22 Z M11 28 C15 26 17 30 20 28 C23 30 26 26 30 28 L33 38 C28 36 25 40 20 37 C15 40 11 36 7 38 Z" fill="#ffffff" /></svg>`;
+  const SNOWMAN = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false">
+      <circle cx="20" cy="47" r="11" fill="#fff" stroke="#c9d6e6" stroke-width="1.5" /><circle cx="20" cy="29" r="8" fill="#fff" stroke="#c9d6e6" stroke-width="1.5" />
+      <circle cx="17" cy="27" r="1.2" fill="#4a2e44" /><circle cx="23" cy="27" r="1.2" fill="#4a2e44" /><path d="M20 30 L26 31.5 L20 32 Z" fill="#ff9f4a" />
+      <path d="M13 35 H27" stroke="#ff8a9c" stroke-width="3" stroke-linecap="round" /><rect x="14" y="17" width="12" height="4" rx="1" fill="#46527a" /><rect x="16" y="11" width="8" height="7" rx="1" fill="#46527a" /></svg>`;
+
+  // Autumn trees in fixed fall colors, so a forest has a mix of red, orange, and gold.
+  const fallTree = (color) => `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="17" y="38" width="6" height="20" rx="2" fill="#8a5f3a" />
+      <circle cx="20" cy="26" r="16" fill="${color}" /><circle cx="12" cy="32" r="10" fill="${color}" /><circle cx="28" cy="32" r="10" fill="${color}" />
+      <circle cx="15" cy="20" r="5" fill="#fff" opacity="0.18" /></svg>`;
+  // A cherry tree with a paper lantern that only shows (and glows) in dark mode.
+  const BLOSSOM_TREE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M20 58 V36 M20 44 L13 36 M20 40 L27 33" stroke="#7a5446" stroke-width="3.5" stroke-linecap="round" />
+      <circle cx="20" cy="24" r="15" fill="var(--scene-tree)" /><circle cx="10" cy="31" r="9" fill="var(--scene-tree)" /><circle cx="30" cy="30" r="9" fill="var(--scene-tree)" />
+      <circle cx="14" cy="20" r="2" fill="#fff" opacity="0.6" /><circle cx="25" cy="27" r="2" fill="#fff" opacity="0.6" /><circle cx="19" cy="31" r="1.6" fill="#fff" opacity="0.6" />
+      <g class="tree-lantern"><path d="M28 34 V38" stroke="#5a3d10" stroke-width="1" /><rect x="25" y="38" width="6" height="8" rx="3" fill="#ffb36b" /></g></svg>`;
+  const BLOSSOM_BUSH = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M6 58 C2 40 12 30 20 30 C28 30 38 40 34 58 Z" fill="var(--scene-bush)" />
+      <circle cx="14" cy="42" r="2.5" fill="#ffffff" /><circle cx="25" cy="38" r="2.5" fill="#ffe3ec" /><circle cx="27" cy="48" r="2.5" fill="#ffffff" /></svg>`;
 
   const SCENE_CLOUD = `<svg viewBox="0 0 60 30" aria-hidden="true" focusable="false">
       <path d="M12 26 C4 26 2 18 8 15 C8 8 18 6 22 11 C25 4 38 4 40 12 C48 10 56 16 52 24 C51 26 49 26 48 26 Z" fill="var(--scene-cloud)" /></svg>`;
 
-  const SCENE_FLOWER_COLORS = ['#ffb3c7', '#fff3b0', '#ffffff', '#d4c6ff'];
+  // Each theme's scenery: hills, things on the far hill, little things in the front, the path's
+  // surface (laid at real size by layPathDetails), and anything falling from the sky.
+  const PATH_THEMES = {
+    meadow: { name: 'Meadow', hills: MEADOW_HILLS, trees: [ROUND_TREE, PINE_TREE, FLOWER_BUSH], ground: ['#ffb3c7', '#fff3b0', '#ffffff', '#d4c6ff'], path: 'cobble', falling: null },
+    beach: { name: 'Beach boardwalk', hills: BEACH_HILLS, trees: [PALM_TREE, PALM_TREE, BEACH_UMBRELLA], ground: ['#ffd1dc', '#ffffff', '#ffe3b3', '#f7b9a8'], path: 'planks', falling: null },
+    snow: { name: 'Snowy trail', hills: MEADOW_HILLS, trees: [SNOWY_PINE, SNOWY_PINE, SNOWMAN], ground: [], path: 'snow', falling: 'snow' },
+    autumn: { name: 'Autumn forest', hills: MEADOW_HILLS, trees: [fallTree('#e8713c'), fallTree('#d9473b'), fallTree('#f2b13d'), PINE_TREE], ground: ['#e8713c', '#d9473b', '#f2b13d', '#b5652f'], path: 'leaves', falling: 'leaves' },
+    blossom: { name: 'Cherry blossom lane', hills: MEADOW_HILLS, trees: [BLOSSOM_TREE, BLOSSOM_TREE, BLOSSOM_BUSH], ground: ['#ffc4d8', '#ffffff', '#ffd9e5'], path: 'slabs', falling: 'petals' },
+  };
+
+  // The viewed semester's theme (each semester remembers its own), Meadow until one is picked.
+  function currentPathTheme() {
+    const picked = (state.pathThemes || {})[state.currentSemesterId];
+    return PATH_THEMES[picked] ? picked : 'meadow';
+  }
 
   // A steady, varied-looking number from 0 to 1 for each decoration, so the scene doesn't
   // reshuffle every time the page redraws.
@@ -932,12 +981,12 @@
     return value - Math.floor(value);
   }
 
-  function renderScenery(stoneCount) {
+  function renderScenery(stoneCount, theme) {
     const spots = Math.max(6, stoneCount + 2);
     const trees = Array.from({ length: spots }, (_, index) => {
       const x = ((index + 0.3 + sceneJitter(index, 1) * 0.5) / spots) * 100;
       const size = 34 + Math.round(sceneJitter(index, 2) * 18);
-      const art = SCENE_TREES[Math.floor(sceneJitter(index, 3) * SCENE_TREES.length)];
+      const art = theme.trees[Math.floor(sceneJitter(index, 3) * theme.trees.length)];
       return `<div class="scene-tree" style="left: ${x.toFixed(1)}%; width: ${size}px">${art}</div>`;
     }).join('');
     const clouds = Array.from({ length: Math.ceil(spots / 2) }, (_, index) => {
@@ -945,36 +994,129 @@
       const y = 6 + sceneJitter(index, 5) * 16;
       return `<div class="scene-cloud" style="left: ${x.toFixed(1)}%; top: ${y.toFixed(1)}%; animation-delay: -${Math.round(sceneJitter(index, 6) * 20)}s">${SCENE_CLOUD}</div>`;
     }).join('');
-    const flowers = Array.from({ length: spots * 2 }, (_, index) => {
-      const x = ((index + sceneJitter(index, 7)) / (spots * 2)) * 100;
-      const color = SCENE_FLOWER_COLORS[index % SCENE_FLOWER_COLORS.length];
-      return `<span class="scene-flower" style="left: ${x.toFixed(1)}%; bottom: ${(4 + sceneJitter(index, 8) * 10).toFixed(1)}px; --flower: ${color}"></span>`;
-    }).join('');
+    // Flowers in the meadow, shells on the beach.
+    const ground = theme.ground.length
+      ? Array.from({ length: spots * 2 }, (_, index) => {
+          const x = ((index + sceneJitter(index, 7)) / (spots * 2)) * 100;
+          const color = theme.ground[index % theme.ground.length];
+          return `<span class="scene-flower" style="left: ${x.toFixed(1)}%; bottom: ${(4 + sceneJitter(index, 8) * 10).toFixed(1)}px; --flower: ${color}"></span>`;
+        }).join('')
+      : '';
+    // Snow, leaves, or petals drifting down. Leaves take the ground's fall colors.
+    const falling = theme.falling
+      ? Array.from({ length: theme.falling === 'snow' ? spots * 3 : spots * 2 }, (_, index) => {
+          const x = (sceneJitter(index, 10) * 100).toFixed(1);
+          const delay = (sceneJitter(index, 11) * 8).toFixed(1);
+          const size = ((theme.falling === 'snow' ? 2 : 5) + sceneJitter(index, 12) * 3).toFixed(1);
+          const color = theme.ground.length ? `; --fall-color: ${theme.ground[index % theme.ground.length]}` : '';
+          return `<span class="scene-falling is-${theme.falling}" style="left: ${x}%; width: ${size}px; height: ${size}px; animation-delay: -${delay}s${color}"></span>`;
+        }).join('')
+      : '';
     return `<div class="buddy-path-scene" aria-hidden="true">
         <span class="scene-sun"></span>
         ${clouds}
-        ${SCENE_HILLS}
+        ${theme.hills}
         ${trees}
-        ${flowers}
+        ${ground}
+        ${falling}
       </div>`;
   }
 
-  // A cobblestone path: a dark edge and a mortar bed that stretch with the trail, then rounded
-  // stones laid on top at their real size once the page knows how big the track is.
+  // The path's edge and bed stretch with the trail; its surface (cobblestones, boardwalk planks,
+  // or footprints in snow) is laid on top at real size once the page knows how big the track is.
   function renderCobbleBed(trail) {
     return `<path class="cobble-edge" d="M${trail}" /><path class="cobble-bed" d="M${trail}" />`;
   }
 
-  // The cobblestones are laid at real size, so they're laid again whenever the track's size
-  // changes: when it's first shown, and when the window is resized.
-  const cobbleObserver = new ResizeObserver(() => layCobblestones());
+  // The surface is laid at real size, so it's laid again whenever the track's size changes: when
+  // it's first shown, and when the window is resized.
+  const cobbleObserver = new ResizeObserver(() => layPathDetails());
 
   const COBBLE_SPACING = 11; // px between stones along the path
   const COBBLE_ROW_OFFSETS = [-7.5, 0, 7.5]; // px across the path
+  const PLANK_SPACING = 9; // px between boardwalk planks
+  const FOOTPRINT_SPACING = 15; // px between footprints in the snow
 
-  // Lays the stones along the drawn trail, in three staggered rows across it, each a slightly
-  // different size and shade. Runs again when the window is resized.
-  function layCobblestones() {
+  // Spots every `spacing` pixels along the drawn trail, each with the direction the trail runs there.
+  function spotsAlongTrail(width, height, waves, spacing) {
+    const point = (along) => {
+      const { x, y } = pathPoint(along, waves);
+      return { x: (x / 100) * width, y: (y / 100) * height };
+    };
+    const spots = [];
+    let previous = point(0);
+    let travelled = 0;
+    for (let step = 1; step <= 600; step += 1) {
+      const next = point(step / 600);
+      travelled += Math.hypot(next.x - previous.x, next.y - previous.y);
+      while (travelled >= spacing * spots.length) {
+        spots.push({ x: next.x, y: next.y, angle: Math.atan2(next.y - previous.y, next.x - previous.x) });
+      }
+      previous = next;
+    }
+    return spots;
+  }
+
+  const degrees = (angle) => ((angle * 180) / Math.PI).toFixed(0);
+
+  // Three staggered rows of rounded stones across the path, each a slightly different size and shade.
+  function cobblestoneMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, COBBLE_SPACING).flatMap(({ x: cx, y: cy, angle }, placed) =>
+      COBBLE_ROW_OFFSETS.map((offset, row) => {
+        const stagger = row === 1 ? COBBLE_SPACING / 2 : 0;
+        const x = cx - Math.sin(angle) * offset + Math.cos(angle) * stagger;
+        const y = cy + Math.cos(angle) * offset + Math.sin(angle) * stagger;
+        const jitter = sceneJitter(placed * 3 + row, 9);
+        return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(4.2 + jitter * 1.2).toFixed(1)}" ry="${(3.1 + jitter).toFixed(1)}"
+            transform="rotate(${degrees(angle)} ${x.toFixed(1)} ${y.toFixed(1)})" class="cobble-stone${jitter > 0.66 ? ' is-light' : jitter < 0.25 ? ' is-dark' : ''}" />`;
+      }),
+    );
+  }
+
+  // Wooden boardwalk planks laid across the path.
+  function plankMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, PLANK_SPACING).map(({ x, y, angle }, placed) => {
+      const jitter = sceneJitter(placed, 13);
+      return `<rect x="${(x - 3.5).toFixed(1)}" y="${(y - 12).toFixed(1)}" width="7" height="24" rx="1.5"
+          transform="rotate(${degrees(angle)} ${x.toFixed(1)} ${y.toFixed(1)})" class="path-plank${jitter > 0.6 ? ' is-light' : jitter < 0.25 ? ' is-dark' : ''}" />`;
+    });
+  }
+
+  // Footprints pressed into the snow, left and right in turn.
+  function footprintMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, FOOTPRINT_SPACING).map(({ x: cx, y: cy, angle }, placed) => {
+      const side = placed % 2 === 0 ? -4 : 4;
+      const x = cx - Math.sin(angle) * side;
+      const y = cy + Math.cos(angle) * side;
+      return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="4" ry="2.3" transform="rotate(${degrees(angle)} ${x.toFixed(1)} ${y.toFixed(1)})" class="path-footprint" />`;
+    });
+  }
+
+  // A dirt path with fallen leaves scattered across it, in fall colors.
+  const LEAF_COLORS = ['#e8713c', '#d9473b', '#f2b13d', '#b5652f'];
+  function leafMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, 7).map(({ x: cx, y: cy, angle }, placed) => {
+      const across = (sceneJitter(placed, 14) - 0.5) * 18;
+      const x = cx - Math.sin(angle) * across;
+      const y = cy + Math.cos(angle) * across;
+      const turn = Math.round(sceneJitter(placed, 15) * 180);
+      return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="3.6" ry="1.9" transform="rotate(${turn} ${x.toFixed(1)} ${y.toFixed(1)})"
+          fill="${LEAF_COLORS[placed % LEAF_COLORS.length]}" class="path-leaf" />`;
+    });
+  }
+
+  // Pale stone slabs laid across the path, with a little gap between each.
+  function slabMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, 16).map(({ x, y, angle }, placed) => {
+      const jitter = sceneJitter(placed, 16);
+      return `<rect x="${(x - 6.5).toFixed(1)}" y="${(y - 10.5).toFixed(1)}" width="13" height="21" rx="3.5"
+          transform="rotate(${degrees(angle)} ${x.toFixed(1)} ${y.toFixed(1)})" class="path-slab${jitter > 0.6 ? ' is-light' : ''}" />`;
+    });
+  }
+
+  const PATH_SURFACES = { cobble: cobblestoneMarkup, planks: plankMarkup, snow: footprintMarkup, leaves: leafMarkup, slabs: slabMarkup };
+
+  function layPathDetails() {
     const track = elements.dueList.querySelector('.buddy-path-track');
     const layer = track && track.querySelector('.cobble-stones');
     if (!layer) {
@@ -982,41 +1124,22 @@
     }
     const width = track.clientWidth;
     const height = track.clientHeight;
-    // A hidden tab has no size yet; the observer below lays them once it's shown.
+    // A hidden tab has no size yet; the observer above lays them once it's shown.
     if (width === 0 || height === 0) {
       return;
     }
-    const waves = Number(track.dataset.waves);
-    const point = (along) => {
-      const { x, y } = pathPoint(along, waves);
-      return { x: (x / 100) * width, y: (y / 100) * height };
-    };
-    // Walks the trail in small steps, dropping a stone every COBBLE_SPACING pixels.
-    const stones = [];
-    let previous = point(0);
-    let travelled = 0;
-    let placed = 0;
-    for (let step = 1; step <= 600; step += 1) {
-      const next = point(step / 600);
-      travelled += Math.hypot(next.x - previous.x, next.y - previous.y);
-      while (travelled >= COBBLE_SPACING * placed) {
-        const angle = Math.atan2(next.y - previous.y, next.x - previous.x);
-        COBBLE_ROW_OFFSETS.forEach((offset, row) => {
-          const stagger = row === 1 ? COBBLE_SPACING / 2 : 0;
-          const x = next.x - Math.sin(angle) * offset + Math.cos(angle) * stagger;
-          const y = next.y + Math.cos(angle) * offset + Math.sin(angle) * stagger;
-          const jitter = sceneJitter(placed * 3 + row, 9);
-          stones.push(
-            `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${(4.2 + jitter * 1.2).toFixed(1)}" ry="${(3.1 + jitter).toFixed(1)}"
-              transform="rotate(${((angle * 180) / Math.PI).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})" class="cobble-stone${jitter > 0.66 ? ' is-light' : jitter < 0.25 ? ' is-dark' : ''}" />`,
-          );
-        });
-        placed += 1;
-      }
-      previous = next;
-    }
+    const surface = PATH_SURFACES[PATH_THEMES[currentPathTheme()].path];
     layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    layer.innerHTML = stones.join('');
+    layer.innerHTML = surface(width, height, Number(track.dataset.waves)).join('');
+  }
+
+  // For now, a row to try each theme on this semester's path. The gem shop replaces it.
+  function renderPathThemePreview() {
+    const current = currentPathTheme();
+    const buttons = Object.entries(PATH_THEMES)
+      .map(([id, theme]) => `<button type="button" class="chip-button" data-action="pick-path-theme" data-theme-id="${id}" aria-pressed="${id === current}">${theme.name}</button>`)
+      .join('');
+    return `<div class="theme-preview-row" role="group" aria-label="Path theme (preview)"><span class="buddy-muted">Preview themes:</span>${buttons}</div>`;
   }
 
   // The week as a winding trail: one stone per assignment, the buddy on the next one to do, and
@@ -1040,9 +1163,9 @@
       ${renderWeekNav()}
       <div class="buddy-path-frame">
       ${renderPathHud(stones, chest)}
-      <div class="buddy-path" id="buddy-path">
+      <div class="buddy-path" id="buddy-path" data-theme="${currentPathTheme()}">
         <div class="buddy-path-track" style="min-width: ${(count + 1) * PATH_STONE_SPACING}px" data-waves="${waves}">
-          ${renderScenery(count)}
+          ${renderScenery(count, PATH_THEMES[currentPathTheme()])}
           <svg class="buddy-path-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
             ${renderCobbleBed(trail)}
           </svg>
@@ -1058,6 +1181,7 @@
         </div>
       </div>
       </div>
+      ${renderPathThemePreview()}
       ${renderNextUp(stones, buddyStone, chest)}
       ${renderPathList(stones)}
       ${
@@ -1945,11 +2069,63 @@
   }
 
   // A big card in the next break's theme: "30 days until Thanksgiving break", or during it, "Back in 4 days".
+  // The next two breaks in one card that slides between them, with arrows and dots to pick one.
   function renderBreakCountdown() {
-    const upcoming = model.upcomingBreak(state, todayKey());
-    if (!upcoming) {
+    const upcoming = model.upcomingBreaks(state, todayKey());
+    if (upcoming.length === 0) {
       return '';
     }
+    breakSlideIndex %= upcoming.length;
+    const slides = upcoming.map((item, index) => renderBreakSlide(item, index === breakSlideIndex)).join('');
+    if (upcoming.length === 1) {
+      return `<div class="break-carousel">${slides}</div>`;
+    }
+    const dots = upcoming
+      .map(
+        (item, index) =>
+          `<button type="button" class="break-dot" data-action="show-break-slide" data-index="${index}" aria-label="Show ${escapeHtml(item.schoolBreak.name)}" aria-pressed="${index === breakSlideIndex}"></button>`,
+      )
+      .join('');
+    return `
+      <div class="break-carousel">
+        <div class="break-track" style="transform: translateX(-${breakSlideIndex * 100}%)">${slides}</div>
+        <button type="button" class="break-arrow previous" data-action="step-break-slide" data-step="-1" aria-label="Previous break">‹</button>
+        <button type="button" class="break-arrow next" data-action="step-break-slide" data-step="1" aria-label="Next break">›</button>
+        <div class="break-dots">${dots}</div>
+      </div>`;
+  }
+
+  function showBreakSlide(index) {
+    const carousel = elements.home.querySelector('.break-carousel');
+    const track = carousel && carousel.querySelector('.break-track');
+    if (!track) {
+      return;
+    }
+    breakSlideIndex = index;
+    track.style.transform = `translateX(-${index * 100}%)`;
+    carousel.querySelectorAll('.break-dot').forEach((dot, dotIndex) => dot.setAttribute('aria-pressed', String(dotIndex === index)));
+    carousel.querySelectorAll('.break-countdown').forEach((slide, slideIndex) => slide.setAttribute('aria-hidden', String(slideIndex !== index)));
+  }
+
+  function breakSlideCount() {
+    return elements.home.querySelectorAll('.break-track .break-countdown').length;
+  }
+
+  // Slides to the other break every few seconds, unless someone has asked for less motion.
+  // Picking a break by hand restarts the wait, so it doesn't slide away right after.
+  const BREAK_SLIDE_MS = 6000;
+  let breakSlideTimer = null;
+  function restartBreakSlideTimer() {
+    clearInterval(breakSlideTimer);
+    breakSlideTimer = setInterval(() => {
+      if (breakSlideCount() > 1 && !prefersReducedMotion()) {
+        showBreakSlide((breakSlideIndex + 1) % breakSlideCount());
+      }
+    }, BREAK_SLIDE_MS);
+  }
+  restartBreakSlideTimer();
+
+  function renderBreakSlide(upcoming, isShown) {
     const { schoolBreak } = upcoming;
     const style = BREAK_THEME_STYLES[schoolBreak.theme];
     const [number, words] = upcoming.ongoing
@@ -1957,7 +2133,7 @@
       : [upcoming.daysUntil, `day${upcoming.daysUntil === 1 ? '' : 's'} until ${escapeHtml(schoolBreak.name)} ${style.emoji}`];
     const dates = upcoming.ongoing ? `Last day ${model.formatDate(schoolBreak.endDate)}` : breakDateRange(schoolBreak);
     return `
-      <div class="break-countdown" style="--break-from: ${style.colors[0]}; --break-to: ${style.colors[2]}; --break-text: ${style.text}">
+      <div class="break-countdown" aria-hidden="${!isShown}" style="--break-from: ${style.colors[0]}; --break-to: ${style.colors[2]}; --break-text: ${style.text}">
         ${renderFallingDecorations(style)}
         <span class="break-countdown-number">${number}</span>
         <span class="break-countdown-words">${words}</span>
@@ -4136,10 +4312,22 @@
     } else if (action === 'remove-friend') {
       const friend = (state.friends || []).find((candidate) => candidate.key === target.dataset.key);
       applyChange(`Removed ${friend.challenge.name || 'your friend'} from Friends`, () => buddy.removeFriend(state, friend.key));
+    } else if (action === 'pick-path-theme') {
+      const themeId = target.dataset.themeId;
+      applyChange(`Path theme: ${PATH_THEMES[themeId].name}`, () => {
+        state.pathThemes = { ...(state.pathThemes || {}), [state.currentSemesterId]: themeId };
+      });
     } else if (action === 'open-chest') {
       openWeekChest();
     } else if (action === 'close-chest') {
       elements.chestDialog.close();
+    } else if (action === 'show-break-slide') {
+      showBreakSlide(Number(target.dataset.index));
+      restartBreakSlideTimer();
+    } else if (action === 'step-break-slide') {
+      const count = breakSlideCount();
+      showBreakSlide((breakSlideIndex + Number(target.dataset.step) + count) % count);
+      restartBreakSlideTimer();
     } else if (action === 'open-quick-add') {
       openQuickAdd();
     } else if (action === 'open-new-semester') {

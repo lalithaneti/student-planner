@@ -427,12 +427,81 @@ body.home-tab .app-header {
 
 /* ---------- Home: break countdown ---------- */
 
+.break-carousel {
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  border-radius: 14px;
+}
+
+.break-track {
+  display: flex;
+  transition: transform 0.6s ease;
+}
+
+.break-track > .break-countdown {
+  flex: 0 0 100%;
+  padding: 22px 52px 34px; /* room for the arrows at the sides and the dots below */
+}
+
+.break-dots {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.break-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.break-arrow:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.break-arrow.previous {
+  left: 8px;
+}
+
+.break-arrow.next {
+  right: 8px;
+}
+
+/* A small visible dot inside a bigger tap target. */
+.break-dot {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: radial-gradient(circle, currentColor 0 4px, transparent 5px);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.break-dot[aria-pressed='true'] {
+  color: #fff;
+}
+
 .break-countdown {
   position: relative;
   overflow: hidden;
   display: grid;
   justify-items: center;
-  margin-top: 14px;
   padding: 22px 16px 20px;
   border-radius: 14px;
   background: linear-gradient(135deg, var(--break-from), var(--break-to));
@@ -514,6 +583,10 @@ body.home-tab .app-header {
   .sky-sun,
   .break-countdown-number {
     animation: none;
+  }
+
+  .break-track {
+    transition: none;
   }
 
   .sky-cloud {
@@ -2819,6 +2892,254 @@ dialog::backdrop {
   .buddy-path-hud.is-bumped .hud-points {
     animation: none;
   }
+}
+
+/* ---------- Path themes ---------- */
+
+.buddy-path[data-theme='beach'] {
+  --scene-sky-top: #7fcdf7;
+  --scene-sky-bottom: #e6f8ff;
+  --scene-hill-far: #5ec2e3;
+  --scene-hill-near: #f1dca8;
+  --scene-tree: #5fb36a;
+  --scene-cloud: #ffffff;
+  --scene-sun: #ffd25e;
+  --cobble-edge: #8a5f3a;
+  --cobble-mortar: #a87849;
+  --cobble-stone: #d9a46a;
+}
+
+.dark .buddy-path[data-theme='beach'] {
+  --scene-sky-top: #12234a;
+  --scene-sky-bottom: #3a5a8c;
+  --scene-hill-far: #24557a;
+  --scene-hill-near: #7d6c50;
+  --scene-tree: #3f7a55;
+  --scene-cloud: #7f8fbf;
+  --scene-sun: #f4f1d0;
+  --cobble-edge: #4a3424;
+  --cobble-mortar: #5e4430;
+  --cobble-stone: #8a6a4a;
+}
+
+.buddy-path[data-theme='snow'] {
+  --scene-sky-top: #c3dbf2;
+  --scene-sky-bottom: #f3f8fd;
+  --scene-hill-far: #ffffff;
+  --scene-hill-near: #eaf2fa;
+  --scene-pine: #4f8a76;
+  --scene-cloud: #ffffff;
+  --scene-sun: #fff2c4;
+  --cobble-edge: #b7cadc;
+  --cobble-mortar: #dce8f3;
+  --cobble-stone: #b4c6d8;
+}
+
+.dark .buddy-path[data-theme='snow'] {
+  --scene-sky-top: #161e3a;
+  --scene-sky-bottom: #3b4472;
+  --scene-hill-far: #c4cde6;
+  --scene-hill-near: #a9b5d4;
+  --scene-pine: #2f5f52;
+  --scene-cloud: #8790bd;
+  --scene-sun: #f4f1d0;
+  --cobble-edge: #7b87a8;
+  --cobble-mortar: #98a4c2;
+  --cobble-stone: #7d89a8;
+}
+
+.scene-waves {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 0.6;
+  opacity: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+
+.path-plank {
+  fill: var(--cobble-stone);
+  stroke: var(--cobble-edge);
+  stroke-width: 0.8;
+}
+
+.path-plank.is-light {
+  fill: color-mix(in srgb, var(--cobble-stone) 75%, #fff);
+}
+
+.path-plank.is-dark {
+  fill: color-mix(in srgb, var(--cobble-stone) 80%, var(--cobble-edge));
+}
+
+.path-footprint {
+  fill: var(--cobble-stone);
+}
+
+/* Snow, leaves, or petals drifting down past the trees. */
+.scene-falling {
+  position: absolute;
+  top: -6px;
+  opacity: 0.9;
+  animation: snow-fall 8s linear infinite;
+}
+
+.scene-falling.is-snow {
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 2px rgb(110 140 180 / 70%); /* So white flakes show against a pale sky. */
+}
+
+.scene-falling.is-leaves {
+  border-radius: 0 70% 0 70%;
+  background: var(--fall-color);
+  animation: leaf-fall 9s linear infinite;
+}
+
+.scene-falling.is-petals {
+  border-radius: 70% 0 70% 0;
+  background: var(--fall-color);
+  animation: leaf-fall 10s linear infinite;
+}
+
+@keyframes snow-fall {
+  to {
+    translate: 12px 250px;
+  }
+}
+
+/* Leaves and petals sway side to side and tumble as they fall. */
+@keyframes leaf-fall {
+  0% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+
+  25% {
+    translate: 14px 62px;
+  }
+
+  50% {
+    translate: -6px 125px;
+  }
+
+  75% {
+    translate: 12px 188px;
+  }
+
+  100% {
+    translate: -4px 250px;
+    rotate: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-falling {
+    animation: none !important;
+    top: auto;
+    bottom: 30%;
+  }
+}
+
+.path-leaf {
+  opacity: 0.9;
+}
+
+.path-slab {
+  fill: var(--cobble-stone);
+  stroke: var(--cobble-edge);
+  stroke-width: 0.8;
+}
+
+.path-slab.is-light {
+  fill: color-mix(in srgb, var(--cobble-stone) 70%, #fff);
+}
+
+/* Paper lanterns in the cherry trees only show at night (dark mode). */
+.tree-lantern {
+  display: none;
+}
+
+.dark .tree-lantern {
+  display: inline;
+  filter: drop-shadow(0 0 3px #ffb36b);
+}
+
+.buddy-path[data-theme='autumn'] {
+  --scene-sky-top: #f6c98a;
+  --scene-sky-bottom: #fdf0dc;
+  --scene-hill-far: #d9b56b;
+  --scene-hill-near: #c79b55;
+  --scene-pine: #4f7f5a;
+  --scene-cloud: #fff7ea;
+  --scene-sun: #ffb347;
+  --cobble-edge: #7a5232;
+  --cobble-mortar: #a87a4f;
+  --cobble-stone: #a87a4f;
+}
+
+.dark .buddy-path[data-theme='autumn'] {
+  --scene-sky-top: #2a1c3a;
+  --scene-sky-bottom: #6a4a5e;
+  --scene-hill-far: #5a4630;
+  --scene-hill-near: #4a3a28;
+  --scene-pine: #2f5a3d;
+  --scene-cloud: #8a7a90;
+  --scene-sun: #ffc46b; /* A harvest moon. */
+  --cobble-edge: #3a2818;
+  --cobble-mortar: #5e4228;
+  --cobble-stone: #5e4228;
+}
+
+.buddy-path[data-theme='blossom'] {
+  --scene-sky-top: #ffd6e5;
+  --scene-sky-bottom: #fff4f8;
+  --scene-hill-far: #c9e7b8;
+  --scene-hill-near: #b5dda3;
+  --scene-tree: #ffb3cc;
+  --scene-bush: #f7a8c4;
+  --scene-cloud: #ffffff;
+  --scene-sun: #fff0a8;
+  --cobble-edge: #c9bfb5;
+  --cobble-mortar: #e3dbd2;
+  --cobble-stone: #ece6df;
+}
+
+.dark .buddy-path[data-theme='blossom'] {
+  --scene-sky-top: #241a3c;
+  --scene-sky-bottom: #5a4270;
+  --scene-hill-far: #3a5546;
+  --scene-hill-near: #2f4a3c;
+  --scene-tree: #b56a8a;
+  --scene-bush: #9a5a78;
+  --scene-cloud: #8a7aa8;
+  --scene-sun: #f4f1d0;
+  --cobble-edge: #6e6680;
+  --cobble-mortar: #8a8298;
+  --cobble-stone: #a49cb2;
+}
+
+.theme-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+
+.chip-button {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.chip-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  font-weight: 600;
 }
 
 /* Everything in the scene sits behind the trail and can't be tapped. */

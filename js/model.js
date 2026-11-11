@@ -246,18 +246,18 @@ const PlannerModel = (() => {
     return breaksDuring(state, week).filter((schoolBreak) => !hasFullSchoolWeek(schoolBreak) || coversSchoolWeek(schoolBreak, weekStart));
   }
 
-  // The break happening now ({ ongoing: true, daysLeft }), or else the next one coming up
-  // ({ ongoing: false, daysUntil }), however far away. null if there are none left.
-  function upcomingBreak(state, todayKey) {
-    const schoolBreak = breaksOf(state)
+  // The next breaks, soonest first: one happening now is { ongoing: true, daysLeft }, one still
+  // coming is { ongoing: false, daysUntil }, however far away. Empty when there are none left.
+  function upcomingBreaks(state, todayKey, count = 2) {
+    return breaksOf(state)
       .filter((candidate) => candidate.endDate >= todayKey)
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-    if (!schoolBreak) {
-      return null;
-    }
-    return schoolBreak.startDate <= todayKey
-      ? { schoolBreak, ongoing: true, daysLeft: daysBetween(todayKey, schoolBreak.endDate) }
-      : { schoolBreak, ongoing: false, daysUntil: daysBetween(todayKey, schoolBreak.startDate) };
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .slice(0, count)
+      .map((schoolBreak) =>
+        schoolBreak.startDate <= todayKey
+          ? { schoolBreak, ongoing: true, daysLeft: daysBetween(todayKey, schoolBreak.endDate) }
+          : { schoolBreak, ongoing: false, daysUntil: daysBetween(todayKey, schoolBreak.startDate) },
+      );
   }
 
   // A starting theme from the month a break begins: Sep–Nov fall, Dec–Feb winter,
@@ -1032,7 +1032,7 @@ const PlannerModel = (() => {
     finalsDayKind,
     breaksDuring,
     bannerBreaks,
-    upcomingBreak,
+    upcomingBreaks,
     guessBreakTheme,
     validateBreak,
     startOfWeek,
