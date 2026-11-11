@@ -409,6 +409,36 @@ const PlannerBuddy = (() => {
     return Math.max(0, gemsEarned(state) - (state.gemsSpent || 0));
   }
 
+  // ---------- The weekly recap ----------
+
+  // A summary of one week for the chest card: how much got done and on time, the gems and points
+  // it earned (not counting the chest's own bonus), the streak now, and the class with the most done.
+  function weekRecap(state, weekStart, todayKey, nowTime) {
+    const weekEnd = PlannerModel.addDays(weekStart, 6);
+    const items = PlannerModel.buildDueList(state).filter((item) => item.date >= weekStart && item.date <= weekEnd);
+    const done = items.filter((item) => item.done);
+    const onTime = done.filter((item) => !wasDoneLate(state.buddy, item));
+    const points = pointsLog(state, todayKey, nowTime)
+      .filter((entry) => entry.reason !== 'chest' && entry.when.slice(0, 10) >= weekStart && entry.when.slice(0, 10) <= weekEnd)
+      .reduce((sum, entry) => sum + entry.points, 0);
+    const doneByClass = new Map();
+    for (const item of done) {
+      doneByClass.set(item.assignment.classId, (doneByClass.get(item.assignment.classId) || 0) + 1);
+    }
+    const [topClassId, topCount] = [...doneByClass.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+    const topClass = state.classes.find((plannerClass) => plannerClass.id === topClassId);
+    return {
+      weekStart,
+      done: done.length,
+      total: items.length,
+      onTime: onTime.length,
+      gems: onTime.filter((item) => item.date >= state.buddy.startDate).length,
+      points,
+      streak: streakFor(state, todayKey, nowTime).current,
+      topClass: topClass ? { name: topClass.name, color: topClass.color, count: topCount } : null,
+    };
+  }
+
   // ---------- The theme shop ----------
   // Each semester has a start, middle, and end theme that follow the real seasons, cheapest first,
   // with the middle and end ones unlocking a third and two thirds of the way through the semester.
@@ -1266,6 +1296,7 @@ const PlannerBuddy = (() => {
     gemStatus,
     gemsEarned,
     gemBalance,
+    weekRecap,
     semesterSeason,
     ownsTheme,
     themeShop,

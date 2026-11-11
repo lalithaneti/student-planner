@@ -3737,7 +3737,7 @@ button.buddy-path-chest {
 
 /* The small card a chest's prize shows on. */
 #chest-dialog {
-  width: min(320px, calc(100vw - 32px));
+  width: min(380px, calc(100vw - 32px));
 }
 
 .chest-card {
@@ -3998,6 +3998,55 @@ button.buddy-path-chest {
 
 .sticker-item.is-missing strong {
   color: var(--text-muted);
+}
+
+.recap-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* All five in one row, even on a phone. */
+  gap: 5px;
+  width: 100%;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recap-stats li {
+  display: grid;
+  justify-items: center;
+  padding: 6px 2px;
+  text-align: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  font-size: 0.75rem;
+}
+
+.recap-stats strong {
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.recap-icon {
+  font-size: 1rem;
+}
+
+.recap-top {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.recap-divider {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px dashed var(--border);
+}
+
+/* The opened chest on the path can be tapped to see the week's recap again. */
+button.buddy-path-chest:not(.is-ready) {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 
 .chest-card-accessory {

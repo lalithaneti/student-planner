@@ -734,10 +734,13 @@
     if (chest.status === 'ready') {
       return `<button type="button" class="buddy-path-chest is-ready" ${place} data-action="open-chest" aria-label="Open this week’s chest">${TREASURE_CHEST}</button>`;
     }
-    return `<div class="buddy-path-chest" ${place}>${chest.status === 'opened' ? OPEN_TREASURE_CHEST : TREASURE_CHEST}</div>`;
+    if (chest.status === 'opened') {
+      return `<button type="button" class="buddy-path-chest" ${place} data-action="show-recap" aria-label="See this week’s recap">${OPEN_TREASURE_CHEST}</button>`;
+    }
+    return `<div class="buddy-path-chest" ${place}>${TREASURE_CHEST}</div>`;
   }
 
-  // Opens the viewed week's chest and shows what was inside, in one small card.
+  // Opens the viewed week's chest and shows the week's recap and what was inside.
   function openWeekChest() {
     const grownUp = buddy.stageFor(buddyPoints()).index === buddy.STAGES.length - 1;
     const prize = buddy.openChest(currentBuddy(), weekStart, grownUp);
@@ -747,29 +750,75 @@
       showToast('Couldn’t save. Your browser may be out of storage or blocking it.', null);
     }
     render();
+    showChestCard({ prize, sticker, accessory, isNew: true });
+  }
+
+  // An opened chest on the path shows its week's recap again, with what it held, and gives nothing new.
+  function showWeekRecap() {
+    const chestKey = (entry) => entry.semesterId === state.currentSemesterId && entry.weekStart === weekStart;
+    const stickerEntry = PlannerStickers.foundStickers(state).find(chestKey);
+    const accessoryEntry = buddy.foundAccessories(state).find(chestKey);
+    showChestCard({
+      prize: buddy.chestFor(buddyView(), weekStart).prize,
+      sticker: stickerEntry ? PlannerStickers.findSticker(stickerEntry.id) : null,
+      accessory: accessoryEntry ? buddy.ACCESSORIES.find((candidate) => candidate.id === accessoryEntry.id) : null,
+      isNew: false,
+    });
+  }
+
+  // The week at a glance: done, on time, gems, points, streak, and the class with the most done.
+  function renderRecap(recap) {
+    const allOnTime = recap.done > 0 && recap.onTime === recap.done;
+    const stat = (icon, value, label) => `<li><span class="recap-icon" aria-hidden="true">${icon}</span><strong>${value}</strong><span class="buddy-muted">${label}</span></li>`;
+    const topClass = recap.topClass
+      ? `<p class="recap-top" style="--class-color: ${recap.topClass.color}">📚 Most finished: <strong>${escapeHtml(recap.topClass.name)}</strong> (${recap.topClass.count})</p>`
+      : '';
+    return `<ul class="recap-stats">
+        ${stat('✅', `${recap.done} of ${recap.total}`, 'done')}
+        ${stat('⏰', recap.onTime, allOnTime ? 'all on time!' : 'on time')}
+        ${stat('💎', `+${recap.gems}`, 'gems')}
+        ${stat('✨', `${recap.points >= 0 ? '+' : '−'}${Math.abs(recap.points)}`, 'points')}
+        ${stat('🔥', recap.streak, 'day streak')}
+      </ul>
+      ${topClass}`;
+  }
+
+  function showChestCard({ prize, sticker, accessory, isNew }) {
+    const name = escapeHtml(buddy.displayName(currentBuddy()));
+    const recap = buddy.weekRecap(buddyView(), weekStart, todayKey(), currentTime());
+    const prizeText =
+      prize.points > 0
+        ? `<p class="chest-card-prize">+${prize.points} bonus points</p>
+           <p class="buddy-muted">${isNew ? `${name} found them in this week’s chest.` : 'From this week’s chest.'}</p>`
+        : `<p>${name} is all grown up! No bonus points needed.</p>`;
+    // Looking back, the sticker is just named; "new" and "added" only fit the first time.
+    const stickerText = isNew
+      ? renderChestSticker(sticker)
+      : sticker
+        ? renderChestSticker(sticker).replace('New sticker', 'Sticker').replace('<span class="buddy-muted">Added to your sticker book.</span>', '')
+        : '';
     elements.chestDialog.innerHTML = `
       <div class="chest-card">
         <div class="chest-card-art">${OPEN_TREASURE_CHEST}</div>
-        <h3 id="chest-heading">Week finished!</h3>
-        ${
-          prize.points > 0
-            ? `<p class="chest-card-prize">+${prize.points} bonus points</p>
-               <p class="buddy-muted">${escapeHtml(buddy.displayName(currentBuddy()))} found them in this week’s chest.</p>`
-            : `<p>${escapeHtml(buddy.displayName(currentBuddy()))} is all grown up! No bonus points needed.</p>`
-        }
-        ${renderChestSticker(sticker)}
+        <h3 id="chest-heading">Week of ${weekRangeLabel(weekStart)} 🎉</h3>
+        ${renderRecap(recap)}
+        <hr class="recap-divider" />
+        ${prizeText}
+        ${stickerText}
         ${
           accessory
             ? `<div class="chest-card-accessory">
                 ${buddy.drawAccessory(accessory.id)}
-                <span>🎁 New accessory: <strong>${accessory.name}</strong></span>
-                <span class="buddy-muted">Wear it from the Study Buddy tab.</span>
+                <span>🎁 ${isNew ? 'New accessory' : 'Accessory'}: <strong>${accessory.name}</strong></span>
+                ${isNew ? '<span class="buddy-muted">Wear it from the Study Buddy tab.</span>' : ''}
               </div>`
             : ''
         }
-        <button type="button" class="primary-button" data-action="close-chest">Nice!</button>
+        <button type="button" class="primary-button" data-action="close-chest">${isNew ? 'Nice!' : 'Close'}</button>
       </div>`;
-    elements.chestDialog.showModal();
+    if (!elements.chestDialog.open) {
+      elements.chestDialog.showModal();
+    }
   }
 
   // The chest card's sticker, or a note once the book is full.
@@ -4451,6 +4500,8 @@
       buyPathTheme(target.dataset.themeId);
     } else if (action === 'shop-use') {
       usePathTheme(target.dataset.themeId);
+    } else if (action === 'show-recap') {
+      showWeekRecap();
     } else if (action === 'open-chest') {
       openWeekChest();
     } else if (action === 'close-chest') {
