@@ -1047,6 +1047,7 @@
             ${renderCobbleBed(trail)}
           </svg>
           <svg class="cobble-stones" aria-hidden="true" focusable="false"></svg>
+          ${renderPathGems(stones, waves)}
           ${stones.map((stone, index) => renderPathStone(stone, index, stoneAlong(index), waves)).join('')}
           ${count > 0 ? renderPathChest(chest, chestSpot) : ''}
           ${(state.friends || [])
@@ -1115,6 +1116,44 @@
       </section>`;
   }
 
+  // A gem after each flag, halfway to the next one. Waiting gems sparkle, taken ones are gone
+  // (collected), and lost ones (late, missed, or past due) are dull gray.
+  const GEM_ART = `<svg viewBox="0 0 20 18" aria-hidden="true" focusable="false">
+      <path d="M5 1 H15 L19 6 L10 17 L1 6 Z" class="gem-body" />
+      <path d="M1 6 H19 M5 1 L7.5 6 L10 17 L12.5 6 L15 1 M7.5 6 L10 1 L12.5 6" class="gem-facets" />
+    </svg>`;
+
+  function renderPathGems(stones, waves) {
+    if (!currentBuddy() || stones.length === 0) {
+      return '';
+    }
+    return stones
+      .map(({ item }, index) => {
+        const status = buddy.gemStatus(buddyView(), item, todayKey(), currentTime());
+        const along = (index + 0.5) / stones.length;
+        const { x, y } = pathPoint(along, waves);
+        return `<span class="path-gem is-${status}" style="left: ${x}%; top: ${y}%" data-along="${along}"
+            data-id="${item.assignment.id}" data-date="${item.date}" aria-hidden="true">${GEM_ART}</span>`;
+      })
+      .join('');
+  }
+
+  // The gem a check-off just earned shows until the buddy reaches it, then sparkles away.
+  function holdGemForPickup(assignment, date) {
+    const gem = elements.dueList.querySelector(`.path-gem.is-taken[data-id="${assignment.id}"][data-date="${date}"]`);
+    gem?.classList.add('is-awaiting');
+    return gem;
+  }
+
+  function pickUpGems(buddyAlong) {
+    elements.dueList.querySelectorAll('.path-gem.is-awaiting').forEach((gem) => {
+      if (buddyAlong === null || Number(gem.dataset.along) <= buddyAlong + 0.001) {
+        gem.classList.remove('is-awaiting');
+        gem.classList.add('is-picked');
+      }
+    });
+  }
+
   // The game-style bar over the sky: the week's progress, the chest, and the buddy's points.
   // It sits outside the scrolling path, so it stays put on a long week.
   function renderPathHud(stones, chest) {
@@ -1136,7 +1175,10 @@
       const grown = buddy.stageFor(points).index === buddy.STAGES.length - 1;
       buddyText = `<span class="hud-buddy">${escapeHtml(buddy.displayName(currentBuddy()))} · <strong class="hud-points">${points}</strong> ✨${grown ? ' 🌼' : ''}</span>`;
     }
-    return `<div class="buddy-path-hud">${progress}${chestIcon}${buddyText}</div>`;
+    const gems = currentBuddy()
+      ? `<span class="hud-gems" aria-label="${buddy.gemBalance(state)} gems">${GEM_ART}<strong class="hud-gem-count">${buddy.gemBalance(state)}</strong></span>`
+      : '';
+    return `<div class="buddy-path-hud"><span class="hud-left">${progress}${gems}</span>${chestIcon}${buddyText}</div>`;
   }
 
   // ---------- The buddy hopping along the path ----------
@@ -1162,6 +1204,7 @@
     const track = elements.dueList.querySelector('.buddy-path-track');
     const toAlong = element ? Number(element.dataset.along) : null;
     if (!element || fromAlong === null || fromAlong === toAlong || prefersReducedMotion()) {
+      pickUpGems(null);
       done();
       return;
     }
@@ -1183,9 +1226,11 @@
       element.style.top = `${y}%`;
       element.style.translate = `0 ${-Math.abs(Math.sin(progress * hops * Math.PI)) * HOP_HEIGHT}px`;
       path.scrollLeft = element.offsetLeft - path.clientWidth / 3;
+      pickUpGems(fromAlong + (toAlong - fromAlong) * eased);
       if (progress < 1) {
         requestAnimationFrame(frame);
       } else {
+        pickUpGems(null);
         element.style.translate = '';
         element.classList.toggle('is-at-chest', atChest);
         done();
@@ -3787,13 +3832,18 @@
     const item = { assignment, date, time: assignment.dueTime };
     const pointsBefore = buddyPoints();
     const streakBefore = buddyStreak().current;
+    const gemsBefore = buddy.gemsEarned(state);
     const message = nowDone ? `Done: ${assignment.title} 🎉` : `Marked not done: ${assignment.title}`;
+    const describeGemChange = () => {
+      const change = buddy.gemsEarned(state) - gemsBefore;
+      return change > 0 ? ` +${change} 💎` : change < 0 ? ` (−${-change} 💎)` : '';
+    };
     const itemWeek = model.startOfWeek(date);
     const onThePath = currentTab === 'assignments' && currentView === 'game';
     const buddyWasAt = onThePath ? pathBuddyAlong() : null;
     const chestReadyText = () =>
       !onThePath && buddy.chestFor(buddyView(), itemWeek).status === 'ready' ? ' Your week’s chest is ready on Buddy’s Path!' : '';
-    applyChange(() => message + describePointsChange(pointsBefore) + describeStreakChange(streakBefore) + chestReadyText(), () => {
+    applyChange(() => message + describePointsChange(pointsBefore) + describeGemChange() + describeStreakChange(streakBefore) + chestReadyText(), () => {
       if (currentBuddy()) {
         buddy.recordCheckOff(currentBuddy(), item, nowDone, todayKey(), currentTime());
       }
@@ -3815,6 +3865,7 @@
       }
       // The bar's count and points pop once to show they went up.
       elements.dueList.querySelector('.buddy-path-hud')?.classList.add('is-bumped');
+      holdGemForPickup(assignment, date);
       // Only the one just finished raises its flag (or lights its lantern); the others are already up.
       elements.dueList.querySelector(`.path-stone[data-id="${assignment.id}"][data-date="${date}"]`)?.classList.add('is-rising');
     }
@@ -3822,8 +3873,11 @@
     const opensChest = nowDone && onThePath && itemWeek === weekStart && buddy.chestFor(buddyView(), weekStart).status === 'ready';
     if (buddyMoves) {
       hopBuddyAlongPath(buddyWasAt, opensChest ? openWeekChest : undefined);
-    } else if (opensChest) {
-      openWeekChest();
+    } else {
+      pickUpGems(null);
+      if (opensChest) {
+        openWeekChest();
+      }
     }
   }
 

@@ -2752,6 +2752,31 @@ dialog::backdrop {
   transition: width 0.5s ease;
 }
 
+.hud-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-gems {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 15%);
+}
+
+.hud-gems svg {
+  width: 15px;
+}
+
+.buddy-path-hud.is-bumped .hud-gem-count {
+  display: inline-block;
+  animation: hud-bump 0.45s ease-out;
+}
+
 .hud-chest {
   width: 30px;
   flex: none;
@@ -2926,6 +2951,82 @@ dialog::backdrop {
 
 .cobble-stone.is-dark {
   fill: color-mix(in srgb, var(--cobble-stone) 80%, var(--cobble-edge));
+}
+
+/* Gems sit on the path between flags. */
+.path-gem {
+  position: absolute;
+  width: 18px;
+  pointer-events: none;
+  transform: translate(-50%, -60%);
+}
+
+.path-gem svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.gem-body {
+  fill: #8fd3ff;
+  stroke: #4f9ee0;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.gem-facets {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 0.8;
+  opacity: 0.7;
+}
+
+.path-gem.is-waiting svg {
+  filter: drop-shadow(0 0 3px rgb(143 211 255 / 90%));
+  animation: gem-shine 2.2s ease-in-out infinite;
+}
+
+/* Collected: gone, unless it was just earned and the buddy hasn't reached it yet. */
+.path-gem.is-taken {
+  visibility: hidden;
+}
+
+.path-gem.is-taken.is-awaiting {
+  visibility: visible;
+}
+
+.path-gem.is-taken.is-picked {
+  visibility: visible;
+  animation: gem-pick 0.5s ease-out forwards;
+}
+
+.path-gem.is-lost {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+@keyframes gem-shine {
+  50% {
+    translate: 0 -2px;
+  }
+}
+
+@keyframes gem-pick {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .path-gem.is-waiting svg {
+    animation: none;
+  }
+
+  .path-gem.is-taken.is-picked {
+    animation: none;
+    visibility: hidden;
+  }
 }
 
 /* A checkpoint stands with the foot of its post on the path. */

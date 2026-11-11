@@ -383,6 +383,32 @@ const PlannerBuddy = (() => {
     return givesNoPoints(buddy, weekStart) ? { points: 0 } : chestPrize(buddy, weekStart);
   }
 
+  // ---------- Gems ----------
+  // Every assignment date checked off on time drops a gem on Buddy's Path. Like points, gems are
+  // worked out from the planner each time, so unchecking takes a gem back and Undo can't add
+  // extras. Gems from every semester's buddy add up into one purse; state.gemsSpent is what's been
+  // spent (on path themes, later).
+
+  // 'taken' (checked off on time), 'lost' (done late, missed, or past due), or 'waiting'.
+  function gemStatus(state, item, todayKey, nowTime) {
+    if (item.done) {
+      return wasDoneLate(state.buddy, item) ? 'lost' : 'taken';
+    }
+    return isPastDue(item, todayKey, nowTime) ? 'lost' : 'waiting';
+  }
+
+  function gemsEarned(state) {
+    return Object.keys(state.buddies || {}).reduce((total, semesterId) => {
+      const view = forSemester(state, semesterId);
+      return total + countedItems(view).filter((item) => item.done && !wasDoneLate(view.buddy, item)).length;
+    }, 0);
+  }
+
+  // Gems on hand. Never below 0, even if something bought with gems is later unchecked.
+  function gemBalance(state) {
+    return Math.max(0, gemsEarned(state) - (state.gemsSpent || 0));
+  }
+
   // The points each counted assignment date and streak bonus earned or lost, newest first.
   function pointsLog(state, todayKey, nowTime) {
     if (!state.buddy) {
@@ -1152,6 +1178,9 @@ const PlannerBuddy = (() => {
     foundAccessories,
     giveChestAccessory,
     giveMissedAccessories,
+    gemStatus,
+    gemsEarned,
+    gemBalance,
     pointsLog,
     totalPoints,
     pointsForCheckingOff,
