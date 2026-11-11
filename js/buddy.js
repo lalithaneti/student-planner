@@ -409,6 +409,91 @@ const PlannerBuddy = (() => {
     return Math.max(0, gemsEarned(state) - (state.gemsSpent || 0));
   }
 
+  // ---------- The theme shop ----------
+  // Each semester has a start, middle, and end theme that follow the real seasons, cheapest first,
+  // with the middle and end ones unlocking a third and two thirds of the way through the semester.
+  // Candy land and Starry space can be bought in any semester. A bought theme is kept for good
+  // (state.ownedThemes) and can be used in any semester; each semester remembers its own pick
+  // (state.pathThemes). Meadow is free and always owned.
+
+  const SEASON_TRACKS = {
+    fall: ['beach', 'autumn', 'snow'],
+    spring: ['snow', 'blossom', 'beach'],
+    summer: ['blossom', 'beach', 'autumn'],
+  };
+  const SEASON_PRICES = [15, 25, 35];
+  const SEASON_POSITIONS = ['start', 'middle', 'end'];
+  const SPECIAL_THEMES = [
+    { themeId: 'candy', price: 40 },
+    { themeId: 'space', price: 50 },
+  ];
+
+  // 'fall', 'spring', or 'summer', from the semester's name, or else the month it starts.
+  function semesterSeason(semester) {
+    const named = ['fall', 'spring', 'summer'].find((season) => semester.name.toLowerCase().includes(season));
+    if (named) {
+      return named;
+    }
+    const month = Number(semester.startDate.slice(5, 7));
+    return month >= 7 && month <= 11 ? 'fall' : month >= 4 && month <= 6 ? 'summer' : 'spring';
+  }
+
+  function ownsTheme(state, themeId) {
+    return themeId === 'meadow' || (state.ownedThemes || []).includes(themeId);
+  }
+
+  // The semester's shop: its three season themes (with price and unlock date) and the specials,
+  // each marked 'owned', 'locked' (not open yet), 'affordable', or 'short' (not enough gems).
+  function themeShop(state, semesterId, todayKey) {
+    const semester = state.semesters.find((candidate) => candidate.id === semesterId);
+    const length = PlannerModel.daysBetween(semester.startDate, semester.endDate);
+    const balance = gemBalance(state);
+    const status = (themeId, price, unlocksOn) => {
+      if (ownsTheme(state, themeId)) {
+        return 'owned';
+      }
+      if (unlocksOn && todayKey < unlocksOn) {
+        return 'locked';
+      }
+      return balance >= price ? 'affordable' : 'short';
+    };
+    const seasons = SEASON_TRACKS[semesterSeason(semester)].map((themeId, index) => {
+      const unlocksOn = index === 0 ? null : PlannerModel.addDays(semester.startDate, Math.round((length * index) / 3));
+      const price = SEASON_PRICES[index];
+      return { themeId, price, position: SEASON_POSITIONS[index], unlocksOn, status: status(themeId, price, unlocksOn) };
+    });
+    const specials = SPECIAL_THEMES.map(({ themeId, price }) => ({ themeId, price, position: 'special', unlocksOn: null, status: status(themeId, price, null) }));
+    return [...seasons, ...specials];
+  }
+
+  // Buys a theme from the semester's shop and puts it on that semester's path. Returns false (and
+  // changes nothing) if it isn't for sale there, isn't open yet, is already owned, or costs too much.
+  function buyTheme(state, semesterId, themeId, todayKey) {
+    const offer = themeShop(state, semesterId, todayKey).find((item) => item.themeId === themeId);
+    if (!offer || offer.status !== 'affordable') {
+      return false;
+    }
+    state.ownedThemes = [...(state.ownedThemes || []), themeId];
+    state.gemsSpent = (state.gemsSpent || 0) + offer.price;
+    useTheme(state, semesterId, themeId);
+    return true;
+  }
+
+  // Puts an owned theme on a semester's path, for free. Returns false for one that isn't owned.
+  function useTheme(state, semesterId, themeId) {
+    if (!ownsTheme(state, themeId)) {
+      return false;
+    }
+    state.pathThemes = { ...(state.pathThemes || {}), [semesterId]: themeId };
+    return true;
+  }
+
+  // The theme on a semester's path: its pick if owned, else Meadow.
+  function pathThemeFor(state, semesterId) {
+    const picked = (state.pathThemes || {})[semesterId];
+    return picked && ownsTheme(state, picked) ? picked : 'meadow';
+  }
+
   // The points each counted assignment date and streak bonus earned or lost, newest first.
   function pointsLog(state, todayKey, nowTime) {
     if (!state.buddy) {
@@ -1181,6 +1266,12 @@ const PlannerBuddy = (() => {
     gemStatus,
     gemsEarned,
     gemBalance,
+    semesterSeason,
+    ownsTheme,
+    themeShop,
+    buyTheme,
+    useTheme,
+    pathThemeFor,
     pointsLog,
     totalPoints,
     pointsForCheckingOff,

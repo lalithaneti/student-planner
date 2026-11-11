@@ -3053,6 +3053,96 @@ dialog::backdrop {
   fill: color-mix(in srgb, var(--cobble-stone) 70%, #fff);
 }
 
+/* Sprinkles tumble down in Candy land; stars twinkle in place in space. */
+.scene-falling.is-sprinkles {
+  width: 3px !important;
+  border-radius: 2px;
+  background: var(--fall-color);
+  animation: leaf-fall 9s linear infinite;
+}
+
+.scene-falling.is-stars {
+  border-radius: 50%;
+  background: #fff8d6;
+  box-shadow: 0 0 4px #fff8d6;
+  animation: star-twinkle 2.6s ease-in-out infinite;
+}
+
+@keyframes star-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.path-candy {
+  fill: #ffffff;
+}
+
+.path-candy.is-pink {
+  fill: #ff8fb1;
+}
+
+.path-glow-stone {
+  fill: var(--cobble-stone);
+  stroke: #ffffff;
+  stroke-width: 1;
+  filter: drop-shadow(0 0 4px var(--cobble-stone));
+}
+
+.scene-craters {
+  fill: rgb(0 0 0 / 12%);
+}
+
+/* No clouds in space; the "sun" is a big lilac planet. */
+.buddy-path[data-theme='space'] .scene-cloud {
+  display: none;
+}
+
+.buddy-path[data-theme='candy'] {
+  --scene-sky-top: #ffc8e0;
+  --scene-sky-bottom: #e6f4ff;
+  --scene-hill-far: #b5f0d8;
+  --scene-hill-near: #ffd9ea;
+  --scene-cloud: #ffe3f0;
+  --scene-sun: #ffe08a;
+  --cobble-edge: #e86f95;
+  --cobble-mortar: #ffffff;
+  --cobble-stone: #ff8fb1;
+}
+
+.dark .buddy-path[data-theme='candy'] {
+  --scene-sky-top: #3a1f4a;
+  --scene-sky-bottom: #7a4a8a;
+  --scene-hill-far: #3f7a6a;
+  --scene-hill-near: #8a5a7a;
+  --scene-cloud: #a07ab0;
+  --scene-sun: #f4f1d0;
+  --cobble-edge: #b04a70;
+  --cobble-mortar: #e8d8e8;
+}
+
+.buddy-path[data-theme='space'] {
+  --scene-sky-top: #1a1442;
+  --scene-sky-bottom: #4a3a8a;
+  --scene-hill-far: #b9a8e8;
+  --scene-hill-near: #a08ad8;
+  --scene-sun: #c9b3ff;
+  --cobble-edge: #7a6ac8;
+  --cobble-mortar: #8a7ad8;
+  --cobble-stone: #ffc4ee; /* Pink-lilac, so the blue gems stand out on it. */
+}
+
+.dark .buddy-path[data-theme='space'] {
+  --scene-sky-top: #0c0a24;
+  --scene-sky-bottom: #2a2260;
+  --scene-hill-far: #6a5aa8;
+  --scene-hill-near: #574898;
+  --scene-sun: #b9a8e8;
+  --cobble-edge: #3a2f78;
+  --cobble-mortar: #4a3e90;
+  --cobble-stone: #f0b0f0;
+}
+
 /* Paper lanterns in the cherry trees only show at night (dark mode). */
 .tree-lantern {
   display: none;
@@ -3117,29 +3207,91 @@ dialog::backdrop {
   --cobble-stone: #a49cb2;
 }
 
-.theme-preview-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+/* ---------- The theme shop ---------- */
+
+.shop-row {
   margin-top: 10px;
+}
+
+#shop-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+#shop-dialog h2 {
+  margin-top: 0;
+}
+
+.shop-balance {
+  margin: 0 0 12px;
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* Two across on a phone. */
+  gap: 10px;
+  margin: 8px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.shop-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-size: 0.85rem;
 }
 
-.chip-button {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
+.shop-card button {
+  margin-top: 4px;
 }
 
-.chip-button[aria-pressed='true'] {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
-  font-weight: 600;
+.shop-in-use {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* The little picture on each card uses the theme's own sky, ground, and path colors. */
+.buddy-path.shop-preview {
+  position: relative;
+  display: block;
+  height: 54px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.shop-preview-ground {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48%;
+  background: var(--scene-hill-near);
+}
+
+.shop-preview-path {
+  position: absolute;
+  bottom: 22%;
+  left: 10%;
+  width: 80%;
+  height: 9px;
+  border: 2px solid var(--cobble-edge);
+  border-radius: 999px;
+  background: var(--cobble-stone);
+  rotate: -6deg;
+}
+
+/* The gem count in the progress bar opens the shop. */
+button.hud-gems {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 /* Everything in the scene sits behind the trail and can't be tapped. */

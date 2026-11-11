@@ -1020,6 +1020,7 @@ const PlannerModel = (() => {
     toDateKey,
     parseDateKey,
     addDays,
+    daysBetween,
     isValidDateKey,
     isValidLink,
     defaultSemester,

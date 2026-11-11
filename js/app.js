@@ -118,6 +118,7 @@
     timeForm: document.getElementById('time-form'),
     timeErrors: document.getElementById('time-errors'),
     chestDialog: document.getElementById('chest-dialog'),
+    shopDialog: document.getElementById('shop-dialog'),
     backupStatus: document.getElementById('backup-status'),
     restoreBackupInput: document.getElementById('restore-backup'),
     quickAddDialog: document.getElementById('quick-add-dialog'),
@@ -955,6 +956,30 @@
   const BLOSSOM_BUSH = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M6 58 C2 40 12 30 20 30 C28 30 38 40 34 58 Z" fill="var(--scene-bush)" />
       <circle cx="14" cy="42" r="2.5" fill="#ffffff" /><circle cx="25" cy="38" r="2.5" fill="#ffe3ec" /><circle cx="27" cy="48" r="2.5" fill="#ffffff" /></svg>`;
 
+  // Candy land: gumdrop hills, lollipops, candy canes, and gumdrops.
+  const GUMDROP_HILLS = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="scene-hill-far" d="M0 48 C4 34 14 34 18 46 C22 34 32 34 36 46 C40 34 50 34 54 46 C58 34 68 34 72 46 C76 34 86 34 90 46 C94 38 98 38 100 42 V100 H0 Z" />
+      <path class="scene-hill-near" d="M0 58 C14 52 26 54 40 57 C56 61 70 50 84 53 C92 55 96 57 100 56 V100 H0 Z" />
+    </svg>`;
+  const LOLLIPOP = (color) => `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><rect x="18.5" y="28" width="3" height="30" rx="1.5" fill="#fff" stroke="#e6d6e6" stroke-width="0.8" />
+      <circle cx="20" cy="20" r="13" fill="${color}" /><path d="M20 20 m0 -9 a9 9 0 1 1 -8 5 a6 6 0 1 1 5 -3 a3 3 0 1 1 3 1" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" /></svg>`;
+  const CANDY_CANE = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M22 58 V20 C22 10 10 10 10 18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" />
+      <path d="M22 58 V20 C22 10 10 10 10 18" fill="none" stroke="#ff6f8e" stroke-width="6" stroke-dasharray="4 4" stroke-linecap="butt" /></svg>`;
+  const GUMDROPS = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M4 58 C4 44 16 44 16 58 Z" fill="#7fd8b5" /><path d="M14 58 C14 40 28 40 28 58 Z" fill="#ffb3c7" /><path d="M24 58 C24 46 36 46 36 58 Z" fill="#c9b3ff" />
+      <circle cx="9" cy="50" r="1" fill="#fff" /><circle cx="20" cy="47" r="1.2" fill="#fff" /><circle cx="29" cy="52" r="1" fill="#fff" /></svg>`;
+
+  // Starry space: a moon's lilac surface with craters, and planets floating above it.
+  const MOON_SURFACE = `<svg class="scene-hills" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path class="scene-hill-far" d="M0 50 C20 44 40 47 60 45 C80 43 90 48 100 46 V100 H0 Z" />
+      <path class="scene-hill-near" d="M0 58 C14 54 26 56 40 58 C56 61 70 53 84 55 C92 56 96 58 100 57 V100 H0 Z" />
+      <g class="scene-craters"><ellipse cx="10" cy="80" rx="4" ry="1.6" /><ellipse cx="36" cy="92" rx="5" ry="2" /><ellipse cx="62" cy="84" rx="3.5" ry="1.4" /><ellipse cx="88" cy="90" rx="4.5" ry="1.8" /></g>
+    </svg>`;
+  const RINGED_PLANET = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><circle cx="20" cy="18" r="10" fill="#ffb36b" />
+      <ellipse cx="20" cy="18" rx="17" ry="4.5" fill="none" stroke="#ffe3a8" stroke-width="2.2" transform="rotate(-15 20 18)" /><circle cx="16" cy="14" r="2.5" fill="#fff" opacity="0.25" /></svg>`;
+  const SMALL_PLANET = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><circle cx="20" cy="24" r="8" fill="#8fd3ff" /><path d="M13 21 C17 23 23 19 27 22 M14 27 C18 29 22 26 26 28" fill="none" stroke="#5aa7e0" stroke-width="1.5" stroke-linecap="round" /></svg>`;
+  const ROCKET = `<svg viewBox="0 0 40 60" aria-hidden="true" focusable="false"><path d="M20 10 C27 18 27 34 25 42 H15 C13 34 13 18 20 10 Z" fill="#f4f1ff" stroke="#c9b3ff" stroke-width="1.5" />
+      <circle cx="20" cy="24" r="3.5" fill="#8fd3ff" stroke="#c9b3ff" stroke-width="1.2" /><path d="M15 34 L10 44 H15 Z M25 34 L30 44 H25 Z" fill="#ff8a9c" /><path d="M17 42 L20 52 L23 42 Z" fill="#ffd166" /></svg>`;
+
   const SCENE_CLOUD = `<svg viewBox="0 0 60 30" aria-hidden="true" focusable="false">
       <path d="M12 26 C4 26 2 18 8 15 C8 8 18 6 22 11 C25 4 38 4 40 12 C48 10 56 16 52 24 C51 26 49 26 48 26 Z" fill="var(--scene-cloud)" /></svg>`;
 
@@ -966,11 +991,13 @@
     snow: { name: 'Snowy trail', hills: MEADOW_HILLS, trees: [SNOWY_PINE, SNOWY_PINE, SNOWMAN], ground: [], path: 'snow', falling: 'snow' },
     autumn: { name: 'Autumn forest', hills: MEADOW_HILLS, trees: [fallTree('#e8713c'), fallTree('#d9473b'), fallTree('#f2b13d'), PINE_TREE], ground: ['#e8713c', '#d9473b', '#f2b13d', '#b5652f'], path: 'leaves', falling: 'leaves' },
     blossom: { name: 'Cherry blossom lane', hills: MEADOW_HILLS, trees: [BLOSSOM_TREE, BLOSSOM_TREE, BLOSSOM_BUSH], ground: ['#ffc4d8', '#ffffff', '#ffd9e5'], path: 'slabs', falling: 'petals' },
+    candy: { name: 'Candy land', hills: GUMDROP_HILLS, trees: [LOLLIPOP('#ff8fb1'), LOLLIPOP('#8fd3ff'), CANDY_CANE, GUMDROPS], ground: ['#ff8fb1', '#8fd3ff', '#ffe08a', '#b5f0c8', '#c9b3ff'], path: 'candy', falling: 'sprinkles' },
+    space: { name: 'Starry space', hills: MOON_SURFACE, trees: [RINGED_PLANET, SMALL_PLANET, ROCKET], ground: [], path: 'glow', falling: 'stars' },
   };
 
-  // The viewed semester's theme (each semester remembers its own), Meadow until one is picked.
+  // The viewed semester's theme (each semester remembers its own owned pick), else Meadow.
   function currentPathTheme() {
-    const picked = (state.pathThemes || {})[state.currentSemesterId];
+    const picked = buddy.pathThemeFor(state, state.currentSemesterId);
     return PATH_THEMES[picked] ? picked : 'meadow';
   }
 
@@ -1007,9 +1034,12 @@
       ? Array.from({ length: theme.falling === 'snow' ? spots * 3 : spots * 2 }, (_, index) => {
           const x = (sceneJitter(index, 10) * 100).toFixed(1);
           const delay = (sceneJitter(index, 11) * 8).toFixed(1);
-          const size = ((theme.falling === 'snow' ? 2 : 5) + sceneJitter(index, 12) * 3).toFixed(1);
+          const small = theme.falling === 'snow' || theme.falling === 'stars';
+          const size = ((small ? 2 : 5) + sceneJitter(index, 12) * 3).toFixed(1);
           const color = theme.ground.length ? `; --fall-color: ${theme.ground[index % theme.ground.length]}` : '';
-          return `<span class="scene-falling is-${theme.falling}" style="left: ${x}%; width: ${size}px; height: ${size}px; animation-delay: -${delay}s${color}"></span>`;
+          // Stars stay up in the sky and twinkle instead of falling.
+          const top = theme.falling === 'stars' ? `top: ${(sceneJitter(index, 17) * 40).toFixed(1)}%; ` : '';
+          return `<span class="scene-falling is-${theme.falling}" style="${top}left: ${x}%; width: ${size}px; height: ${size}px; animation-delay: -${delay}s${color}"></span>`;
         }).join('')
       : '';
     return `<div class="buddy-path-scene" aria-hidden="true">
@@ -1114,7 +1144,32 @@
     });
   }
 
-  const PATH_SURFACES = { cobble: cobblestoneMarkup, planks: plankMarkup, snow: footprintMarkup, leaves: leafMarkup, slabs: slabMarkup };
+  // Candy stripes across the path, alternating pink and white like a candy cane.
+  function candyStripeMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, 6).map(
+      ({ x, y, angle }, placed) =>
+        `<rect x="${(x - 3).toFixed(1)}" y="${(y - 12).toFixed(1)}" width="6" height="24"
+          transform="rotate(${degrees(angle)} ${x.toFixed(1)} ${y.toFixed(1)})" class="path-candy${placed % 2 === 0 ? ' is-pink' : ''}" />`,
+    );
+  }
+
+  // Round glowing stepping stones floating along the path.
+  function glowStoneMarkup(width, height, waves) {
+    return spotsAlongTrail(width, height, waves, 18).map(
+      ({ x, y }, placed) =>
+        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(7 + sceneJitter(placed, 18) * 2).toFixed(1)}" class="path-glow-stone" />`,
+    );
+  }
+
+  const PATH_SURFACES = {
+    cobble: cobblestoneMarkup,
+    planks: plankMarkup,
+    snow: footprintMarkup,
+    leaves: leafMarkup,
+    slabs: slabMarkup,
+    candy: candyStripeMarkup,
+    glow: glowStoneMarkup,
+  };
 
   function layPathDetails() {
     const track = elements.dueList.querySelector('.buddy-path-track');
@@ -1133,19 +1188,89 @@
     layer.innerHTML = surface(width, height, Number(track.dataset.waves)).join('');
   }
 
-  // For now, a row to try each theme on this semester's path, only on the local copy used for
-  // building the app, so the live site doesn't give themes away free. The gem shop replaces it.
-  const IS_LOCAL_COPY = ['localhost', '127.0.0.1'].includes(location.hostname);
+  // ---------- The theme shop ----------
 
-  function renderPathThemePreview() {
-    if (!IS_LOCAL_COPY) {
-      return '';
+  function openThemeShop() {
+    renderThemeShop();
+    if (!elements.shopDialog.open) {
+      elements.shopDialog.showModal();
     }
-    const current = currentPathTheme();
-    const buttons = Object.entries(PATH_THEMES)
-      .map(([id, theme]) => `<button type="button" class="chip-button" data-action="pick-path-theme" data-theme-id="${id}" aria-pressed="${id === current}">${theme.name}</button>`)
-      .join('');
-    return `<div class="theme-preview-row" role="group" aria-label="Path theme (preview)"><span class="buddy-muted">Preview themes:</span>${buttons}</div>`;
+  }
+
+  const SHOP_POSITIONS = { start: 'Start of', middle: 'Middle of', end: 'End of' };
+
+  // A tiny picture of a theme: its sky, ground, and path colors.
+  function themeSwatch(themeId) {
+    return `<span class="buddy-path shop-preview" data-theme="${themeId}" aria-hidden="true"><span class="shop-preview-ground"></span><span class="shop-preview-path"></span></span>`;
+  }
+
+  // What a shop card offers: In use, Use, Buy, not enough gems yet, or when it unlocks.
+  function shopAction(themeId, status, price, unlocksOn) {
+    if (status === 'owned') {
+      return themeId === currentPathTheme()
+        ? '<span class="shop-in-use">In use ✓</span>'
+        : `<button type="button" class="secondary-button" data-action="shop-use" data-theme-id="${themeId}">Use</button>`;
+    }
+    if (status === 'locked') {
+      return `<span class="buddy-muted">🔒 Unlocks ${model.formatMonthDay(unlocksOn)}</span>`;
+    }
+    if (status === 'short') {
+      return `<button type="button" class="secondary-button" disabled>Need 💎 ${price - buddy.gemBalance(state)} more</button>`;
+    }
+    return `<button type="button" class="primary-button" data-action="shop-buy" data-theme-id="${themeId}">Buy for 💎 ${price}</button>`;
+  }
+
+  function shopCard(themeId, label, action) {
+    return `<li class="shop-card">
+        ${themeSwatch(themeId)}
+        <strong>${PATH_THEMES[themeId].name}</strong>
+        <span class="buddy-muted">${label}</span>
+        ${action}
+      </li>`;
+  }
+
+  // The viewed semester's season themes, the specials, and owned themes from other seasons.
+  function renderThemeShop() {
+    const semester = currentSemester();
+    const shop = buddy.themeShop(state, semester.id, todayKey());
+    const cards = (items) => items.map((item) => shopCard(item.themeId, item.label, shopAction(item.themeId, item.status, item.price, item.unlocksOn))).join('');
+    const seasons = shop
+      .filter((item) => item.position !== 'special')
+      .map((item) => ({ ...item, label: `${SHOP_POSITIONS[item.position]} ${escapeHtml(semester.name)}` }));
+    const specials = shop.filter((item) => item.position === 'special').map((item) => ({ ...item, label: 'Any semester' }));
+    const inShop = new Set(shop.map((item) => item.themeId));
+    const others = Object.keys(PATH_THEMES)
+      .filter((themeId) => !inShop.has(themeId) && buddy.ownsTheme(state, themeId))
+      .map((themeId) => ({ themeId, status: 'owned', label: themeId === 'meadow' ? 'Free' : 'Yours' }));
+    elements.shopDialog.innerHTML = `
+      <h2 id="shop-heading">Theme shop</h2>
+      <p class="shop-balance">You have <strong>💎 ${buddy.gemBalance(state)}</strong>. Earn gems by checking things off on time.</p>
+      <h3 class="due-heading">${escapeHtml(semester.name)}’s seasons</h3>
+      <ul class="shop-grid">${cards(seasons)}</ul>
+      <h3 class="due-heading">Specials</h3>
+      <ul class="shop-grid">${cards(specials)}</ul>
+      <h3 class="due-heading">Your themes</h3>
+      <ul class="shop-grid">${cards(others)}</ul>
+      <p class="buddy-muted">Themes you buy are yours in every semester. Switching is free, and each semester keeps its own.</p>
+      <div class="button-row"><button type="button" class="text-button" data-action="close-shop">Close</button></div>`;
+  }
+
+  async function buyPathTheme(themeId) {
+    const offer = buddy.themeShop(state, state.currentSemesterId, todayKey()).find((item) => item.themeId === themeId);
+    const name = PATH_THEMES[themeId].name;
+    const answer = await askChoice(`Buy ${name} for 💎 ${offer.price}? It goes on this semester’s path right away.`, [
+      { value: 'buy', label: `Buy for 💎 ${offer.price}`, className: 'primary-button' },
+    ]);
+    if (answer !== 'buy') {
+      return;
+    }
+    applyChange(`Bought ${name}! It’s on your path now 🎉`, () => buddy.buyTheme(state, state.currentSemesterId, themeId, todayKey()));
+    renderThemeShop();
+  }
+
+  function usePathTheme(themeId) {
+    applyChange(`Path theme: ${PATH_THEMES[themeId].name}`, () => buddy.useTheme(state, state.currentSemesterId, themeId));
+    renderThemeShop();
   }
 
   // The week as a winding trail: one stone per assignment, the buddy on the next one to do, and
@@ -1187,7 +1312,7 @@
         </div>
       </div>
       </div>
-      ${renderPathThemePreview()}
+      ${currentBuddy() ? '<div class="shop-row"><button type="button" class="secondary-button" data-action="open-shop">🛒 Theme shop</button></div>' : ''}
       ${renderNextUp(stones, buddyStone, chest)}
       ${renderPathList(stones)}
       ${
@@ -1306,7 +1431,7 @@
       buddyText = `<span class="hud-buddy">${escapeHtml(buddy.displayName(currentBuddy()))} · <strong class="hud-points">${points}</strong> ✨${grown ? ' 🌼' : ''}</span>`;
     }
     const gems = currentBuddy()
-      ? `<span class="hud-gems" aria-label="${buddy.gemBalance(state)} gems">${GEM_ART}<strong class="hud-gem-count">${buddy.gemBalance(state)}</strong></span>`
+      ? `<button type="button" class="hud-gems" data-action="open-shop" aria-label="${buddy.gemBalance(state)} gems. Open the theme shop">${GEM_ART}<strong class="hud-gem-count">${buddy.gemBalance(state)}</strong></button>`
       : '';
     return `<div class="buddy-path-hud"><span class="hud-left">${progress}${gems}</span>${chestIcon}${buddyText}</div>`;
   }
@@ -4318,11 +4443,14 @@
     } else if (action === 'remove-friend') {
       const friend = (state.friends || []).find((candidate) => candidate.key === target.dataset.key);
       applyChange(`Removed ${friend.challenge.name || 'your friend'} from Friends`, () => buddy.removeFriend(state, friend.key));
-    } else if (action === 'pick-path-theme') {
-      const themeId = target.dataset.themeId;
-      applyChange(`Path theme: ${PATH_THEMES[themeId].name}`, () => {
-        state.pathThemes = { ...(state.pathThemes || {}), [state.currentSemesterId]: themeId };
-      });
+    } else if (action === 'open-shop') {
+      openThemeShop();
+    } else if (action === 'close-shop') {
+      elements.shopDialog.close();
+    } else if (action === 'shop-buy') {
+      buyPathTheme(target.dataset.themeId);
+    } else if (action === 'shop-use') {
+      usePathTheme(target.dataset.themeId);
     } else if (action === 'open-chest') {
       openWeekChest();
     } else if (action === 'close-chest') {
@@ -4577,9 +4705,9 @@
         menu.open = false;
       }
     });
-    // A tap on the dim area around the prize card closes it too.
-    if (event.target === elements.chestDialog) {
-      elements.chestDialog.close();
+    // A tap on the dim area around the prize card or the shop closes it too.
+    if (event.target === elements.chestDialog || event.target === elements.shopDialog) {
+      event.target.close();
     }
     const target = event.target.closest('[data-action]');
     if (target && target.dataset.action !== 'toggle-done') {
