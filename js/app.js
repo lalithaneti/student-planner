@@ -1133,8 +1133,14 @@
     layer.innerHTML = surface(width, height, Number(track.dataset.waves)).join('');
   }
 
-  // For now, a row to try each theme on this semester's path. The gem shop replaces it.
+  // For now, a row to try each theme on this semester's path, only on the local copy used for
+  // building the app, so the live site doesn't give themes away free. The gem shop replaces it.
+  const IS_LOCAL_COPY = ['localhost', '127.0.0.1'].includes(location.hostname);
+
   function renderPathThemePreview() {
+    if (!IS_LOCAL_COPY) {
+      return '';
+    }
     const current = currentPathTheme();
     const buttons = Object.entries(PATH_THEMES)
       .map(([id, theme]) => `<button type="button" class="chip-button" data-action="pick-path-theme" data-theme-id="${id}" aria-pressed="${id === current}">${theme.name}</button>`)
