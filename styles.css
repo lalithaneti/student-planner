@@ -2679,6 +2679,7 @@ dialog::backdrop {
 
 .buddy-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr); /* A long sticker tray scrolls instead of widening the column. */
   gap: 14px;
 }
 
@@ -3998,6 +3999,100 @@ button.buddy-path-chest {
 
 .sticker-item.is-missing strong {
   color: var(--text-muted);
+}
+
+/* The buddy's room: the top of its box, where found stickers sit behind it. It spans the
+   box's full width (undoing the box's padding) so stickers can go right to the edges. */
+.buddy-room {
+  position: relative;
+  margin: -20px -16px 0;
+  padding: 20px 16px 4px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.buddy-room .buddy-big {
+  z-index: 1;
+}
+
+/* While decorating, stickers come in front so ones behind the buddy can be grabbed. */
+.buddy-room.is-decorating {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+.buddy-room.is-decorating .page-sticker {
+  z-index: 2;
+}
+
+.buddy-decorate {
+  margin-top: 4px;
+}
+
+/* Each sticker is about a sixth of the room wide, centered on its spot. */
+.page-sticker {
+  position: absolute;
+  z-index: 0;
+  width: 17%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  transform: translate(-50%, -50%);
+  touch-action: none; /* A finger drags the sticker instead of scrolling the screen. */
+}
+
+button.page-sticker {
+  cursor: grab;
+}
+
+.page-sticker .sticker-art,
+.page-sticker .sticker-art.is-rare {
+  width: 100%;
+}
+
+.page-sticker.is-selected {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
+.page-sticker.is-dragging {
+  z-index: 1;
+  cursor: grabbing;
+  scale: 1.08;
+}
+
+.sticker-page-toolbar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 44px;
+  margin: 8px 0;
+}
+
+.sticker-tray {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 4px 4px 8px;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.tray-sticker {
+  width: 60px;
+  height: 60px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.tray-sticker .sticker-art,
+.tray-sticker .sticker-art.is-rare {
+  width: 100%;
 }
 
 .recap-stats {

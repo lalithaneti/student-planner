@@ -3983,6 +3983,158 @@
       </section>`;
   }
 
+  // ---------- Decorating the buddy's room ----------
+  // Found stickers go in the top of the buddy's box, behind the buddy, like its room. Decorate
+  // shows the sticker tray: tap one to stick it on, drag to move it, tap it to peel it off.
+  // Arrow keys move the selected one too.
+  let decoratingRoom = false;
+  let selectedPageSticker = null;
+  const PAGE_ARROW_STEP = 2; // percent of the room per arrow key press
+
+  function foundStickersInOrder() {
+    const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
+    return [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS].filter((sticker) => foundIds.has(sticker.id));
+  }
+
+  function renderBuddyRoom(buddyArt) {
+    const placed = PlannerStickers.pageStickers(state);
+    if (!decoratingRoom || !placed.some((sticker) => sticker.key === selectedPageSticker)) {
+      selectedPageSticker = null;
+    }
+    const stickers = placed
+      .map((placedSticker) => {
+        const sticker = PlannerStickers.findSticker(placedSticker.id);
+        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%`;
+        if (!decoratingRoom) {
+          return `<span class="page-sticker" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
+        }
+        const selected = placedSticker.key === selectedPageSticker;
+        return `<button type="button" class="page-sticker${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
+            data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
+            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it.">${PlannerStickers.drawSticker(sticker)}</button>`;
+      })
+      .join('');
+    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${stickers}${buddyArt}</div>`;
+  }
+
+  function renderDecorateButton() {
+    return foundStickersInOrder().length === 0
+      ? ''
+      : '<button type="button" class="text-button buddy-decorate" data-action="decorate-room">🎨 Decorate</button>';
+  }
+
+  // While decorating: what's selected, Peel off, Done, and the tray of found stickers.
+  function renderDecorateTools() {
+    const placed = PlannerStickers.pageStickers(state);
+    const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
+    const status = selected
+      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected</span>
+         <button type="button" class="secondary-button" data-action="peel-page-sticker">Peel off</button>`
+      : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag a sticker to move it. Tap one to peel it off.'}</span>`;
+    const tray = foundStickersInOrder()
+      .map(
+        (sticker) => `<li><button type="button" class="tray-sticker" data-action="place-page-sticker" data-sticker-id="${sticker.id}"
+            aria-label="Stick on ${sticker.name}" title="${sticker.name}">${PlannerStickers.drawSticker(sticker)}</button></li>`,
+      )
+      .join('');
+    return `<div class="decorate-tools">
+        <div class="sticker-page-toolbar">${status}</div>
+        <button type="button" class="primary-button" data-action="done-decorating">Done</button>
+        <p class="buddy-muted">Your stickers · tap one to stick it on (as many times as you like)</p>
+        <ul class="sticker-tray">${tray}</ul>
+      </div>`;
+  }
+
+  function placePageSticker(stickerId) {
+    if (PlannerStickers.pageStickers(state).length >= PlannerStickers.PAGE_MAX_STICKERS) {
+      showToast(`Your page is full (${PlannerStickers.PAGE_MAX_STICKERS} stickers). Peel one off to add more.`, null);
+      return;
+    }
+    const name = PlannerStickers.findSticker(stickerId).name;
+    applyChange(`Stuck on ${name}`, () => {
+      selectedPageSticker = PlannerStickers.placeSticker(state, stickerId).key;
+    });
+  }
+
+  function peelPageSticker() {
+    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === selectedPageSticker);
+    if (!placed) {
+      return;
+    }
+    applyChange(`Peeled off ${PlannerStickers.findSticker(placed.id).name}`, () => {
+      PlannerStickers.peelSticker(state, placed.key);
+      selectedPageSticker = null;
+    });
+  }
+
+  function movePageSticker(key, x, y) {
+    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
+    if (!placed) {
+      return;
+    }
+    applyChange(`Moved ${PlannerStickers.findSticker(placed.id).name}`, () => {
+      PlannerStickers.moveSticker(state, key, x, y);
+      selectedPageSticker = key;
+    });
+  }
+
+  // Dragging works with a mouse, pen, or finger (the stickers don't scroll the screen).
+  let stickerDrag = null;
+
+  function startStickerDrag(event) {
+    const element = event.target.closest('button.page-sticker');
+    if (!element || event.button !== 0) {
+      return;
+    }
+    const page = element.closest('.buddy-room').getBoundingClientRect();
+    stickerDrag = { element, page, startX: event.clientX, startY: event.clientY, moved: false, x: null, y: null };
+    element.setPointerCapture(event.pointerId);
+  }
+
+  function moveStickerDrag(event) {
+    if (!stickerDrag) {
+      return;
+    }
+    const { element, page } = stickerDrag;
+    if (!stickerDrag.moved && Math.hypot(event.clientX - stickerDrag.startX, event.clientY - stickerDrag.startY) < DRAG_START_DISTANCE) {
+      return;
+    }
+    stickerDrag.moved = true;
+    element.classList.add('is-dragging');
+    stickerDrag.x = Math.min(100, Math.max(0, ((event.clientX - page.left) / page.width) * 100));
+    stickerDrag.y = Math.min(100, Math.max(0, ((event.clientY - page.top) / page.height) * 100));
+    element.style.left = `${stickerDrag.x}%`;
+    element.style.top = `${stickerDrag.y}%`;
+  }
+
+  function endStickerDrag() {
+    if (!stickerDrag) {
+      return;
+    }
+    const { element, moved, x, y } = stickerDrag;
+    stickerDrag = null;
+    if (!moved) {
+      return;
+    }
+    // A drag shouldn't also count as a tap that selects or unselects the sticker.
+    element.addEventListener('click', (clickEvent) => clickEvent.stopPropagation(), { capture: true, once: true });
+    movePageSticker(Number(element.dataset.pageKey), x, y);
+  }
+
+  function nudgePageSticker(event) {
+    const element = event.target.closest('button.page-sticker');
+    const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (!element || !steps[event.key]) {
+      return;
+    }
+    event.preventDefault();
+    const key = Number(element.dataset.pageKey);
+    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
+    const [dx, dy] = steps[event.key];
+    movePageSticker(key, placed.x + dx * PAGE_ARROW_STEP, placed.y + dy * PAGE_ARROW_STEP);
+    elements.buddyPanel.querySelector(`.page-sticker[data-page-key="${key}"]`)?.focus();
+  }
+
   // For a semester without a buddy: pick a species (each shown grown up, with ones other
   // semesters already have grayed out), then a color, then start the egg.
   function renderBuddyPicker() {
@@ -4066,7 +4218,8 @@
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
         <section class="buddy-home">
-          <div class="buddy-big">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</div>
+          ${renderBuddyRoom(`<div class="buddy-big">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</div>`)}
+          ${decoratingRoom ? renderDecorateTools() : `${renderDecorateButton()}
           <p class="buddy-mood-line">${escapeHtml(moodText(mood))}</p>
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
@@ -4082,7 +4235,7 @@
           <div class="buddy-streak-box">
             <p class="buddy-streak-now">${streakText(streak)}</p>
             <p class="buddy-muted">Best: ${dayCount(streak.best)} · ${nextBonusText(streak)}</p>
-          </div>
+          </div>`}
         </section>
         <div class="buddy-side">
           <section class="home-box">
@@ -4527,6 +4680,24 @@
     } else if (action === 'remove-friend') {
       const friend = (state.friends || []).find((candidate) => candidate.key === target.dataset.key);
       applyChange(`Removed ${friend.challenge.name || 'your friend'} from Friends`, () => buddy.removeFriend(state, friend.key));
+    } else if (action === 'decorate-room') {
+      decoratingRoom = true;
+      renderBuddy();
+      elements.buddyPanel.querySelector('.buddy-room')?.scrollIntoView({ block: 'nearest' });
+    } else if (action === 'done-decorating') {
+      decoratingRoom = false;
+      renderBuddy();
+    } else if (action === 'place-page-sticker') {
+      placePageSticker(target.dataset.stickerId);
+    } else if (action === 'select-page-sticker') {
+      const key = Number(target.dataset.pageKey) || null;
+      selectedPageSticker = key === selectedPageSticker ? null : key;
+      renderBuddy();
+      if (key) {
+        elements.buddyPanel.querySelector(`.page-sticker[data-page-key="${key}"]`)?.focus();
+      }
+    } else if (action === 'peel-page-sticker') {
+      peelPageSticker();
     } else if (action === 'open-shop') {
       openThemeShop();
     } else if (action === 'close-shop') {
@@ -4671,6 +4842,14 @@
   elements.semesterButton.addEventListener('click', openSemesterDialog);
   elements.timeForm.addEventListener('submit', handleTimeSubmit);
   document.getElementById('time-cancel').addEventListener('click', () => elements.timeDialog.close());
+  elements.buddyPanel.addEventListener('pointerdown', startStickerDrag);
+  elements.buddyPanel.addEventListener('pointermove', moveStickerDrag);
+  elements.buddyPanel.addEventListener('pointerup', endStickerDrag);
+  elements.buddyPanel.addEventListener('pointercancel', () => {
+    stickerDrag = null;
+    renderBuddy();
+  });
+  elements.buddyPanel.addEventListener('keydown', nudgePageSticker);
   elements.calendar.addEventListener('pointerdown', startBlockDrag);
   elements.calendar.addEventListener('pointermove', moveBlockDrag);
   elements.calendar.addEventListener('pointerup', endBlockDrag);

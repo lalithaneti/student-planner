@@ -440,5 +440,59 @@ const PlannerStickers = (() => {
     return foundStickers(state).length - before;
   }
 
-  return { STICKERS, RARE_STICKERS, drawSticker, findSticker, foundStickers, giveSticker, giveMissedStickers };
+  // ---------- The sticker page ----------
+  // One page to decorate with found stickers, each as many times as wanted. A spot is a
+  // percentage across and down the page (where the sticker's middle is), so the page looks
+  // the same on a phone and a laptop.
+  const PAGE_MAX_STICKERS = 60;
+
+  // The stickers on the page, oldest (bottom) first. Skips anything not found or not readable.
+  function pageStickers(state) {
+    const found = new Set(foundStickers(state).map((entry) => entry.id));
+    const placed = (state.stickerPage && state.stickerPage.stickers) || [];
+    return placed.filter(
+      (sticker) => sticker && found.has(sticker.id) && Number.isInteger(sticker.key) && Number.isFinite(sticker.x) && Number.isFinite(sticker.y),
+    );
+  }
+
+  const clampSpot = (value) => Math.min(100, Math.max(0, Math.round(value * 10) / 10));
+
+  // Sticks a found sticker on the page and returns it, or null if it isn't found or the page is full.
+  function placeSticker(state, stickerId) {
+    const placed = pageStickers(state);
+    if (!foundStickers(state).some((entry) => entry.id === stickerId) || placed.length >= PAGE_MAX_STICKERS) {
+      return null;
+    }
+    const key = placed.reduce((highest, sticker) => Math.max(highest, sticker.key), 0) + 1;
+    // Each lands a little down and to the right of the last, so a few added in a row don't hide each other.
+    const nudge = (placed.length % 5) * 10 - 20;
+    const sticker = { key, id: stickerId, x: 50 + nudge, y: 50 + nudge };
+    state.stickerPage = { stickers: [...placed, sticker] };
+    return sticker;
+  }
+
+  function moveSticker(state, key, x, y) {
+    state.stickerPage = {
+      stickers: pageStickers(state).map((sticker) => (sticker.key === key ? { ...sticker, x: clampSpot(x), y: clampSpot(y) } : sticker)),
+    };
+  }
+
+  function peelSticker(state, key) {
+    state.stickerPage = { stickers: pageStickers(state).filter((sticker) => sticker.key !== key) };
+  }
+
+  return {
+    STICKERS,
+    RARE_STICKERS,
+    PAGE_MAX_STICKERS,
+    drawSticker,
+    findSticker,
+    foundStickers,
+    giveSticker,
+    giveMissedStickers,
+    pageStickers,
+    placeSticker,
+    moveSticker,
+    peelSticker,
+  };
 })();
