@@ -51,6 +51,16 @@ const PlannerBuddy = (() => {
     { id: 'strawberry-hat', name: 'Strawberry hat', spot: 'head', fromChest: true },
     { id: 'star-glasses', name: 'Star glasses', spot: 'face', fromChest: true },
     { id: 'lanyard', name: 'Lanyard', spot: 'neck', fromChest: true },
+    { id: 'propeller-beanie', name: 'Propeller beanie', spot: 'head', fromChest: true },
+    { id: 'halo', name: 'Halo', spot: 'head', fromChest: true },
+    // Taller than the usual face view, so the mustache shows in the wardrobe.
+    { id: 'secret-agent', name: 'Secret agent', spot: 'face', fromChest: true, viewBox: '42 86 116 60' },
+    // Pushed up on the forehead, above the usual face view.
+    { id: 'sleep-mask', name: 'Sleep mask', spot: 'face', fromChest: true, viewBox: '42 66 116 44' },
+    { id: 'duck-floatie', name: 'Rubber duck floatie', spot: 'neck', fromChest: true },
+    // The cape hangs behind the body, so the wardrobe shows all of it.
+    { id: 'cape', name: 'Cape', spot: 'neck', fromChest: true, viewBox: '6 98 188 94' },
+    { id: 'lei', name: 'Lei', spot: 'neck', fromChest: true },
   ];
 
   // The mochi blob comes in these colors, picked when a semester's buddy is started.
@@ -854,6 +864,7 @@ const PlannerBuddy = (() => {
       ? `<path d="M58 98 L70 108 L80 96 L92 110 L103 97 L114 109 L126 96 L140 104" fill="none" stroke="#c9a46e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />`
       : '';
     return `<g class="buddy-body buddy-egg">
+        ${drawAccessoriesBehind(wearing, true)}
         <path d="M100 38 C142 38 162 108 160 136 C158 166 134 180 100 180 C66 180 42 166 40 136 C38 108 58 38 100 38 Z"
           fill="url(#${fillId})" stroke="${palette.egg[2]}" stroke-width="3" />
         <circle cx="74" cy="84" r="10" fill="#ffc8dc" />
@@ -894,6 +905,18 @@ const PlannerBuddy = (() => {
       return `${(x + radius * Math.cos(angle)).toFixed(1)} ${(116 + radius * Math.sin(angle)).toFixed(1)}`;
     });
     return `<path d="M${points.join(' L')} Z" fill="#ffe08f" fill-opacity="0.55" stroke="#e8a93f" stroke-width="3" stroke-linejoin="round" />`;
+  }
+
+  // Flowers strung along a curve for the lei, from one shoulder down past the belly and back up.
+  function leiFlowers() {
+    const colors = ['#ff86b6', '#ffd166', '#ffffff', '#c9b3ff', '#ff9f6e'];
+    const count = 10;
+    return Array.from({ length: count }, (_, index) => {
+      const t = index / (count - 1);
+      const x = (1 - t) ** 2 * 42 + 2 * (1 - t) * t * 100 + t ** 2 * 158;
+      const y = (1 - t) ** 2 * 130 + 2 * (1 - t) * t * 182 + t ** 2 * 130;
+      return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(1.3)">${flower(0, 0, colors[index % colors.length])}</g>`;
+    }).join('');
   }
 
   const ACCESSORY_ART = {
@@ -940,16 +963,71 @@ const PlannerBuddy = (() => {
       <rect x="86" y="162" width="28" height="24" rx="4" fill="#fff" stroke="#6588c4" stroke-width="2.5" />
       <rect x="90" y="167" width="9" height="10" rx="2" fill="#ffc6da" />
       <path d="M102 169 H110 M102 175 H108" stroke="#b9c3d6" stroke-width="2.5" stroke-linecap="round" />`,
+    // The propeller spins slowly, and fast while the buddy hops (see .accessory-propeller).
+    'propeller-beanie': `<path d="M64 76 C62 44 138 44 136 76 Z" fill="#7cc4ff" stroke="#4f9ee0" stroke-width="3" stroke-linejoin="round" />
+      <path d="M100 47 C92 52 86 62 85 75 H100 Z" fill="#ff6f91" />
+      <path d="M100 47 C108 52 114 62 115 75 H100 Z" fill="#ffd166" />
+      <path d="M64 76 C62 44 138 44 136 76" fill="none" stroke="#4f9ee0" stroke-width="3" stroke-linejoin="round" />
+      <rect x="60" y="70" width="80" height="11" rx="5.5" fill="#ff6f91" stroke="#e0558c" stroke-width="2.5" />
+      <path d="M100 47 V34" stroke="#8a8fa3" stroke-width="3.5" stroke-linecap="round" />
+      <g class="accessory-propeller">
+        <ellipse cx="85" cy="32" rx="15" ry="4.5" fill="#ff6f91" stroke="#e0558c" stroke-width="2" />
+        <ellipse cx="115" cy="32" rx="15" ry="4.5" fill="#ffd166" stroke="#d99a1f" stroke-width="2" />
+        <circle cx="100" cy="32" r="4" fill="#8a8fa3" />
+      </g>`,
+    halo: `<g class="accessory-halo">
+        <ellipse class="accessory-halo-glow" cx="100" cy="36" rx="32" ry="9" fill="none" stroke="#ffe9a0" stroke-width="14" opacity="0.35" />
+        <ellipse cx="100" cy="36" rx="32" ry="9" fill="none" stroke="#f5c542" stroke-width="7" />
+        <ellipse cx="100" cy="35" rx="32" ry="9" fill="none" stroke="#fff6cf" stroke-width="2" stroke-dasharray="30 70" />
+      </g>`,
+    'secret-agent': `<path d="M64 98 Q80 88 95 98 M105 98 Q120 88 136 98" fill="none" stroke="#4a3428" stroke-width="7" stroke-linecap="round" />
+      <g fill="#fff" fill-opacity="0.15" stroke="#26232b" stroke-width="5">
+        <rect x="64" y="104" width="32" height="24" rx="9" /><rect x="104" y="104" width="32" height="24" rx="9" />
+      </g>
+      <path d="M96 112 Q100 108 104 112 M64 110 L48 104 M136 110 L152 104" fill="none" stroke="#26232b" stroke-width="5" stroke-linecap="round" />
+      <path d="M100 134 C92 129 80 130 72 140 C82 142 91 142 100 138 C109 142 118 142 128 140 C120 130 108 129 100 134 Z" fill="#4a3428" stroke="#36261d" stroke-width="2" stroke-linejoin="round" />
+      <ellipse cx="100" cy="126" rx="10" ry="11" fill="#ffb59c" stroke="#e08a74" stroke-width="2.5" />
+      <ellipse cx="96" cy="121" rx="3" ry="2" fill="#fff" opacity="0.7" />`,
+    'sleep-mask': `<path d="M66 86 L52 92 M134 86 L148 92" stroke="#9d84e0" stroke-width="4" stroke-linecap="round" />
+      <path d="M66 86 C66 72 96 72 100 79 C104 72 134 72 134 86 C134 100 106 100 100 93 C94 100 66 100 66 86 Z" fill="#c9b3ff" stroke="#9d84e0" stroke-width="2.5" stroke-linejoin="round" />
+      <path d="M75 85 Q83 92 91 85 M109 85 Q117 92 125 85" fill="none" stroke="#5b4a8a" stroke-width="2.5" stroke-linecap="round" />
+      <path d="M78 89 L76 93 M83 91 L83 95 M88 89 L90 93 M112 89 L110 93 M117 91 L117 95 M122 89 L124 93" stroke="#5b4a8a" stroke-width="1.8" stroke-linecap="round" />
+      <circle cx="128" cy="78" r="2" fill="#fff" opacity="0.8" />`,
+    'duck-floatie': `<path d="M30 148 A70 20 0 0 0 170 148" fill="none" stroke="#e0a91c" stroke-width="25" stroke-linecap="round" />
+      <path d="M30 148 A70 20 0 0 0 170 148" fill="none" stroke="#ffd94a" stroke-width="19" stroke-linecap="round" />
+      <path d="M50 160 A60 14 0 0 0 96 168" fill="none" stroke="#fff6c2" stroke-width="4" stroke-linecap="round" opacity="0.9" />
+      <path d="M42 144 L28 148 L42 152 Z" fill="#ff9f43" stroke="#e07a1f" stroke-width="2" stroke-linejoin="round" />
+      <circle cx="52" cy="140" r="13" fill="#ffd94a" stroke="#e0a91c" stroke-width="2.5" />
+      <circle cx="48" cy="137" r="2.4" fill="#2f2a33" />
+      <path d="M58 132 Q62 128 60 124" fill="none" stroke="#e0a91c" stroke-width="2" stroke-linecap="round" />`,
+    // The front of the cape: its ties and a gold clasp. The cape itself is in ACCESSORY_BEHIND.
+    cape: `<path d="M40 128 Q70 146 100 146 Q130 146 160 128" fill="none" stroke="#e8455f" stroke-width="5" stroke-linecap="round" />
+      <circle cx="100" cy="146" r="7" fill="#ffd166" stroke="#d99a1f" stroke-width="2.5" />`,
+    lei: `<path d="M42 130 Q100 182 158 130" fill="none" stroke="#6cbf8a" stroke-width="2.5" />${leiFlowers()}`,
     'bow-tie': `<path d="M100 156 L82 146 L82 166 Z M100 156 L118 146 L118 166 Z" fill="#6f8cff" stroke="#4f6be0" stroke-width="2.5" stroke-linejoin="round" />
       <circle cx="100" cy="156" r="5" fill="#4f6be0" />`,
   };
 
+  // Parts of accessories that go behind the body, drawn before it.
+  const ACCESSORY_BEHIND = {
+    cape: `<path d="M48 104 C30 132 12 166 10 188 Q55 178 100 188 Q145 178 190 188 C188 166 170 132 152 104 Z" fill="#e8455f" stroke="#b8304a" stroke-width="3" stroke-linejoin="round" />
+      <path d="M30 150 C22 164 18 176 18 182 M170 150 C178 164 182 176 182 182" fill="none" stroke="#ff7a8e" stroke-width="3" stroke-linecap="round" opacity="0.8" />`,
+  };
+
+  // The same nudges as drawAccessories, for the egg's shape.
+  const EGG_FIT = { head: 'translate(0 -24)', face: 'translate(0 8)', neck: 'translate(100 4) scale(0.86 1) translate(-100 0)' };
+
+  function drawAccessoriesBehind(wearing, isEgg) {
+    return ACCESSORY_SPOTS.map((spot) => spot.id)
+      .filter((spot) => ACCESSORY_BEHIND[wearing[spot]])
+      .map((spot) => `<g transform="${isEgg ? EGG_FIT[spot] : ''}">${ACCESSORY_BEHIND[wearing[spot]]}</g>`)
+      .join('');
+  }
+
   // The worn accessories as SVG. On the egg, head things sit higher, face things lower
   // (its eyes are lower), and neck things narrower.
   function drawAccessories(wearing, isEgg, sleepy) {
-    const fit = isEgg
-      ? { head: 'translate(0 -24)', face: 'translate(0 8)', neck: 'translate(100 4) scale(0.86 1) translate(-100 0)' }
-      : { head: '', face: '', neck: '' };
+    const fit = isEgg ? EGG_FIT : { head: '', face: '', neck: '' };
     return ['neck', 'face', 'head']
       .filter((spot) => wearing[spot] && !(spot === 'head' && sleepy))
       .map((spot) => `<g transform="${fit[spot]}">${ACCESSORY_ART[wearing[spot]]}</g>`)
@@ -961,7 +1039,7 @@ const PlannerBuddy = (() => {
 
   function drawAccessory(accessoryId) {
     const accessory = ACCESSORIES.find((candidate) => candidate.id === accessoryId);
-    return `<svg class="accessory-art" viewBox="${accessory.viewBox || SPOT_VIEW_BOXES[accessory.spot]}" aria-hidden="true" focusable="false">${ACCESSORY_ART[accessoryId]}</svg>`;
+    return `<svg class="accessory-art" viewBox="${accessory.viewBox || SPOT_VIEW_BOXES[accessory.spot]}" aria-hidden="true" focusable="false">${ACCESSORY_BEHIND[accessoryId] || ''}${ACCESSORY_ART[accessoryId]}</svg>`;
   }
 
   // Each drawing gets its own gradient ids: a gradient defined inside a hidden tab
@@ -1230,7 +1308,7 @@ const PlannerBuddy = (() => {
       : '';
     return `<g transform="translate(100 172) scale(${scale}) translate(-100 -172)">
         <g class="buddy-body">
-          ${tail}${ears}${feet}
+          ${drawAccessoriesBehind(wearing, false)}${tail}${ears}${feet}
           <path d="${BODY_PATH}" fill="url(#${fillId})" stroke="${outline}" stroke-width="3" />
           <ellipse cx="68" cy="88" rx="13" ry="7" transform="rotate(-32 68 88)" fill="#fff" opacity="0.65" />
           ${part('underFace')}${arms}${face(mood)}${part('front')}${shell}${daisy}${drawAccessories(wearing, false, sleepy)}${sleepy ? NIGHTCAP : ''}
