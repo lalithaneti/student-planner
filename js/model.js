@@ -363,6 +363,12 @@ const PlannerModel = (() => {
     return addDays(dateKey, -((weekday + 6) % 7));
   }
 
+  // A list with the unchecked items first and the checked ones after, each part still in due order,
+  // so what's left to do sits at the top. Checking an item off sinks it; unchecking brings it back.
+  function unfinishedFirst(items) {
+    return [...items.filter((item) => !item.done), ...items.filter((item) => item.done)];
+  }
+
   // Planner columns for one week: Mon–Fri, then Saturday and Sunday together.
   // When viewing the current week, overdue items from earlier weeks go in overdue
   // (missed ones don't, since they can't be turned in). progress counts the week's items.
@@ -383,6 +389,9 @@ const PlannerModel = (() => {
         overdue.push(item);
       }
     }
+    for (const column of columns) {
+      column.items = unfinishedFirst(column.items);
+    }
     const weekItems = columns.flatMap((column) => column.items);
     const progress = { done: weekItems.filter((item) => item.done).length, total: weekItems.length };
     return { overdue, columns, progress };
@@ -392,7 +401,7 @@ const PlannerModel = (() => {
   // When the day is today, unfinished late-allowed items from earlier days go in overdue.
   // completed is everything checked off this semester, most recent first.
   function buildDay(items, date, todayKey, nowTime = '00:00') {
-    const dayItems = items.filter((item) => item.date === date);
+    const dayItems = unfinishedFirst(items.filter((item) => item.date === date));
     const overdue =
       date === todayKey ? items.filter((item) => item.date < date && itemStatus(item, todayKey, nowTime) === 'overdue') : [];
     const progress = { done: dayItems.filter((item) => item.done).length, total: dayItems.length };
@@ -1044,6 +1053,7 @@ const PlannerModel = (() => {
     startOfWeek,
     buildWeek,
     buildDay,
+    unfinishedFirst,
     buildPathWeek,
     detachOccurrence,
     newRecurringAssignment,

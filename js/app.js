@@ -2439,7 +2439,7 @@
     const now = new Date();
     const today = todayKey();
     const nowTime = currentTime();
-    const dueToday = model.buildDueList(state).filter((item) => item.date === today);
+    const dueToday = model.unfinishedFirst(model.buildDueList(state).filter((item) => item.date === today));
     const doneCount = dueToday.filter((item) => item.done).length;
     const homework =
       dueToday.length === 0
