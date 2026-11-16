@@ -735,15 +735,22 @@ const PlannerBuddy = (() => {
   }
 
   // Saves a friend's challenge: 'added', 'updated', 'older' (a newer one is already saved, so
-  // it's kept), or 'self' (your own link, which isn't saved).
-  function saveFriend(state, challenge, myId) {
+  // it's kept), 'self' (your own link, which isn't saved), or 'future' (dated after next week,
+  // from a wrong clock or an edited link, so it isn't saved). Next week is allowed because a
+  // friend's Monday can start before yours. A future link saved before this check doesn't block
+  // newer real ones.
+  function saveFriend(state, challenge, myId, todayKey) {
     if (challenge.from && challenge.from === myId) {
       return 'self';
+    }
+    const latestWeek = PlannerModel.addDays(PlannerModel.startOfWeek(todayKey), 7);
+    if (challenge.week > latestWeek) {
+      return 'future';
     }
     const key = friendKey(challenge);
     const friends = state.friends || [];
     const saved = friends.find((friend) => friend.key === key);
-    if (saved && saved.challenge.week > challenge.week) {
+    if (saved && saved.challenge.week > challenge.week && saved.challenge.week <= latestWeek) {
       return 'older';
     }
     state.friends = saved

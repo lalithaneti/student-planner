@@ -1675,6 +1675,7 @@
     updated: 'Updated on your Game page.',
     older: 'You already have a newer link from them, so your Game page keeps that one.',
     self: 'This is your own link, so it isn’t saved to Friends.',
+    future: 'This link is dated in a future week, so it isn’t saved to Friends.',
   };
 
   // A challenge someone sent: their buddy and progress beside yours, and a way to answer.
@@ -1704,7 +1705,7 @@
     history.replaceState(null, '', location.pathname + location.search);
     const challenge = buddy.readChallenge(match[1]);
     if (challenge) {
-      const savedAs = buddy.saveFriend(state, challenge, state.challengeId);
+      const savedAs = buddy.saveFriend(state, challenge, state.challengeId, todayKey());
       if (savedAs === 'added' || savedAs === 'updated') {
         PlannerStorage.save(state);
         render();
@@ -2970,7 +2971,7 @@
     event.preventDefault();
     const kind = elements.assignmentForm.elements.kind.value;
     const fields = readAssignmentForm(kind);
-    const errors = model.validateAssignment({ kind, ...fields });
+    const errors = model.validateAssignment({ kind, ...fields }, currentSemester());
     showErrors(elements.assignmentErrors, errors);
     if (errors.length > 0) {
       return;
@@ -3295,7 +3296,7 @@
     const recurring = readRecurringRows().map((row) => recurringRowToAssignment(row, classId));
     recurring.forEach((assignment, index) => {
       const which = assignment.title || `Recurring assignment ${index + 1}`;
-      model.validateAssignment(assignment).forEach((error) => errors.push(`${which}: ${error}`));
+      model.validateAssignment(assignment, currentSemester()).forEach((error) => errors.push(`${which}: ${error}`));
     });
     const exams = readOneTimeRows(elements.classExamList).map((row) => ({ ...row, semesterId: state.currentSemesterId, classId }));
     exams.forEach((exam, index) => {
@@ -3660,7 +3661,7 @@
       lateAllowed: true,
       dueDate: form.elements.dueDate.value,
     };
-    const errors = model.validateAssignment({ kind: 'once', ...fields });
+    const errors = model.validateAssignment({ kind: 'once', ...fields }, currentSemester());
     showErrors(elements.quickAddErrors, errors);
     if (errors.length > 0) {
       return;

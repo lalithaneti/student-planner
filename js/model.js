@@ -991,13 +991,19 @@ const PlannerModel = (() => {
     ];
   }
 
-  function validateAssignment(assignment) {
+  // semester, when given, is the one the assignment belongs to: its dates have to fall in it, so a
+  // wrong-year typo is caught instead of hiding the assignment until that year. A repeating one may
+  // start before the semester (they start on the day they're added), but not after it or past its end.
+  function validateAssignment(assignment, semester = null) {
     const errors = [];
+    const semesterRange = semester
+      ? `${semester.name} (${formatMonthDay(semester.startDate)} – ${formatMonthDay(semester.endDate)})`
+      : '';
     if (!assignment.title.trim()) {
       errors.push('Give the assignment a name.');
     }
     if (assignment.link && !isValidLink(assignment.link)) {
-      errors.push('The link should start with https://');
+      errors.push('The link should start with https:// or http://');
     }
     if (!isValidTime(assignment.dueTime)) {
       errors.push('Pick a due time.');
@@ -1005,6 +1011,8 @@ const PlannerModel = (() => {
     if (assignment.kind === 'once') {
       if (!isValidDateKey(assignment.dueDate)) {
         errors.push('Pick a due date.');
+      } else if (semester && (assignment.dueDate < semester.startDate || assignment.dueDate > semester.endDate)) {
+        errors.push(`That due date is outside ${semesterRange}. Check the year.`);
       }
     } else {
       if (assignment.days.length === 0) {
@@ -1014,6 +1022,8 @@ const PlannerModel = (() => {
         errors.push('Pick when the repeating assignment starts and ends.');
       } else if (assignment.startDate > assignment.endDate) {
         errors.push('The end date must be after the start date.');
+      } else if (semester && (assignment.startDate > semester.endDate || assignment.endDate > semester.endDate || assignment.endDate < semester.startDate)) {
+        errors.push(`The repeating dates should be within ${semesterRange}. Check the year.`);
       } else if (assignment.days.length > 0 && occurrenceDates({ ...assignment, skippedDates: [] }).length === 0) {
         // Without a single due date it would never show anywhere, so it couldn't be found to fix.
         errors.push(
