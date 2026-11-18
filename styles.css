@@ -4037,7 +4037,7 @@ button.buddy-path-chest {
   border: 0;
   border-radius: 50%;
   background: none;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) rotate(var(--sticker-tilt, 0deg));
   touch-action: none; /* A finger drags the sticker instead of scrolling the screen. */
 }
 

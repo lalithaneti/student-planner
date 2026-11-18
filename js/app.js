@@ -4016,11 +4016,14 @@
   // ---------- Decorating the buddy's room ----------
   // Found stickers go in the top of the buddy's box, behind the buddy, like its room. Decorate
   // shows the sticker tray: tap one to stick it on, drag to move it, tap it to peel it off.
-  // The selected one has a corner dot to drag for resizing. Arrow keys move it, and + and − resize it.
+  // The selected one has a corner dot: drag it in or out to resize, around to tilt. Arrow keys move
+  // it, + and − resize it, and [ and ] tilt it.
   let decoratingRoom = false;
   let selectedPageSticker = null;
   const PAGE_ARROW_STEP = 2; // percent of the room per arrow key press
   const PAGE_SIZE_STEP = 0.1; // size change per + or − key press
+  const PAGE_TILT_STEP = 15; // degrees per [ or ] key press
+  const RESHAPE_SIZE_DEAD_ZONE = 0.05; // a drag of the corner dot under 5% in or out only tilts
 
   function foundStickersInOrder() {
     const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
@@ -4035,14 +4038,14 @@
     const stickers = placed
       .map((placedSticker) => {
         const sticker = PlannerStickers.findSticker(placedSticker.id);
-        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)}`;
+        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
         if (!decoratingRoom) {
           return `<span class="page-sticker" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
         }
         const selected = placedSticker.key === selectedPageSticker;
         return `<button type="button" class="page-sticker${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
-            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it' : ''}."
+            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
             >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
@@ -4060,7 +4063,7 @@
     const placed = PlannerStickers.pageStickers(state);
     const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
     const status = selected
-      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected · drag its corner dot to resize</span>
+      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected · drag its corner dot to resize or tilt</span>
          <button type="button" class="secondary-button" data-action="peel-page-sticker">Peel off</button>`
       : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag a sticker to move it. Tap one to peel it off.'}</span>`;
     const tray = foundStickersInOrder()
@@ -4110,20 +4113,33 @@
     });
   }
 
-  function resizePageSticker(key, size) {
+  // Changes the size, the tilt, or both, as one change to undo. The message says which changed.
+  function reshapePageSticker(key, { size, tilt }) {
     const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
     if (!placed) {
       return;
     }
-    applyChange(`Resized ${PlannerStickers.findSticker(placed.id).name}`, () => {
-      PlannerStickers.resizeSticker(state, key, size);
+    // The same rounding and limits as saving, so a change too small to save isn't counted.
+    const before = { size: PlannerStickers.stickerSize(placed), tilt: PlannerStickers.stickerTilt(placed) };
+    const after = { size: PlannerStickers.stickerSize({ size: size ?? before.size }), tilt: PlannerStickers.stickerTilt({ tilt: tilt ?? before.tilt }) };
+    const resized = after.size !== before.size;
+    const tilted = after.tilt !== before.tilt;
+    if (!resized && !tilted) {
+      renderBuddy();
+      return;
+    }
+    const verb = resized && tilted ? 'Resized and tilted' : resized ? 'Resized' : 'Tilted';
+    applyChange(`${verb} ${PlannerStickers.findSticker(placed.id).name}`, () => {
+      PlannerStickers.resizeSticker(state, key, after.size);
+      PlannerStickers.tiltSticker(state, key, after.tilt);
       selectedPageSticker = key;
     });
   }
 
   // Dragging works with a mouse, pen, or finger (the stickers don't scroll the screen).
-  // Grabbing the corner dot resizes instead: the size follows how far the pointer is from the
-  // sticker's middle, compared with where the drag started, so the sticker grows around its middle.
+  // Grabbing the corner dot reshapes instead, around the sticker's middle: the size follows how far
+  // the pointer is from the middle, and the tilt follows how far it has turned around it, both
+  // compared with where the drag started.
   let stickerDrag = null;
 
   function startStickerDrag(event) {
@@ -4142,8 +4158,11 @@
         centerX,
         centerY,
         startDistance: Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY)),
+        startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
         startSize: PlannerStickers.stickerSize(placed),
+        startTilt: PlannerStickers.stickerTilt(placed),
         size: null,
+        tilt: null,
       };
     }
     element.setPointerCapture(event.pointerId);
@@ -4160,9 +4179,14 @@
     stickerDrag.moved = true;
     if (resize) {
       const distance = Math.hypot(event.clientX - resize.centerX, event.clientY - resize.centerY);
-      const size = (resize.startSize * distance) / resize.startDistance;
+      // Turning the dot never keeps it exactly the same distance away, so small changes keep the size.
+      const stretch = distance / resize.startDistance;
+      const size = Math.abs(stretch - 1) < RESHAPE_SIZE_DEAD_ZONE ? resize.startSize : resize.startSize * stretch;
       resize.size = Math.min(PlannerStickers.PAGE_SIZE_MAX, Math.max(PlannerStickers.PAGE_SIZE_MIN, size));
+      const turned = ((Math.atan2(event.clientY - resize.centerY, event.clientX - resize.centerX) - resize.startAngle) * 180) / Math.PI;
+      resize.tilt = resize.startTilt + turned;
       element.style.setProperty('--sticker-size', resize.size);
+      element.style.setProperty('--sticker-tilt', `${PlannerStickers.stickerTilt({ tilt: resize.tilt })}deg`);
       return;
     }
     element.classList.add('is-dragging');
@@ -4184,7 +4208,7 @@
     // A drag shouldn't also count as a tap that selects or unselects the sticker.
     element.addEventListener('click', (clickEvent) => clickEvent.stopPropagation(), { capture: true, once: true });
     if (resize) {
-      resizePageSticker(Number(element.dataset.pageKey), resize.size);
+      reshapePageSticker(Number(element.dataset.pageKey), { size: resize.size, tilt: resize.tilt });
     } else {
       movePageSticker(Number(element.dataset.pageKey), x, y);
     }
@@ -4194,14 +4218,17 @@
     const element = event.target.closest('button.page-sticker');
     const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const sizeSteps = { '+': 1, '=': 1, '-': -1, _: -1 };
-    if (!element || (!steps[event.key] && !sizeSteps[event.key])) {
+    const tiltSteps = { '[': -1, ']': 1 };
+    if (!element || (!steps[event.key] && !sizeSteps[event.key] && !tiltSteps[event.key])) {
       return;
     }
     event.preventDefault();
     const key = Number(element.dataset.pageKey);
     const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
     if (sizeSteps[event.key]) {
-      resizePageSticker(key, PlannerStickers.stickerSize(placed) + sizeSteps[event.key] * PAGE_SIZE_STEP);
+      reshapePageSticker(key, { size: PlannerStickers.stickerSize(placed) + sizeSteps[event.key] * PAGE_SIZE_STEP });
+    } else if (tiltSteps[event.key]) {
+      reshapePageSticker(key, { tilt: PlannerStickers.stickerTilt(placed) + tiltSteps[event.key] * PAGE_TILT_STEP });
     } else {
       const [dx, dy] = steps[event.key];
       movePageSticker(key, placed.x + dx * PAGE_ARROW_STEP, placed.y + dy * PAGE_ARROW_STEP);

@@ -487,6 +487,25 @@ const PlannerStickers = (() => {
     };
   }
 
+  // A sticker's tilt in whole degrees, from -180 to 180 (positive turns clockwise). Within a few
+  // degrees of straight it snaps to straight, so a tilt is easy to take back by hand.
+  const TILT_SNAP = 6;
+
+  function normalTilt(degrees) {
+    const turned = ((Math.round(degrees) % 360) + 540) % 360 - 180;
+    return Math.abs(turned) <= TILT_SNAP ? 0 : turned;
+  }
+
+  function stickerTilt(sticker) {
+    return Number.isFinite(sticker.tilt) ? normalTilt(sticker.tilt) : 0;
+  }
+
+  function tiltSticker(state, key, degrees) {
+    state.stickerPage = {
+      stickers: pageStickers(state).map((sticker) => (sticker.key === key ? { ...sticker, tilt: normalTilt(degrees) } : sticker)),
+    };
+  }
+
   function resizeSticker(state, key, size) {
     state.stickerPage = {
       stickers: pageStickers(state).map((sticker) => (sticker.key === key ? { ...sticker, size: clampSize(size) } : sticker)),
@@ -513,6 +532,8 @@ const PlannerStickers = (() => {
     PAGE_SIZE_MAX,
     stickerSize,
     resizeSticker,
+    stickerTilt,
+    tiltSticker,
     peelSticker,
   };
 })();
