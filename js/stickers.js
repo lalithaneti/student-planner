@@ -457,6 +457,16 @@ const PlannerStickers = (() => {
 
   const clampSpot = (value) => Math.min(100, Math.max(0, Math.round(value * 10) / 10));
 
+  // A sticker's size is a multiple of its normal size, from half to double. Stickers saved before
+  // resizing existed (or with a damaged size) are normal size.
+  const PAGE_SIZE_MIN = 0.5;
+  const PAGE_SIZE_MAX = 2;
+  const clampSize = (value) => Math.min(PAGE_SIZE_MAX, Math.max(PAGE_SIZE_MIN, Math.round(value * 100) / 100));
+
+  function stickerSize(sticker) {
+    return Number.isFinite(sticker.size) ? clampSize(sticker.size) : 1;
+  }
+
   // Sticks a found sticker on the page and returns it, or null if it isn't found or the page is full.
   function placeSticker(state, stickerId) {
     const placed = pageStickers(state);
@@ -477,6 +487,12 @@ const PlannerStickers = (() => {
     };
   }
 
+  function resizeSticker(state, key, size) {
+    state.stickerPage = {
+      stickers: pageStickers(state).map((sticker) => (sticker.key === key ? { ...sticker, size: clampSize(size) } : sticker)),
+    };
+  }
+
   function peelSticker(state, key) {
     state.stickerPage = { stickers: pageStickers(state).filter((sticker) => sticker.key !== key) };
   }
@@ -493,6 +509,10 @@ const PlannerStickers = (() => {
     pageStickers,
     placeSticker,
     moveSticker,
+    PAGE_SIZE_MIN,
+    PAGE_SIZE_MAX,
+    stickerSize,
+    resizeSticker,
     peelSticker,
   };
 })();

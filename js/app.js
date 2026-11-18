@@ -4016,10 +4016,11 @@
   // ---------- Decorating the buddy's room ----------
   // Found stickers go in the top of the buddy's box, behind the buddy, like its room. Decorate
   // shows the sticker tray: tap one to stick it on, drag to move it, tap it to peel it off.
-  // Arrow keys move the selected one too.
+  // The selected one has a corner dot to drag for resizing. Arrow keys move it, and + and − resize it.
   let decoratingRoom = false;
   let selectedPageSticker = null;
   const PAGE_ARROW_STEP = 2; // percent of the room per arrow key press
+  const PAGE_SIZE_STEP = 0.1; // size change per + or − key press
 
   function foundStickersInOrder() {
     const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
@@ -4034,14 +4035,15 @@
     const stickers = placed
       .map((placedSticker) => {
         const sticker = PlannerStickers.findSticker(placedSticker.id);
-        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%`;
+        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)}`;
         if (!decoratingRoom) {
           return `<span class="page-sticker" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
         }
         const selected = placedSticker.key === selectedPageSticker;
         return `<button type="button" class="page-sticker${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
-            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it.">${PlannerStickers.drawSticker(sticker)}</button>`;
+            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it' : ''}."
+            >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
     return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${stickers}${buddyArt}</div>`;
@@ -4058,7 +4060,7 @@
     const placed = PlannerStickers.pageStickers(state);
     const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
     const status = selected
-      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected</span>
+      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected · drag its corner dot to resize</span>
          <button type="button" class="secondary-button" data-action="peel-page-sticker">Peel off</button>`
       : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag a sticker to move it. Tap one to peel it off.'}</span>`;
     const tray = foundStickersInOrder()
@@ -4108,7 +4110,20 @@
     });
   }
 
+  function resizePageSticker(key, size) {
+    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
+    if (!placed) {
+      return;
+    }
+    applyChange(`Resized ${PlannerStickers.findSticker(placed.id).name}`, () => {
+      PlannerStickers.resizeSticker(state, key, size);
+      selectedPageSticker = key;
+    });
+  }
+
   // Dragging works with a mouse, pen, or finger (the stickers don't scroll the screen).
+  // Grabbing the corner dot resizes instead: the size follows how far the pointer is from the
+  // sticker's middle, compared with where the drag started, so the sticker grows around its middle.
   let stickerDrag = null;
 
   function startStickerDrag(event) {
@@ -4118,6 +4133,19 @@
     }
     const page = element.closest('.buddy-room').getBoundingClientRect();
     stickerDrag = { element, page, startX: event.clientX, startY: event.clientY, moved: false, x: null, y: null };
+    if (event.target.closest('.sticker-resize-handle')) {
+      const box = element.getBoundingClientRect();
+      const centerX = box.left + box.width / 2;
+      const centerY = box.top + box.height / 2;
+      const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === Number(element.dataset.pageKey));
+      stickerDrag.resize = {
+        centerX,
+        centerY,
+        startDistance: Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY)),
+        startSize: PlannerStickers.stickerSize(placed),
+        size: null,
+      };
+    }
     element.setPointerCapture(event.pointerId);
   }
 
@@ -4125,11 +4153,18 @@
     if (!stickerDrag) {
       return;
     }
-    const { element, page } = stickerDrag;
+    const { element, page, resize } = stickerDrag;
     if (!stickerDrag.moved && Math.hypot(event.clientX - stickerDrag.startX, event.clientY - stickerDrag.startY) < DRAG_START_DISTANCE) {
       return;
     }
     stickerDrag.moved = true;
+    if (resize) {
+      const distance = Math.hypot(event.clientX - resize.centerX, event.clientY - resize.centerY);
+      const size = (resize.startSize * distance) / resize.startDistance;
+      resize.size = Math.min(PlannerStickers.PAGE_SIZE_MAX, Math.max(PlannerStickers.PAGE_SIZE_MIN, size));
+      element.style.setProperty('--sticker-size', resize.size);
+      return;
+    }
     element.classList.add('is-dragging');
     stickerDrag.x = Math.min(100, Math.max(0, ((event.clientX - page.left) / page.width) * 100));
     stickerDrag.y = Math.min(100, Math.max(0, ((event.clientY - page.top) / page.height) * 100));
@@ -4141,27 +4176,36 @@
     if (!stickerDrag) {
       return;
     }
-    const { element, moved, x, y } = stickerDrag;
+    const { element, moved, x, y, resize } = stickerDrag;
     stickerDrag = null;
     if (!moved) {
       return;
     }
     // A drag shouldn't also count as a tap that selects or unselects the sticker.
     element.addEventListener('click', (clickEvent) => clickEvent.stopPropagation(), { capture: true, once: true });
-    movePageSticker(Number(element.dataset.pageKey), x, y);
+    if (resize) {
+      resizePageSticker(Number(element.dataset.pageKey), resize.size);
+    } else {
+      movePageSticker(Number(element.dataset.pageKey), x, y);
+    }
   }
 
   function nudgePageSticker(event) {
     const element = event.target.closest('button.page-sticker');
     const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-    if (!element || !steps[event.key]) {
+    const sizeSteps = { '+': 1, '=': 1, '-': -1, _: -1 };
+    if (!element || (!steps[event.key] && !sizeSteps[event.key])) {
       return;
     }
     event.preventDefault();
     const key = Number(element.dataset.pageKey);
     const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
-    const [dx, dy] = steps[event.key];
-    movePageSticker(key, placed.x + dx * PAGE_ARROW_STEP, placed.y + dy * PAGE_ARROW_STEP);
+    if (sizeSteps[event.key]) {
+      resizePageSticker(key, PlannerStickers.stickerSize(placed) + sizeSteps[event.key] * PAGE_SIZE_STEP);
+    } else {
+      const [dx, dy] = steps[event.key];
+      movePageSticker(key, placed.x + dx * PAGE_ARROW_STEP, placed.y + dy * PAGE_ARROW_STEP);
+    }
     elements.buddyPanel.querySelector(`.page-sticker[data-page-key="${key}"]`)?.focus();
   }
 
