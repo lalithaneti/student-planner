@@ -566,6 +566,15 @@
       </form>
     </dialog>
 
+    <details class="sticky-note" id="sticky-note">
+      <summary class="sticky-note-tab"><span aria-hidden="true">📝</span> Reminders</summary>
+      <div class="sticky-note-paper">
+        <label class="sticky-note-label" for="sticky-note-text">Reminders</label>
+        <textarea id="sticky-note-text" maxlength="2000" placeholder="Jot down anything quick…"></textarea>
+        <p class="sticky-note-hint">Saves as you type. Click away to tuck it in.</p>
+      </div>
+    </details>
+
     <div class="toast" id="toast" role="status" hidden>
       <span id="toast-message"></span>
       <button type="button" class="text-button" id="toast-undo" hidden>Undo</button>

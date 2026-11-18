@@ -4418,6 +4418,49 @@ button.buddy-path-chest:not(.is-ready) {
   font-weight: 600;
 }
 
+/* While the buddy is worried, its mood line opens the work it's worried about. */
+.buddy-mood-line.is-tappable {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--overdue) 40%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--overdue) 8%, var(--surface));
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.buddy-mood-line.is-tappable:hover {
+  background: color-mix(in srgb, var(--overdue) 14%, var(--surface));
+}
+
+.buddy-mood-go {
+  color: var(--overdue);
+  white-space: nowrap;
+}
+
+/* The items a worried buddy pointed to glow a few times, then settle. */
+.due-item.is-flashing {
+  animation: worry-flash 0.8s ease-in-out 3;
+}
+
+@keyframes worry-flash {
+  50% {
+    box-shadow: 0 0 0 3px var(--overdue);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .due-item.is-flashing {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--overdue);
+  }
+}
+
 .buddy-card-mood {
   font-size: 0.9rem;
 }
@@ -4554,4 +4597,84 @@ button.buddy-path-chest:not(.is-ready) {
   .accessory-halo {
     animation: none;
   }
+}
+
+/* ---------- Sticky note ---------- */
+
+/* A Reminders tab tucked into the bottom-right corner of every screen, with only its 📝
+   peeking out until it's hovered or focused. It opens a note in the theme's colors. */
+.sticky-note {
+  position: fixed;
+  right: 0;
+  bottom: 84px; /* above the Undo messages at the bottom */
+  z-index: 30;
+}
+
+.sticky-note-tab {
+  list-style: none;
+  padding: 8px 12px 8px 10px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  opacity: 0.85;
+  transform: translateX(calc(100% - 32px));
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.sticky-note-tab:hover,
+.sticky-note-tab:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.sticky-note-tab::-webkit-details-marker {
+  display: none;
+}
+
+.sticky-note[open] .sticky-note-tab {
+  display: none;
+}
+
+.sticky-note-paper {
+  display: grid;
+  gap: 6px;
+  width: min(280px, calc(100vw - 32px));
+  margin-right: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-top: 6px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.sticky-note-label {
+  font-weight: 700;
+}
+
+.sticky-note-paper textarea {
+  min-height: 160px;
+  padding: 8px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.sticky-note-paper textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sticky-note-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
 }

@@ -3818,6 +3818,35 @@
     return `${name} is cheering you on: ${dueLeft} thing${dueLeft === 1 ? '' : 's'} left today ✨`;
   }
 
+  // A worried buddy's mood line is a button that opens the work it's worried about; other moods are plain text.
+  function renderMoodLine(mood) {
+    const text = escapeHtml(moodText(mood));
+    if (mood.mood !== 'droopy' || mood.wakesOn) {
+      return `<p class="buddy-mood-line">${text}</p>`;
+    }
+    return `<button type="button" class="buddy-mood-line is-tappable" data-action="show-worries">${text} <span class="buddy-mood-go">See them ›</span></button>`;
+  }
+
+  // Opens today's Day view, where overdue work and today's missed work are listed, scrolls to the
+  // first thing the buddy is worried about, and flashes each of them so they're easy to spot.
+  function showWorries() {
+    const worries = buddyMood().worries;
+    selectedDay = todayKey();
+    weekStart = model.startOfWeek(selectedDay);
+    currentView = 'day';
+    savePreference(VIEW_STORAGE_KEY, currentView);
+    currentTab = 'assignments';
+    render();
+    const rows = worries
+      .map((item) => elements.dueList.querySelector(`.done-checkbox[data-id="${CSS.escape(item.assignment.id)}"][data-date="${item.date}"]`))
+      .filter(Boolean)
+      .map((checkbox) => checkbox.closest('.due-item'));
+    rows.forEach((row) => row.classList.add('is-flashing'));
+    if (rows.length > 0) {
+      rows[0].scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    }
+  }
+
   // Chest-only accessories found so far, which every buddy can wear.
   function foundAccessoryIds() {
     return buddy.foundAccessories(state).map((entry) => entry.id);
@@ -4221,7 +4250,7 @@
         <section class="buddy-home">
           ${renderBuddyRoom(`<div class="buddy-big">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</div>`)}
           ${decoratingRoom ? renderDecorateTools() : `${renderDecorateButton()}
-          <p class="buddy-mood-line">${escapeHtml(moodText(mood))}</p>
+          ${renderMoodLine(mood)}
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
               <span>Name</span>
@@ -4638,6 +4667,8 @@
       currentView = target.dataset.view;
       savePreference(VIEW_STORAGE_KEY, currentView);
       renderDueList();
+    } else if (action === 'show-worries') {
+      showWorries();
     } else if (action === 'set-tab') {
       currentTab = target.dataset.tab;
       renderTabs();
@@ -5016,6 +5047,47 @@
   themeOptions.addEventListener('input', handleCustomColor);
   // In Auto mode the computer can switch between light and dark while the menu is open.
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderThemeOptions);
+  // ---------- Sticky note ----------
+
+  // A Reminders note for quick things to remember that peeks out from the side of every screen. It saves with
+  // the planner as you type and tucks away on a click anywhere else or Escape.
+  const stickyNote = document.getElementById('sticky-note');
+  const stickyNoteText = document.getElementById('sticky-note-text');
+  let stickyNoteSaveFailed = false;
+
+  function fillStickyNote() {
+    if (document.activeElement !== stickyNoteText) {
+      stickyNoteText.value = state.stickyNote || '';
+    }
+  }
+
+  stickyNote.addEventListener('toggle', () => {
+    if (stickyNote.open) {
+      fillStickyNote();
+      stickyNoteText.focus();
+    }
+  });
+  stickyNoteText.addEventListener('input', () => {
+    state.stickyNote = stickyNoteText.value;
+    const saved = PlannerStorage.save(state);
+    if (!saved && !stickyNoteSaveFailed) {
+      showToast('Couldn’t save your note. Your browser may be out of storage or blocking it.', null);
+    }
+    stickyNoteSaveFailed = !saved;
+  });
+  stickyNote.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      stickyNote.open = false;
+    }
+  });
+  document.addEventListener('click', (event) => {
+    if (stickyNote.open && !stickyNote.contains(event.target)) {
+      stickyNote.open = false;
+    }
+  });
+  // Another tab's note shows here too, unless this one is being typed in.
+  window.addEventListener('storage', fillStickyNote);
+
   // The theme menu stays open while trying themes, and closes on a click anywhere else.
   document.addEventListener('click', (event) => {
     if (themeMenu.open && !themeMenu.contains(event.target)) {
