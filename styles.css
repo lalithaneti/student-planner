@@ -4041,6 +4041,11 @@ button.buddy-path-chest {
   touch-action: none; /* A finger drags the sticker instead of scrolling the screen. */
 }
 
+/* Brought to the front: in front of the buddy. */
+.page-sticker.is-front {
+  z-index: 2;
+}
+
 button.page-sticker {
   cursor: grab;
 }

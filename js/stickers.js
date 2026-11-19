@@ -455,6 +455,9 @@ const PlannerStickers = (() => {
     );
   }
 
+  // Stickers are behind the buddy unless brought to the front.
+  const isInFront = (sticker) => sticker.front === true;
+
   const clampSpot = (value) => Math.min(100, Math.max(0, Math.round(value * 10) / 10));
 
   // A sticker's size is a multiple of its normal size, from half to double. Stickers saved before
@@ -477,7 +480,10 @@ const PlannerStickers = (() => {
     // Each lands a little down and to the right of the last, so a few added in a row don't hide each other.
     const nudge = (placed.length % 5) * 10 - 20;
     const sticker = { key, id: stickerId, x: 50 + nudge, y: 50 + nudge };
-    state.stickerPage = { stickers: [...placed, sticker] };
+    // New stickers go behind the buddy, on top of the others back there.
+    const firstFront = placed.findIndex(isInFront);
+    const at = firstFront === -1 ? placed.length : firstFront;
+    state.stickerPage = { stickers: [...placed.slice(0, at), sticker, ...placed.slice(at)] };
     return sticker;
   }
 
@@ -512,6 +518,32 @@ const PlannerStickers = (() => {
     };
   }
 
+  // The page lists stickers bottom first, and the ones in front of the buddy come last, so the
+  // list order is always the order you see. To front: on top of everything, in front of the buddy.
+  // To back: under everything, behind the buddy. Each returns false if it was already there.
+
+  function stickerToFront(state, key) {
+    const placed = pageStickers(state);
+    const sticker = placed.find((each) => each.key === key);
+    if (!sticker || (isInFront(sticker) && placed[placed.length - 1] === sticker)) {
+      return false;
+    }
+    state.stickerPage = { stickers: [...placed.filter((each) => each !== sticker), { ...sticker, front: true }] };
+    return true;
+  }
+
+  function stickerToBack(state, key) {
+    const placed = pageStickers(state);
+    const sticker = placed.find((each) => each.key === key);
+    if (!sticker || (!isInFront(sticker) && placed[0] === sticker)) {
+      return false;
+    }
+    const behind = { ...sticker };
+    delete behind.front;
+    state.stickerPage = { stickers: [behind, ...placed.filter((each) => each !== sticker)] };
+    return true;
+  }
+
   function peelSticker(state, key) {
     state.stickerPage = { stickers: pageStickers(state).filter((sticker) => sticker.key !== key) };
   }
@@ -534,6 +566,9 @@ const PlannerStickers = (() => {
     resizeSticker,
     stickerTilt,
     tiltSticker,
+    isInFront,
+    stickerToFront,
+    stickerToBack,
     peelSticker,
   };
 })();

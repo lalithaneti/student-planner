@@ -4039,11 +4039,12 @@
       .map((placedSticker) => {
         const sticker = PlannerStickers.findSticker(placedSticker.id);
         const style = `left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
+        const front = PlannerStickers.isInFront(placedSticker) ? ' is-front' : '';
         if (!decoratingRoom) {
-          return `<span class="page-sticker" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
+          return `<span class="page-sticker${front}" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
         }
         const selected = placedSticker.key === selectedPageSticker;
-        return `<button type="button" class="page-sticker${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
+        return `<button type="button" class="page-sticker${front}${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
             aria-label="${sticker.name} sticker. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
             >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
@@ -4064,6 +4065,8 @@
     const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
     const status = selected
       ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected · drag its corner dot to resize or tilt</span>
+         <button type="button" class="secondary-button" data-action="page-sticker-to-front">To front</button>
+         <button type="button" class="secondary-button" data-action="page-sticker-to-back">To back</button>
          <button type="button" class="secondary-button" data-action="peel-page-sticker">Peel off</button>`
       : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag a sticker to move it. Tap one to peel it off.'}</span>`;
     const tray = foundStickersInOrder()
@@ -4100,6 +4103,22 @@
       PlannerStickers.peelSticker(state, placed.key);
       selectedPageSticker = null;
     });
+  }
+
+  // To front: on top of the other stickers and in front of the buddy. To back: under them and behind it.
+  function layerPageSticker(toFront) {
+    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === selectedPageSticker);
+    if (!placed) {
+      return;
+    }
+    const name = PlannerStickers.findSticker(placed.id).name;
+    let moved = false;
+    applyChange(
+      () => (moved ? `Moved ${name} to the ${toFront ? 'front' : 'back'}` : `${name} is already ${toFront ? 'in front' : 'at the back'}`),
+      () => {
+        moved = (toFront ? PlannerStickers.stickerToFront : PlannerStickers.stickerToBack)(state, placed.key);
+      },
+    );
   }
 
   function movePageSticker(key, x, y) {
@@ -4801,6 +4820,8 @@
       }
     } else if (action === 'peel-page-sticker') {
       peelPageSticker();
+    } else if (action === 'page-sticker-to-front' || action === 'page-sticker-to-back') {
+      layerPageSticker(action === 'page-sticker-to-front');
     } else if (action === 'open-shop') {
       openThemeShop();
     } else if (action === 'close-shop') {
