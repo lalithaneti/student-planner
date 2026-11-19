@@ -4149,7 +4149,24 @@
   function roomItemsInOrder() {
     const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
     const stickers = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS].filter((sticker) => foundIds.has(sticker.id));
-    return [...stickers, ...PlannerStickers.ownedFurniture(state)];
+    return [...stickers, ...PlannerStickers.ownedFurniture(state), PlannerStickers.TROPHY_SHELF];
+  }
+
+  // The trophy shelf with what's been earned. Outside Decorate, tapping a trophy says what it's for.
+  function renderTrophyShelf(tappable) {
+    const trophies = PlannerStickers.trophiesFor(state, todayKey(), currentTime());
+    const frames = trophies.frames.map(({ semesterId, semesterName }) => {
+      const { view, art } = semesterBuddy(semesterId);
+      const label = view.buddy.name ? `${view.buddy.name}, your ${semesterName} buddy` : `Your ${semesterName} buddy`;
+      return { art, label: escapeHtml(label) };
+    });
+    return PlannerStickers.drawTrophyShelf(trophies, frames, tappable);
+  }
+
+  function trophyCount() {
+    const trophies = PlannerStickers.trophiesFor(state, todayKey(), currentTime());
+    const all = [...trophies.cups, ...trophies.medals, trophies.chest, trophies.star];
+    return `${all.filter((trophy) => trophy.earned).length} of ${all.length} trophies earned`;
   }
 
   // A sticker is "peeled off"; furniture is "taken out".
@@ -4184,14 +4201,17 @@
         const base = sticker.furniture ? `--sticker-base:${sticker.width}%;` : '';
         const style = `${base}left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
         const front = PlannerStickers.isInFront(placedSticker) ? ' is-front' : '';
+        const isShelf = sticker.id === PlannerStickers.TROPHY_SHELF.id;
+        const art = isShelf ? renderTrophyShelf(!decoratingRoom) : PlannerStickers.drawSticker(sticker);
         if (!decoratingRoom) {
-          return `<span class="page-sticker${front}" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
+          const about = isShelf ? `role="img" aria-label="Trophy shelf: ${trophyCount()}"` : 'aria-hidden="true"';
+          return `<span class="page-sticker${front}${isShelf ? ' is-trophy-shelf' : ''}" style="${style}" ${about}>${art}</span>`;
         }
         const selected = placedSticker.key === selectedPageSticker;
         return `<button type="button" class="page-sticker${front}${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
             aria-label="${sticker.name}${sticker.furniture ? '' : ' sticker'}. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
-            >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
+            >${art}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
     const surfaces = ['wall', 'floor']
@@ -4203,11 +4223,9 @@
     return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${surfaces}${stickers}${renderRoomBuddy(buddyArt)}</div>`;
   }
 
-  // 🎨 Decorate (once there's a sticker or furniture to use) and the Gem shop's Room section.
+  // 🎨 Decorate (there's always the buddy and the trophy shelf to place) and the Gem shop's Room section.
   function renderDecorateButton() {
-    const decorate =
-      roomItemsInOrder().length === 0 ? '' : '<button type="button" class="text-button" data-action="decorate-room">🎨 Decorate</button>';
-    return `<div class="buddy-room-actions">${decorate}
+    return `<div class="buddy-room-actions"><button type="button" class="text-button" data-action="decorate-room">🎨 Decorate</button>
         <button type="button" class="text-button" data-action="open-shop" data-shop-section="room">🛒 Gem shop</button>
       </div>`;
   }
@@ -4242,6 +4260,13 @@
   function placePageSticker(stickerId) {
     if (PlannerStickers.pageStickers(state).length >= PlannerStickers.PAGE_MAX_STICKERS) {
       showToast(`Your page is full (${PlannerStickers.PAGE_MAX_STICKERS} stickers). Peel one off to add more.`, null);
+      return;
+    }
+    const shelf = PlannerStickers.pageStickers(state).find((placed) => placed.id === PlannerStickers.TROPHY_SHELF.id);
+    if (stickerId === PlannerStickers.TROPHY_SHELF.id && shelf) {
+      selectedPageSticker = shelf.key;
+      renderBuddy();
+      showToast('Your trophy shelf is already in the room. It’s selected now.', null);
       return;
     }
     const item = PlannerStickers.findSticker(stickerId);
@@ -4485,19 +4510,26 @@
   }
 
   // Buddies from the other semesters, each as it is in its own semester.
-  function renderBuddyShelf() {
+  // Another semester's buddy as it is now: its drawing, stage, points, and best streak.
+  function semesterBuddy(semesterId) {
     const today = todayKey();
     const nowTime = currentTime();
+    const view = buddy.forSemester(state, semesterId);
+    const points = buddy.totalPoints(buddy.pointsLog(view, today, nowTime));
+    const where = buddy.stageFor(points);
+    const best = buddy.streakFor(view, today, nowTime).best;
+    const art = buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best, foundAccessoryIds()), view.buddy.color, view.buddy.species);
+    return { view, points, where, best, art };
+  }
+
+  function renderBuddyShelf() {
     const cards = state.semesters
       .filter((semester) => semester.id !== state.currentSemesterId && (state.buddies || {})[semester.id])
       .sort((a, b) => a.startDate.localeCompare(b.startDate))
       .map((semester) => {
-        const view = buddy.forSemester(state, semester.id);
-        const points = buddy.totalPoints(buddy.pointsLog(view, today, nowTime));
-        const where = buddy.stageFor(points);
-        const best = buddy.streakFor(view, today, nowTime).best;
+        const { view, points, where, best, art } = semesterBuddy(semester.id);
         return `<li class="buddy-shelf-item">
-            ${buddy.drawBuddy(where.index, where.progress, 'content', buddy.wornAccessories(view.buddy, best, foundAccessoryIds()), view.buddy.color, view.buddy.species)}
+            ${art}
             <strong>${escapeHtml(buddy.displayName(view.buddy))}</strong>
             <span>${escapeHtml(semester.name)}</span>
             <span class="buddy-muted">${where.stage.name} · ${points} point${points === 1 ? '' : 's'}</span>
@@ -5012,6 +5044,8 @@
       if (key) {
         elements.buddyPanel.querySelector(`.page-sticker[data-page-key="${key}"]`)?.focus();
       }
+    } else if (action === 'show-trophy') {
+      showToast(target.dataset.trophyText, null);
     } else if (action === 'peel-page-sticker') {
       peelPageSticker();
     } else if (action === 'page-sticker-to-front' || action === 'page-sticker-to-back') {

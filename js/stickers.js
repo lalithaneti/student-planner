@@ -772,6 +772,163 @@ const PlannerStickers = (() => {
     return true;
   }
 
+  // ---------- The trophy shelf ----------
+  // A free shelf for the room, with a trophy for each thing earned. Trophies stay once earned:
+  // streak cups go by the best streak any semester's buddy has had, and medals by the furthest any
+  // buddy has grown. Unearned ones show as faint gray outlines, so you can see what's left. The
+  // shelf only goes in the room once.
+  const TROPHY_SHELF_ID = 'trophy-shelf';
+  const CUP_NAMES = ['Bronze cup', 'Silver cup', 'Gold cup', 'Rainbow cup'];
+  const MEDAL_WORDS = ['your buddy hatching', 'your buddy growing to Little one', 'your buddy growing all the way up'];
+  const SHELF_FRAMES = 3; // photos of other semesters' buddies, the latest ones
+
+  // Every trophy, earned or not, each with what it's for. `frames` are other semesters' buddies
+  // (their semester ids and names), latest last, for the bottom shelf's photos.
+  function trophiesFor(state, todayKey, nowTime) {
+    const semesterIds = Object.keys(state.buddies || {}).filter((id) => state.semesters.some((semester) => semester.id === id));
+    const views = semesterIds.map((id) => PlannerBuddy.forSemester(state, id));
+    const bestStreak = Math.max(0, ...views.map((view) => PlannerBuddy.streakFor(view, todayKey, nowTime).best));
+    const furthestStage = Math.max(
+      0,
+      ...views.map((view) => PlannerBuddy.stageFor(PlannerBuddy.totalPoints(PlannerBuddy.pointsLog(view, todayKey, nowTime))).index),
+    );
+    const cups = PlannerBuddy.STREAK_MILESTONES.map((milestone, index) => ({
+      id: `streak-${milestone.days}`,
+      name: CUP_NAMES[index] || `${milestone.days}-day cup`,
+      earned: bestStreak >= milestone.days,
+      why: `a best streak of ${milestone.days} days`,
+    }));
+    const medals = PlannerBuddy.STAGES.slice(1).map((stage, index) => ({
+      id: `stage-${index + 1}`,
+      name: `${stage.name} medal`,
+      earned: furthestStage >= index + 1,
+      why: MEDAL_WORDS[index],
+    }));
+    const found = new Set(foundStickers(state).map((entry) => entry.id));
+    const chest = {
+      id: 'first-chest',
+      name: 'Treasure trophy',
+      earned: views.some((view) => (view.buddy.openedChests || []).length > 0),
+      why: 'opening your first chest on Buddy’s Path',
+    };
+    const star = {
+      id: 'all-stickers',
+      name: 'Sticker star',
+      earned: STICKERS.every((sticker) => found.has(sticker.id)),
+      why: `finding all ${STICKERS.length} common stickers`,
+    };
+    const frames = state.semesters
+      .filter((semester) => semester.id !== state.currentSemesterId && semesterIds.includes(semester.id))
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .slice(-SHELF_FRAMES)
+      .map((semester) => ({ semesterId: semester.id, semesterName: semester.name }));
+    return { cups, medals, chest, star, frames };
+  }
+
+  // ----- Drawing the shelf: 200 wide by 130 tall, two shelves of six spots. -----
+  const SHELF_SPOTS = [22, 53, 84, 116, 147, 178];
+  const SHELF_TOP = 52;
+  const SHELF_BOTTOM = 117;
+  const CUP_COLORS = [
+    ['#e8ab74', '#b8763e'],
+    ['#e3e6ee', '#99a2b5'],
+    ['#ffd97a', '#d99a1f'],
+    ['url(#trophy-rainbow)', '#c98fd8'],
+  ];
+  const MEDAL_RIBBONS = ['#b5e3cf', '#c9b6f2', '#ffb3c7'];
+
+  function drawCup([fill, edge]) {
+    return `<rect x="-9" y="-6" width="18" height="6" rx="1.5" fill="#9c7a54" stroke="#7a5c3c" stroke-width="1" />
+      <rect x="-2.5" y="-14" width="5" height="8" fill="${fill}" stroke="${edge}" stroke-width="1" />
+      <path d="M-11 -24 C-18 -24 -18 -15 -9 -15 M11 -24 C18 -24 18 -15 9 -15" fill="none" stroke="${edge}" stroke-width="2" />
+      <path d="M-12 -34 H12 C12 -22 7 -14 0 -14 C-7 -14 -12 -22 -12 -34 Z" fill="${fill}" stroke="${edge}" stroke-width="1.5" stroke-linejoin="round" />
+      <path d="M-7 -30 C-7 -24 -5 -20 -2 -18" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />`;
+  }
+
+  function drawMedal(ribbon) {
+    return `<path d="M-8 -36 L-3 -20 H3 L8 -36 Z" fill="${ribbon}" stroke="#fff" stroke-width="1" />
+      <circle cx="0" cy="-12" r="10" fill="#ffd97a" stroke="#d99a1f" stroke-width="1.5" />
+      <path d="M0 -18 L1.8 -14 L6 -13.5 L2.8 -10.6 L3.7 -6.5 L0 -8.6 L-3.7 -6.5 L-2.8 -10.6 L-6 -13.5 L-1.8 -14 Z" fill="#fff3b0" stroke="#d99a1f" stroke-width="0.8" />`;
+  }
+
+  const DRAW_CHEST = `<rect x="-10" y="-4" width="20" height="4" rx="1" fill="#9c7a54" />
+      <rect x="-12" y="-20" width="24" height="16" rx="2" fill="#c98f5c" stroke="#8a5a34" stroke-width="1.2" />
+      <path d="M-12 -20 C-12 -30 12 -30 12 -20 Z" fill="#e8b98a" stroke="#8a5a34" stroke-width="1.2" />
+      <path d="M-12 -20 H12" stroke="#ffd97a" stroke-width="2" />
+      <rect x="-3" y="-23" width="6" height="7" rx="1.5" fill="#ffd97a" stroke="#d99a1f" stroke-width="1" />`;
+
+  const DRAW_STAR = `<rect x="-9" y="-6" width="18" height="6" rx="1.5" fill="#9c7a54" stroke="#7a5c3c" stroke-width="1" />
+      <rect x="-1.5" y="-12" width="3" height="6" fill="#d99a1f" />
+      <path d="M0 -38 L4.5 -28.5 L15 -27.5 L7 -20.5 L9.5 -10.5 L0 -15.5 L-9.5 -10.5 L-7 -20.5 L-15 -27.5 L-4.5 -28.5 Z" fill="#ffd97a" stroke="#d99a1f" stroke-width="1.5" stroke-linejoin="round" />`;
+
+  // A photo frame; `inside` is the picture (a buddy drawing, or a question mark for none yet).
+  function drawFrame(inside) {
+    return `<rect x="-13" y="-36" width="26" height="34" rx="2" fill="#e8b98a" stroke="#c98f5c" stroke-width="1.5" />
+      <rect x="-9.5" y="-32.5" width="19" height="27" fill="#fffdf8" />
+      ${inside}
+      <path d="M-13 -2 L-16 0 H16 L13 -2" fill="#c98f5c" />`;
+  }
+
+  // One spot on the shelf. Earned ones can be tapped to say what they're for (when `tappable`).
+  function shelfItem(x, baseline, art, { name, earned, why, label }, tappable) {
+    const text = label || (earned ? `${name} 🏆 Earned for ${why}!` : `${name}: not earned yet. It’s for ${why}.`);
+    const tap = tappable ? ` data-action="show-trophy" data-trophy-text="${text.replace(/"/g, '&quot;')}"` : '';
+    const look = earned ? '' : ' filter="url(#trophy-locked)" opacity="0.28"';
+    return `<g class="trophy" transform="translate(${x} ${baseline})"${look}${tap}><title>${text}</title>${art}</g>`;
+  }
+
+  // The whole shelf. `frames` are { art, label } for photos of other semesters' buddies (art is
+  // an <svg> of the buddy). With `tappable`, each trophy says what it's for when tapped.
+  function drawTrophyShelf(trophies, frames, tappable) {
+    const top = [
+      ...trophies.cups.map((cup, index) => shelfItem(SHELF_SPOTS[index], SHELF_TOP, drawCup(CUP_COLORS[index] || CUP_COLORS[2]), cup, tappable)),
+      shelfItem(SHELF_SPOTS[4], SHELF_TOP, DRAW_CHEST, trophies.chest, tappable),
+      shelfItem(SHELF_SPOTS[5], SHELF_TOP, DRAW_STAR, trophies.star, tappable),
+    ];
+    const photos =
+      frames.length > 0
+        ? frames.map((frame, index) =>
+            shelfItem(
+              SHELF_SPOTS[3 + index],
+              SHELF_BOTTOM,
+              drawFrame(frame.art.replace('<svg', '<svg x="-9.5" y="-32.5" width="19" height="27"')),
+              { earned: true, label: frame.label },
+              tappable,
+            ),
+          )
+        : [
+            shelfItem(
+              SHELF_SPOTS[3],
+              SHELF_BOTTOM,
+              drawFrame('<text x="0" y="-13" text-anchor="middle" font-size="14" font-weight="700" fill="#c9b6c4">?</text>'),
+              { earned: false, label: 'A photo of your buddy from another semester goes here once you have one.' },
+              tappable,
+            ),
+          ];
+    const bottom = [...trophies.medals.map((medal, index) => shelfItem(SHELF_SPOTS[index], SHELF_BOTTOM, drawMedal(MEDAL_RIBBONS[index]), medal, tappable)), ...photos];
+    const board = (y) => `<rect x="4" y="${y}" width="192" height="7" rx="2" fill="#e8b98a" stroke="#c98f5c" stroke-width="1.5" />
+      <path d="M20 ${y + 7} V${y + 13} L28 ${y + 7} M180 ${y + 7} V${y + 13} L172 ${y + 7}" fill="#c98f5c" stroke="#c98f5c" stroke-width="1.5" stroke-linejoin="round" />`;
+    return `<svg class="sticker-art is-furniture" viewBox="0 0 200 130" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="trophy-rainbow" x1="0" x2="1"><stop offset="0" stop-color="#ffb3c7" /><stop offset="0.35" stop-color="#ffd97a" /><stop offset="0.65" stop-color="#b5e3cf" /><stop offset="1" stop-color="#b9c8ff" /></linearGradient>
+          <filter id="trophy-locked"><feColorMatrix type="saturate" values="0" /></filter>
+        </defs>
+        ${top.join('')}${board(SHELF_TOP)}${bottom.join('')}${board(SHELF_BOTTOM)}
+      </svg>`;
+  }
+
+  // In Decorate's tray, the shelf is shown with three cups.
+  const TROPHY_SHELF = {
+    id: TROPHY_SHELF_ID,
+    name: 'Trophy shelf',
+    width: 30,
+    furniture: true,
+    art: `<rect x="4" y="58" width="92" height="9" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5" />
+      <g transform="translate(22 58) scale(1.2)">${drawCup(CUP_COLORS[0])}</g>
+      <g transform="translate(50 58) scale(1.4)">${drawCup(CUP_COLORS[2])}</g>
+      <g transform="translate(78 58) scale(1.2)">${drawCup(CUP_COLORS[1])}</g>`,
+  };
+
   function drawSticker(sticker) {
     if (sticker.rare) {
       return drawRareSticker(sticker);
@@ -790,7 +947,7 @@ const PlannerStickers = (() => {
   const RARE_CHANCE = 6;
 
   function findSticker(id) {
-    return [...STICKERS, ...RARE_STICKERS, ...FURNITURE].find((sticker) => sticker.id === id) || null;
+    return [...STICKERS, ...RARE_STICKERS, ...FURNITURE, TROPHY_SHELF].find((sticker) => sticker.id === id) || null;
   }
 
   function foundStickers(state) {
@@ -881,7 +1038,7 @@ const PlannerStickers = (() => {
   // The stickers on the page, oldest (bottom) first. Skips anything not found or not readable.
   // Found stickers and bought furniture can go on the page.
   function placeableIds(state) {
-    return new Set([...foundStickers(state).map((entry) => entry.id), ...ownedFurniture(state).map((piece) => piece.id)]);
+    return new Set([...foundStickers(state).map((entry) => entry.id), ...ownedFurniture(state).map((piece) => piece.id), TROPHY_SHELF_ID]);
   }
 
   function pageStickers(state) {
@@ -911,7 +1068,8 @@ const PlannerStickers = (() => {
   // found or bought, or the page is full.
   function placeSticker(state, stickerId) {
     const placed = pageStickers(state);
-    if (!placeableIds(state).has(stickerId) || placed.length >= PAGE_MAX_STICKERS) {
+    const shelfAlreadyUp = stickerId === TROPHY_SHELF_ID && placed.some((sticker) => sticker.id === TROPHY_SHELF_ID);
+    if (!placeableIds(state).has(stickerId) || placed.length >= PAGE_MAX_STICKERS || shelfAlreadyUp) {
       return null;
     }
     const key = placed.reduce((highest, sticker) => Math.max(highest, sticker.key), 0) + 1;
@@ -1011,6 +1169,7 @@ const PlannerStickers = (() => {
     STICKERS,
     RARE_STICKERS,
     FURNITURE,
+    TROPHY_SHELF,
     WALLPAPERS,
     FLOORS,
     PAGE_MAX_STICKERS,
@@ -1022,6 +1181,8 @@ const PlannerStickers = (() => {
     ownedFurniture,
     furnitureShop,
     buyFurniture,
+    trophiesFor,
+    drawTrophyShelf,
     findSurface,
     roomSurface,
     surfaceShop,

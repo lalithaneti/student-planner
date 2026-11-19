@@ -4097,6 +4097,11 @@ button.buddy-path-chest {
   border-top: 3px solid #c98f5c;
 }
 
+/* Outside Decorate, each trophy can be tapped to say what it's for. */
+.is-trophy-shelf .trophy[data-action] {
+  cursor: pointer;
+}
+
 /* The buddy stands in the room like a sticker, in front of stickers sent to the back. */
 .page-sticker.room-buddy {
   --sticker-base: 38%;
