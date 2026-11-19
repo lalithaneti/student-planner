@@ -4163,6 +4163,15 @@
     return PlannerStickers.drawTrophyShelf(trophies, frames, tappable);
   }
 
+  // A window in the room shows the sky for the time of day right now (the room redraws each minute).
+  function roomLook(sticker) {
+    if (sticker.id !== 'window') {
+      return sticker;
+    }
+    const time = PlannerStickers.windowTimeFor(Number(currentTime().slice(0, 2)));
+    return { ...sticker, art: PlannerStickers.drawWindowArt(time) };
+  }
+
   function trophyCount() {
     const trophies = PlannerStickers.trophiesFor(state, todayKey(), currentTime());
     const all = [...trophies.cups, ...trophies.medals, trophies.chest, trophies.star];
@@ -4202,7 +4211,7 @@
         const style = `${base}left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
         const front = PlannerStickers.isInFront(placedSticker) ? ' is-front' : '';
         const isShelf = sticker.id === PlannerStickers.TROPHY_SHELF.id;
-        const art = isShelf ? renderTrophyShelf(!decoratingRoom) : PlannerStickers.drawSticker(sticker);
+        const art = isShelf ? renderTrophyShelf(!decoratingRoom) : PlannerStickers.drawSticker(roomLook(sticker));
         if (!decoratingRoom) {
           const about = isShelf ? `role="img" aria-label="Trophy shelf: ${trophyCount()}"` : 'aria-hidden="true"';
           return `<span class="page-sticker${front}${isShelf ? ' is-trophy-shelf' : ''}" style="${style}" ${about}>${art}</span>`;

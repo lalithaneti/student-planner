@@ -370,6 +370,67 @@ const PlannerStickers = (() => {
       </svg>`;
   }
 
+  // ---------- The window's sky ----------
+  // A window in the room shows the sky for the time of day: sunrise from 5 to 9 AM, day until
+  // 5 PM, sunset until 8 PM, then night. The shop and Decorate's tray show the daytime one.
+  const WINDOW_TIMES = ['morning', 'day', 'evening', 'night'];
+
+  function windowTimeFor(hour) {
+    if (hour >= 5 && hour < 9) {
+      return 'morning';
+    }
+    if (hour >= 9 && hour < 17) {
+      return 'day';
+    }
+    return hour >= 17 && hour < 20 ? 'evening' : 'night';
+  }
+
+  const WINDOW_CLOUD = 'M26 46 C24 40 32 37 35 41 C37 36 46 37 46 43 C50 43 51 49 46 49 H29 C25 49 24 47 26 46 Z';
+
+  // What's seen through the glass (inside 19,15 to 81,71) at each time of day.
+  const WINDOW_SKIES = {
+    morning: {
+      top: '#ffc7d6',
+      bottom: '#ffe3b3',
+      view: `<circle cx="34" cy="64" r="9" fill="#ffd97a" stroke="#f2b84b" stroke-width="2" />
+        <path d="${WINDOW_CLOUD}" fill="#fff" opacity="0.8" transform="translate(30 -18)" />`,
+    },
+    day: {
+      top: '#cfe9ff',
+      bottom: '#cfe9ff',
+      view: `<circle cx="64" cy="31" r="7" fill="#ffd97a" stroke="#e0ad3f" stroke-width="2" />
+        <path d="${WINDOW_CLOUD}" fill="#fff" />`,
+    },
+    evening: {
+      top: '#b9a3e3',
+      bottom: '#ffb08a',
+      view: `<circle cx="64" cy="64" r="10" fill="#ff9f6b" stroke="#f07f4c" stroke-width="2" />
+        <path d="${WINDOW_CLOUD}" fill="#ffd1dc" opacity="0.85" transform="translate(-2 -14)" />`,
+    },
+    night: {
+      top: '#1f2550',
+      bottom: '#3a4280',
+      view: `<path d="M64 22 A10 10 0 1 0 72 38 A8 8 0 1 1 64 22 Z" fill="#fff3b0" />
+        <g fill="#fff"><circle cx="28" cy="24" r="1.3" /><circle cx="40" cy="34" r="1" /><circle cx="30" cy="56" r="1.2" /><circle cx="58" cy="52" r="1" /><circle cx="72" cy="62" r="1.3" /><circle cx="44" cy="20" r="0.9" /></g>`,
+    },
+  };
+
+  function drawWindowArt(time) {
+    const sky = WINDOW_SKIES[time] || WINDOW_SKIES.day;
+    return `<defs><linearGradient id="window-sky-${time}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky.top}" /><stop offset="1" stop-color="${sky.bottom}" /></linearGradient>
+        <clipPath id="window-glass"><rect x="19" y="15" width="62" height="56" rx="3" /></clipPath></defs>
+      <rect x="14" y="10" width="72" height="66" rx="5" fill="#fffdf8" stroke="#c98f5c" stroke-width="3" />
+      <g clip-path="url(#window-glass)">
+        <rect x="19" y="15" width="62" height="56" fill="url(#window-sky-${time})" />
+        ${sky.view}
+      </g>
+      <path d="M50 15 V71 M19 43 H81" stroke="#e8b98a" stroke-width="4" />
+      <rect x="8" y="73" width="84" height="8" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5" />
+      <path d="M8 6 H25 C21 30 27 54 18 78 H8 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
+      <path d="M92 6 H75 C79 30 73 54 82 78 H92 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
+      <rect x="3" y="3" width="94" height="6" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2" />`;
+  }
+
   // ---------- Furniture ----------
   // Things for the buddy's room, bought with gems in the Gem shop (state.ownedFurniture lists
   // what's been bought, for every semester). Once bought, a piece goes in the room like a sticker,
@@ -452,15 +513,7 @@ const PlannerStickers = (() => {
       price: 10,
       width: 16,
       furniture: true,
-      art: `<rect x="14" y="10" width="72" height="66" rx="5" fill="#fffdf8" stroke="#c98f5c" stroke-width="3" />
-        <rect x="19" y="15" width="62" height="56" rx="3" fill="#cfe9ff" />
-        <circle cx="64" cy="31" r="7" fill="#ffd97a" stroke="#e0ad3f" stroke-width="2" />
-        <path d="M26 46 C24 40 32 37 35 41 C37 36 46 37 46 43 C50 43 51 49 46 49 H29 C25 49 24 47 26 46 Z" fill="#fff" />
-        <path d="M50 15 V71 M19 43 H81" stroke="#e8b98a" stroke-width="4" />
-        <rect x="8" y="73" width="84" height="8" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5" />
-        <path d="M8 6 H25 C21 30 27 54 18 78 H8 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
-        <path d="M92 6 H75 C79 30 73 54 82 78 H92 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
-        <rect x="3" y="3" width="94" height="6" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2" />`,
+      art: drawWindowArt('day'),
     },
     {
       id: 'beanbag',
@@ -1170,6 +1223,9 @@ const PlannerStickers = (() => {
     RARE_STICKERS,
     FURNITURE,
     TROPHY_SHELF,
+    WINDOW_TIMES,
+    windowTimeFor,
+    drawWindowArt,
     WALLPAPERS,
     FLOORS,
     PAGE_MAX_STICKERS,
