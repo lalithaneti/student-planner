@@ -431,6 +431,26 @@ const PlannerStickers = (() => {
       <rect x="3" y="3" width="94" height="6" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2" />`;
   }
 
+  // ---------- The wall clock ----------
+  // A wall clock in the room points to the real time ("HH:MM"); the shop shows 10:10.
+
+  // How far each hand is turned, in degrees clockwise from 12.
+  function clockHandAngles(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    return { hour: (hours % 12) * 30 + minutes / 2, minute: minutes * 6 };
+  }
+
+  function drawClockArt(time) {
+    const angles = clockHandAngles(time);
+    return `<circle cx="50" cy="52" r="40" fill="#fffdf8" stroke="#e58aa5" stroke-width="6" />
+      <g stroke="#c9b6c4" stroke-width="4" stroke-linecap="round">
+        <path d="M50 19 V25 M50 79 V85 M17 52 H23 M77 52 H83" />
+      </g>
+      <path d="M50 52 V34" transform="rotate(${angles.hour} 50 52)" stroke="${INK}" stroke-width="5" stroke-linecap="round" />
+      <path d="M50 52 V24" transform="rotate(${angles.minute} 50 52)" stroke="${INK}" stroke-width="3.5" stroke-linecap="round" />
+      <circle cx="50" cy="52" r="4" fill="#e58aa5" />`;
+  }
+
   // ---------- The room's light ----------
   // The room takes on the time of day: a rosy tint in the morning, none in the day, golden in the
   // evening, and a cozy dim blue at night. Lamps and fairy lights are on in the evening and at
@@ -591,12 +611,7 @@ const PlannerStickers = (() => {
       price: 6,
       width: 8,
       furniture: true,
-      art: `<circle cx="50" cy="52" r="40" fill="#fffdf8" stroke="#e58aa5" stroke-width="6" />
-        <g stroke="#c9b6c4" stroke-width="4" stroke-linecap="round">
-          <path d="M50 19 V25 M50 79 V85 M17 52 H23 M77 52 H83" />
-        </g>
-        <path d="M50 52 V30 M50 52 L66 60" stroke="${INK}" stroke-width="4" stroke-linecap="round" />
-        <circle cx="50" cy="52" r="4" fill="#e58aa5" />`,
+      art: drawClockArt('10:10'),
     },
     {
       id: 'picture',
@@ -1299,6 +1314,8 @@ const PlannerStickers = (() => {
     lightsOnAt,
     glowSpots,
     drawWindowArt,
+    clockHandAngles,
+    drawClockArt,
     WALLPAPERS,
     FLOORS,
     PAGE_MAX_STICKERS,

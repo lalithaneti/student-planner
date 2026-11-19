@@ -4212,9 +4212,12 @@
   // Morning, day, evening, or night right now (the room redraws each minute).
   const roomTimeOfDay = () => PlannerStickers.timeOfDayFor(Number(currentTime().slice(0, 2)));
 
-  // A window in the room shows the sky for the time of day right now.
+  // A window in the room shows the sky for the time of day right now, and a wall clock the time.
   function roomLook(sticker) {
-    return sticker.id === 'window' ? { ...sticker, art: PlannerStickers.drawWindowArt(roomTimeOfDay()) } : sticker;
+    if (sticker.id === 'window') {
+      return { ...sticker, art: PlannerStickers.drawWindowArt(roomTimeOfDay()) };
+    }
+    return sticker.id === 'clock' ? { ...sticker, art: PlannerStickers.drawClockArt(currentTime()) } : sticker;
   }
 
   // Outside Decorate, the room's light for the time of day: a tint over everything, and a warm spot
