@@ -396,6 +396,182 @@ const PlannerStickers = (() => {
           <circle cx="52" cy="62" r="2.2" /><circle cx="64" cy="68" r="2.2" /><circle cx="76" cy="61" r="2.2" /><circle cx="58" cy="71" r="1.8" /><circle cx="82" cy="70" r="1.8" />
         </g>`,
     },
+    {
+      id: 'desk',
+      name: 'Desk with a lamp',
+      price: 15,
+      width: 26,
+      furniture: true,
+      art: `<circle cx="27" cy="30" r="15" fill="#fff3b0" opacity="0.45" />
+        <g fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5">
+          <rect x="12" y="58" width="7" height="36" rx="2" /><rect x="81" y="58" width="7" height="36" rx="2" />
+          <rect x="54" y="58" width="30" height="22" rx="3" />
+          <rect x="5" y="51" width="90" height="9" rx="3" />
+        </g>
+        <path d="M60 69 H78" stroke="#c98f5c" stroke-width="2" stroke-linecap="round" />
+        <circle cx="69" cy="69" r="2.2" fill="#c98f5c" />
+        <ellipse cx="27" cy="49" rx="10" ry="3.5" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" />
+        <rect x="25" y="28" width="4" height="21" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2" />
+        <path d="M14 32 L21 14 H33 L40 32 Z" fill="#ffd97a" stroke="#e0ad3f" stroke-width="2.5" stroke-linejoin="round" />
+        <rect x="60" y="43" width="26" height="8" rx="2" fill="#b5e3cf" stroke="#7fc0a3" stroke-width="2" />
+        <rect x="63" y="35" width="21" height="8" rx="2" fill="#c9b6f2" stroke="#a48ad8" stroke-width="2" />
+        <rect x="61" y="27" width="23" height="8" rx="2" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2" />`,
+    },
+    {
+      id: 'rug',
+      name: 'Round rug',
+      price: 8,
+      width: 32,
+      furniture: true,
+      art: `<g stroke="#f093b3" stroke-width="2.5" stroke-linecap="round">
+          <path d="M3 50 H-2 M3 56 H-2 M3 62 H-2 M97 50 H102 M97 56 H102 M97 62 H102" />
+        </g>
+        <ellipse cx="50" cy="56" rx="47" ry="22" fill="#ffc4d8" stroke="#f093b3" stroke-width="3" />
+        <ellipse cx="50" cy="56" rx="35" ry="15" fill="#fff1f6" stroke="#f093b3" stroke-width="2" stroke-dasharray="4 4" />
+        <ellipse cx="50" cy="56" rx="20" ry="8" fill="#ffc4d8" stroke="#f093b3" stroke-width="2" />`,
+    },
+    {
+      id: 'plant',
+      name: 'Potted plant',
+      price: 6,
+      width: 10,
+      furniture: true,
+      art: `<g fill="#a3dc95" stroke="#6fb864" stroke-width="2.5">
+          <ellipse cx="30" cy="48" rx="7" ry="16" transform="rotate(-55 30 48)" />
+          <ellipse cx="70" cy="48" rx="7" ry="16" transform="rotate(55 70 48)" />
+          <ellipse cx="39" cy="32" rx="8" ry="21" transform="rotate(-22 39 32)" />
+          <ellipse cx="61" cy="32" rx="8" ry="21" transform="rotate(22 61 32)" />
+          <ellipse cx="50" cy="26" rx="8" ry="24" />
+        </g>
+        <path d="M33 66 H67 L62 94 H38 Z" fill="#f0a77a" stroke="#cf8152" stroke-width="3" stroke-linejoin="round" />
+        <rect x="28" y="58" width="44" height="11" rx="4" fill="#f7bc94" stroke="#cf8152" stroke-width="3" />`,
+    },
+    {
+      id: 'window',
+      name: 'Window',
+      price: 10,
+      width: 16,
+      furniture: true,
+      art: `<rect x="14" y="10" width="72" height="66" rx="5" fill="#fffdf8" stroke="#c98f5c" stroke-width="3" />
+        <rect x="19" y="15" width="62" height="56" rx="3" fill="#cfe9ff" />
+        <circle cx="64" cy="31" r="7" fill="#ffd97a" stroke="#e0ad3f" stroke-width="2" />
+        <path d="M26 46 C24 40 32 37 35 41 C37 36 46 37 46 43 C50 43 51 49 46 49 H29 C25 49 24 47 26 46 Z" fill="#fff" />
+        <path d="M50 15 V71 M19 43 H81" stroke="#e8b98a" stroke-width="4" />
+        <rect x="8" y="73" width="84" height="8" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5" />
+        <path d="M8 6 H25 C21 30 27 54 18 78 H8 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
+        <path d="M92 6 H75 C79 30 73 54 82 78 H92 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2.5" stroke-linejoin="round" />
+        <rect x="3" y="3" width="94" height="6" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2" />`,
+    },
+    {
+      id: 'beanbag',
+      name: 'Beanbag',
+      price: 12,
+      width: 15,
+      furniture: true,
+      art: `<path d="M14 86 C3 70 12 40 34 30 C46 24 58 24 70 32 C90 44 98 70 86 86 C70 96 30 96 14 86 Z" fill="#c9b6f2" stroke="#a48ad8" stroke-width="3" stroke-linejoin="round" />
+        <path d="M24 60 C38 70 62 70 76 58" fill="none" stroke="#a48ad8" stroke-width="2.5" stroke-linecap="round" />
+        <path d="M34 40 C40 34 50 32 58 34" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.6" />`,
+    },
+    {
+      id: 'fairy-lights',
+      name: 'Fairy lights',
+      price: 10,
+      width: 30,
+      furniture: true,
+      art: `<path d="M2 22 Q26 52 50 26 Q74 52 98 22" fill="none" stroke="#9c8a7a" stroke-width="2" />
+        ${[
+          [11, 31, '#ffd97a'],
+          [24, 37, '#ffb3c7'],
+          [37, 35, '#b5e3cf'],
+          [50, 27, '#cfe9ff'],
+          [63, 35, '#ffd97a'],
+          [76, 37, '#ffb3c7'],
+          [89, 31, '#b5e3cf'],
+        ]
+          .map(
+            ([x, y, color]) => `<circle cx="${x}" cy="${y + 7}" r="9" fill="${color}" opacity="0.35" />
+              <rect x="${x - 2}" y="${y - 1}" width="4" height="4" fill="#9c8a7a" />
+              <ellipse cx="${x}" cy="${y + 7}" rx="4" ry="5.5" fill="${color}" stroke="#fff" stroke-width="1.2" />`,
+          )
+          .join('')}`,
+    },
+    {
+      id: 'clock',
+      name: 'Wall clock',
+      price: 6,
+      width: 8,
+      furniture: true,
+      art: `<circle cx="50" cy="52" r="40" fill="#fffdf8" stroke="#e58aa5" stroke-width="6" />
+        <g stroke="#c9b6c4" stroke-width="4" stroke-linecap="round">
+          <path d="M50 19 V25 M50 79 V85 M17 52 H23 M77 52 H83" />
+        </g>
+        <path d="M50 52 V30 M50 52 L66 60" stroke="${INK}" stroke-width="4" stroke-linecap="round" />
+        <circle cx="50" cy="52" r="4" fill="#e58aa5" />`,
+    },
+    {
+      id: 'picture',
+      name: 'Framed picture',
+      price: 6,
+      width: 10,
+      furniture: true,
+      art: `<path d="M32 14 L50 3 L68 14" fill="none" stroke="#9c8a7a" stroke-width="2" />
+        <circle cx="50" cy="3" r="2.5" fill="#9c8a7a" />
+        <rect x="14" y="12" width="72" height="82" rx="4" fill="#e8b98a" stroke="#c98f5c" stroke-width="3" />
+        <rect x="22" y="20" width="56" height="66" fill="#fffdf8" />
+        <rect x="28" y="26" width="44" height="54" fill="#cfe9ff" />
+        <circle cx="61" cy="38" r="6" fill="#ffd97a" />
+        <path d="M28 80 L42 56 L52 68 L60 60 L72 74 V80 Z" fill="#a3dc95" stroke="#6fb864" stroke-width="2" stroke-linejoin="round" />`,
+    },
+    {
+      id: 'fish-tank',
+      name: 'Fish tank',
+      price: 18,
+      width: 18,
+      furniture: true,
+      art: `<rect x="12" y="80" width="76" height="12" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5" />
+        <rect x="8" y="22" width="84" height="60" rx="6" fill="#cfe9ff" stroke="#8fc7f0" stroke-width="3" />
+        <path d="M11 30 H89" stroke="#fff" stroke-width="2" opacity="0.8" />
+        <path d="M11 72 Q30 66 50 72 T89 70 V79 H11 Z" fill="#ffe3a8" />
+        <path d="M24 72 C18 62 30 56 24 44 M30 72 C36 64 26 58 32 50" fill="none" stroke="#6fb864" stroke-width="3" stroke-linecap="round" />
+        <ellipse cx="50" cy="46" rx="10" ry="7" fill="#ffb066" stroke="#e58a3f" stroke-width="2" />
+        <path d="M40 46 L32 40 V52 Z" fill="#ffb066" stroke="#e58a3f" stroke-width="2" stroke-linejoin="round" />
+        <circle cx="54" cy="44" r="1.6" fill="${INK}" />
+        <ellipse cx="72" cy="60" rx="7" ry="5" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2" />
+        <path d="M79 60 L85 56 V64 Z" fill="#ffb3c7" stroke="#e58aa5" stroke-width="2" stroke-linejoin="round" />
+        <circle cx="69" cy="59" r="1.3" fill="${INK}" />
+        <g fill="none" stroke="#fff" stroke-width="1.5"><circle cx="58" cy="34" r="2.5" /><circle cx="62" cy="27" r="2" /></g>
+        <rect x="5" y="16" width="90" height="7" rx="3" fill="#c9cfdc" stroke="#99a2b5" stroke-width="2" />`,
+    },
+    {
+      id: 'nightstand',
+      name: 'Nightstand with a lamp',
+      price: 8,
+      width: 11,
+      furniture: true,
+      art: `<circle cx="50" cy="20" r="18" fill="#fff3b0" opacity="0.45" />
+        <g fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5">
+          <rect x="27" y="88" width="7" height="8" rx="2" /><rect x="66" y="88" width="7" height="8" rx="2" />
+          <rect x="20" y="46" width="60" height="44" rx="5" />
+        </g>
+        <g fill="#f3cfa8" stroke="#c98f5c" stroke-width="2">
+          <rect x="27" y="52" width="46" height="15" rx="3" /><rect x="27" y="70" width="46" height="15" rx="3" />
+        </g>
+        <circle cx="50" cy="59.5" r="2.2" fill="#c98f5c" /><circle cx="50" cy="77.5" r="2.2" fill="#c98f5c" />
+        <ellipse cx="50" cy="44" rx="11" ry="3.5" fill="#b5e3cf" stroke="#7fc0a3" stroke-width="2.5" />
+        <rect x="48" y="26" width="4" height="18" fill="#b5e3cf" stroke="#7fc0a3" stroke-width="2" />
+        <path d="M33 30 L40 10 H60 L67 30 Z" fill="#ffd97a" stroke="#e0ad3f" stroke-width="2.5" stroke-linejoin="round" />`,
+    },
+    {
+      id: 'pet-bed',
+      name: 'Pet bed',
+      price: 10,
+      width: 16,
+      furniture: true,
+      art: `<ellipse cx="50" cy="64" rx="45" ry="24" fill="#ffb3c7" stroke="#e58aa5" stroke-width="3" />
+        <ellipse cx="50" cy="58" rx="32" ry="13" fill="#fff1f6" stroke="#e58aa5" stroke-width="2" />
+        <path d="M30 56 C38 50 62 50 70 56" fill="none" stroke="#f6c6d6" stroke-width="3" stroke-linecap="round" />
+        <path d="M50 84 C44 79 40 76 42 73 C44 70 48 71 50 74 C52 71 56 70 58 73 C60 76 56 79 50 84 Z" fill="#fff" stroke="#e58aa5" stroke-width="1.5" />`,
+    },
   ];
 
   function drawSticker(sticker) {
