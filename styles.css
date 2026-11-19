@@ -4041,6 +4041,33 @@ button.buddy-path-chest {
   border-radius: calc(var(--radius) - 4px);
 }
 
+/* The wallpaper covers the top 70% of the room (its wall), with a wooden baseboard along the
+   bottom. Dimmer in dark mode, like the decorated themes. */
+.room-wall {
+  position: absolute;
+  inset: 0 0 30%;
+  border-radius: inherit;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 5px solid #c98f5c;
+  pointer-events: none;
+}
+
+.dark .room-wall {
+  filter: brightness(0.85);
+}
+
+.shop-wallpaper-preview {
+  display: block;
+  aspect-ratio: 3 / 1.4;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.shop-wallpaper-preview.is-plain {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
+}
+
 /* The buddy stands in the room like a sticker, in front of stickers sent to the back. */
 .page-sticker.room-buddy {
   --sticker-base: 38%;

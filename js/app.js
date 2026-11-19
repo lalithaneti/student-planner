@@ -1319,8 +1319,12 @@
       <ul class="shop-grid">${cards(others)}</ul>
       <p class="buddy-muted">Themes you buy are yours in every semester. Switching is free, and each semester keeps its own.</p>
       <h3 class="shop-section-heading" id="shop-room-heading">Room</h3>
+      <h3 class="due-heading">Furniture</h3>
       <ul class="shop-grid">${renderFurnitureCards()}</ul>
       <p class="buddy-muted">Furniture goes in your buddy’s room with 🎨 Decorate on the Study Buddy tab, as many times as you like.</p>
+      <h3 class="due-heading">Wallpaper</h3>
+      <ul class="shop-grid">${renderWallpaperCards()}</ul>
+      <p class="buddy-muted">Wallpaper you buy is yours to keep. Switching is free.</p>
       <div class="button-row"><button type="button" class="text-button" data-action="close-shop">Close</button></div>`;
   }
 
@@ -1343,6 +1347,54 @@
           </li>`;
       })
       .join('');
+  }
+
+  function renderWallpaperCards() {
+    const balance = buddy.gemBalance(state);
+    const inUse = PlannerStickers.roomWallpaper(state).id;
+    return PlannerStickers.wallpaperShop(state)
+      .map((item) => {
+        const wallpaper = PlannerStickers.findWallpaper(item.id);
+        let action;
+        if (item.status === 'owned') {
+          action =
+            item.id === inUse
+              ? '<span class="shop-in-use">In use ✓</span>'
+              : `<button type="button" class="secondary-button" data-action="shop-use-wallpaper" data-wallpaper-id="${item.id}">Use</button>`;
+        } else if (item.status === 'short') {
+          action = `<button type="button" class="secondary-button" disabled>Need 💎 ${item.price - balance} more</button>`;
+        } else {
+          action = `<button type="button" class="primary-button" data-action="shop-buy-wallpaper" data-wallpaper-id="${item.id}">Buy for 💎 ${item.price}</button>`;
+        }
+        return `<li class="shop-card">
+            <span class="shop-wallpaper-preview${wallpaper.pattern ? '' : ' is-plain'}" style="${wallpaper.pattern ? `background:${wallpaper.pattern}` : ''}" aria-hidden="true"></span>
+            <strong>${wallpaper.name}</strong>
+            <span class="buddy-muted">${item.price === 0 ? 'Free' : 'For your buddy’s wall'}</span>
+            ${action}
+          </li>`;
+      })
+      .join('');
+  }
+
+  async function buyWallpaper(wallpaperId) {
+    const offer = PlannerStickers.wallpaperShop(state).find((item) => item.id === wallpaperId);
+    if (!offer || offer.status !== 'affordable') {
+      return;
+    }
+    const name = PlannerStickers.findWallpaper(wallpaperId).name;
+    const answer = await askChoice(`Buy ${name} wallpaper for 💎 ${offer.price}? It goes up in your buddy’s room right away.`, [
+      { value: 'buy', label: `Buy for 💎 ${offer.price}`, className: 'primary-button' },
+    ]);
+    if (answer !== 'buy') {
+      return;
+    }
+    applyChange(`Bought ${name} wallpaper! It’s up in the room now 🎉`, () => PlannerStickers.buyWallpaper(state, wallpaperId));
+    renderThemeShop();
+  }
+
+  function useWallpaper(wallpaperId) {
+    applyChange(`Wallpaper: ${PlannerStickers.findWallpaper(wallpaperId).name}`, () => PlannerStickers.useWallpaper(state, wallpaperId));
+    renderThemeShop();
   }
 
   async function buyFurniture(furnitureId) {
@@ -4123,7 +4175,9 @@
             >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
-    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${stickers}${renderRoomBuddy(buddyArt)}</div>`;
+    const { pattern } = PlannerStickers.roomWallpaper(state);
+    const wall = pattern ? `<div class="room-wall" style="background:${pattern}" aria-hidden="true"></div>` : '';
+    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${wall}${stickers}${renderRoomBuddy(buddyArt)}</div>`;
   }
 
   // 🎨 Decorate (once there's a sticker or furniture to use) and the Gem shop's Room section.
@@ -4943,6 +4997,10 @@
       openThemeShop(target.dataset.shopSection || null);
     } else if (action === 'shop-buy-furniture') {
       buyFurniture(target.dataset.furnitureId);
+    } else if (action === 'shop-buy-wallpaper') {
+      buyWallpaper(target.dataset.wallpaperId);
+    } else if (action === 'shop-use-wallpaper') {
+      useWallpaper(target.dataset.wallpaperId);
     } else if (action === 'close-shop') {
       elements.shopDialog.close();
     } else if (action === 'shop-buy') {

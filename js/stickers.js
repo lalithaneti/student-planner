@@ -574,6 +574,132 @@ const PlannerStickers = (() => {
     },
   ];
 
+  // ---------- Wallpaper ----------
+  // Patterns for the top of the buddy's room (its wall), bought with gems in the Gem shop like path
+  // themes: bought once (state.ownedWallpapers), then switched for free (state.roomWallpaper).
+  // Plain, the room with no wallpaper, is free. Each pattern is a CSS background, sized in
+  // percentages of the wall so it looks the same on a phone and a laptop.
+
+  // The wall is the top 70% of a 3-by-2 room, so it's 3 wide by 1.4 tall.
+  const WALL_SHAPE = 3 / 1.4;
+
+  // A small square picture repeated `across` times across the wall, over a solid color. The color
+  // is its own layer (not part of each picture) so no thin lines show where the pictures meet.
+  function wallTile(svg, color, across) {
+    const width = 100 / across;
+    const picture = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">${svg}</svg>`);
+    return `url('data:image/svg+xml,${picture}') 0 0 / ${width.toFixed(3)}% ${(width * WALL_SHAPE).toFixed(3)}%, ${color}`;
+  }
+
+  const DAISY = [0, 72, 144, 216, 288]
+    .map((angle) => `<circle cx="20" cy="13" r="4.5" fill="#fff" stroke="#e8c26a" stroke-width="1.3" transform="rotate(${angle} 20 20)" />`)
+    .join('');
+
+  const WALLPAPERS = [
+    { id: 'plain', name: 'Plain', price: 0, pattern: null },
+    { id: 'stripes', name: 'Pink stripes', price: 8, pattern: 'repeating-linear-gradient(90deg, #ffd6e2 0 3%, #ffeaf0 3% 6%)' },
+    {
+      id: 'dots',
+      name: 'Polka dots',
+      price: 8,
+      pattern: wallTile('<circle cx="10" cy="10" r="4" fill="#fff" /><circle cx="30" cy="30" r="4" fill="#fff" />', '#d9f2e6', 18),
+    },
+    {
+      id: 'hearts',
+      name: 'Hearts',
+      price: 10,
+      pattern: wallTile(
+        '<path d="M20 28 C12 22 9 18 11 14 C13 10 18 11 20 15 C22 11 27 10 29 14 C31 18 28 22 20 28 Z" fill="#ffb3c7" />',
+        '#ffe3ec',
+        16,
+      ),
+    },
+    {
+      id: 'stars',
+      name: 'Starry night',
+      price: 12,
+      pattern: wallTile(
+        '<path d="M12 5 L14 10 L19 12 L14 14 L12 19 L10 14 L5 12 L10 10 Z" fill="#fff3b0" /><circle cx="30" cy="29" r="1.6" fill="#fff" /><circle cx="33" cy="9" r="1" fill="#fff" /><circle cx="8" cy="33" r="1" fill="#fff" />',
+        '#2e3566',
+        14,
+      ),
+    },
+    {
+      id: 'gingham',
+      name: 'Gingham',
+      price: 10,
+      pattern: `linear-gradient(90deg, rgb(255 140 175 / 0.3) 50%, transparent 0) 0 0 / 5% ${(5 * WALL_SHAPE).toFixed(2)}%, linear-gradient(rgb(255 140 175 / 0.3) 50%, transparent 0) 0 0 / 5% ${(5 * WALL_SHAPE).toFixed(2)}%, #fff8fa`,
+    },
+    {
+      id: 'flowers',
+      name: 'Daisies',
+      price: 12,
+      pattern: wallTile(`${DAISY}<circle cx="20" cy="20" r="3.5" fill="#ffc94d" />`, '#fff1c4', 14),
+    },
+    {
+      id: 'clouds',
+      name: 'Clouds',
+      price: 12,
+      pattern: wallTile(
+        '<path d="M7 25 C3 25 3 19 8 19 C9 14 16 13 18 17 C22 15 26 18 25 22 C28 22 28 25 25 25 Z" fill="#fff" /><path d="M24 37 C22 37 22 34 25 34 C26 31 30 31 31 33 C33 32 35 34 34 36 C36 36 36 37 34 37 Z" fill="#fff" opacity="0.85" />',
+        '#cfe9ff',
+        9,
+      ),
+    },
+    {
+      id: 'wood',
+      name: 'Wood panels',
+      price: 15,
+      pattern: 'linear-gradient(rgb(255 255 255 / 0.12), transparent), repeating-linear-gradient(90deg, #e8b98a 0 7.24%, #c98f5c 7.24% 7.69%)',
+    },
+  ];
+
+  function findWallpaper(id) {
+    return WALLPAPERS.find((wallpaper) => wallpaper.id === id) || null;
+  }
+
+  function ownsWallpaper(state, id) {
+    return id === 'plain' || (state.ownedWallpapers || []).includes(id);
+  }
+
+  // The wallpaper on the room's wall: the one picked, if it's owned, or else Plain.
+  function roomWallpaper(state) {
+    const picked = findWallpaper(state.roomWallpaper);
+    return picked && ownsWallpaper(state, picked.id) ? picked : WALLPAPERS[0];
+  }
+
+  // The Gem shop's wallpapers, each marked 'owned', 'affordable', or 'short' (not enough gems).
+  function wallpaperShop(state) {
+    const balance = PlannerBuddy.gemBalance(state);
+    return WALLPAPERS.map((wallpaper) => ({
+      id: wallpaper.id,
+      price: wallpaper.price,
+      status: ownsWallpaper(state, wallpaper.id) ? 'owned' : balance >= wallpaper.price ? 'affordable' : 'short',
+    }));
+  }
+
+  // Buys a wallpaper and puts it up. Returns false (and changes nothing) if it isn't sold, is
+  // already owned, or costs more gems than there are.
+  function buyWallpaper(state, id) {
+    const offer = wallpaperShop(state).find((item) => item.id === id);
+    if (!offer || offer.status !== 'affordable') {
+      return false;
+    }
+    state.ownedWallpapers = [...(state.ownedWallpapers || []), id];
+    state.gemsSpent = (state.gemsSpent || 0) + offer.price;
+    state.roomWallpaper = id;
+    return true;
+  }
+
+  // Puts up an owned wallpaper, for free. Returns false for one that isn't owned.
+  function useWallpaper(state, id) {
+    if (!findWallpaper(id) || !ownsWallpaper(state, id)) {
+      return false;
+    }
+    state.roomWallpaper = id;
+    return true;
+  }
+
   function drawSticker(sticker) {
     if (sticker.rare) {
       return drawRareSticker(sticker);
@@ -813,6 +939,7 @@ const PlannerStickers = (() => {
     STICKERS,
     RARE_STICKERS,
     FURNITURE,
+    WALLPAPERS,
     PAGE_MAX_STICKERS,
     drawSticker,
     findSticker,
@@ -822,6 +949,11 @@ const PlannerStickers = (() => {
     ownedFurniture,
     furnitureShop,
     buyFurniture,
+    findWallpaper,
+    roomWallpaper,
+    wallpaperShop,
+    buyWallpaper,
+    useWallpaper,
     pageStickers,
     placeSticker,
     moveSticker,
