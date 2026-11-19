@@ -4260,13 +4260,26 @@
     const spot = PlannerStickers.roomBuddy(state);
     const style = `left:${spot.x}%;top:${spot.y}%;--sticker-size:${spot.size}`;
     if (!decoratingRoom) {
-      return `<div class="page-sticker room-buddy" style="${style}">${buddyArt}</div>`;
+      return renderTuckedInBuddy(buddyArt) || `<div class="page-sticker room-buddy" style="${style}">${buddyArt}</div>`;
     }
     const selected = selectedPageSticker === ROOM_BUDDY_KEY;
     return `<button type="button" class="page-sticker room-buddy${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
         data-page-key="${ROOM_BUDDY_KEY}" style="${style}" aria-pressed="${selected}"
         aria-label="${escapeHtml(roomBuddyName())}. Drag or use arrow keys to move it${selected ? ', and plus and minus keys to resize it' : ''}."
         >${buddyArt}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
+  }
+
+  // From 9 PM to 7:30 AM with a bed in the room, the buddy sits on the bed with the bed's blanket
+  // drawn again over it, so it looks tucked in. Returns '' at other times or with no bed.
+  function renderTuckedInBuddy(buddyArt) {
+    const inBed = PlannerStickers.isBedtime(currentTime()) && PlannerStickers.bedSpot(state);
+    if (!inBed) {
+      return '';
+    }
+    const { bed } = inBed;
+    const bedStyle = `--sticker-base:${PlannerStickers.findSticker('bed').width}%;left:${bed.x}%;top:${bed.y}%;--sticker-size:${PlannerStickers.stickerSize(bed)};--sticker-tilt:${PlannerStickers.stickerTilt(bed)}deg`;
+    return `<div class="page-sticker room-buddy is-in-bed" style="left:${inBed.x}%;top:${inBed.y}%;--sticker-size:${inBed.size}">${buddyArt}</div>
+      <span class="page-sticker bed-blanket" style="${bedStyle}" aria-hidden="true"><svg class="sticker-art is-furniture" viewBox="0 0 100 100" focusable="false">${PlannerStickers.BED_BLANKET}</svg></span>`;
   }
 
   // The buddy's name, or "Your buddy" (capitalized for starting a sentence, or not).

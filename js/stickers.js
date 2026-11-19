@@ -451,6 +451,64 @@ const PlannerStickers = (() => {
       <circle cx="50" cy="52" r="4" fill="#e58aa5" />`;
   }
 
+  // ---------- Bedtime ----------
+  // From 9 PM to 7:30 AM, if a bed is in the room, the buddy is tucked in on it (the bed on top, if
+  // there's more than one): drawn on the mattress with a copy of the bed's blanket over it. Its
+  // saved spot doesn't change, so it's back there in the morning and while decorating.
+  const BEDTIME_START = 21 * 60;
+  const BEDTIME_END = 7 * 60 + 30;
+
+  function isBedtime(time) {
+    const [hours, minutes] = time.split(':').map(Number);
+    const minute = hours * 60 + minutes;
+    return minute >= BEDTIME_START || minute < BEDTIME_END;
+  }
+
+  // The bed's blanket, drawn on the bed and again over a tucked-in buddy.
+  const BED_BLANKET = `<path d="M40 50 C40 46 44 45 48 45 H84 C87 45 88 47 88 50 V70 C88 74 86 76 82 76 H46 C42 76 40 74 40 70 Z" fill="#c9b6f2" stroke="#a48ad8" stroke-width="2.5" stroke-linejoin="round" />
+        <path d="M40 54 H88" stroke="#a48ad8" stroke-width="2" />
+        <path d="M40 50 V54 C40 52 44 51 48 51 H88" fill="#e3d8fb" stroke="#a48ad8" stroke-width="2" />
+        <g fill="#fff" opacity="0.85">
+          <circle cx="52" cy="62" r="2.2" /><circle cx="64" cy="68" r="2.2" /><circle cx="76" cy="61" r="2.2" /><circle cx="58" cy="71" r="1.8" /><circle cx="82" cy="70" r="1.8" />
+        </g>`;
+
+  // Where a point on a placed piece's 100-by-100 drawing is in the room (percentages, like
+  // spots), following the piece's size and tilt. Also returns the piece's width (a percentage of
+  // the room's width).
+  function pointOnPiece(placed, item, pointX, pointY) {
+    const width = item.width * stickerSize(placed);
+    const turn = (stickerTilt(placed) * Math.PI) / 180;
+    const across = ((pointX - 50) / 100) * width;
+    const down = ((pointY - 50) / 100) * width;
+    return {
+      x: placed.x + across * Math.cos(turn) - down * Math.sin(turn),
+      y: placed.y + (across * Math.sin(turn) + down * Math.cos(turn)) * ROOM_SHAPE,
+      width,
+    };
+  }
+
+  // The buddy is drawn 38% of the room wide at size 1, with its body's bottom near the bottom of
+  // its drawing. In bed it's a bit narrower than the bed, sitting on the mattress over the blanket.
+  const ROOM_BUDDY_WIDTH = 38;
+  const BUDDY_BODY_BOTTOM = 0.42; // from the middle of its drawing to its body's bottom, in drawing widths
+
+  // At bedtime, where the buddy goes (spot and size) and the bed it's in, or null with no bed.
+  function bedSpot(state) {
+    const bed = pageStickers(state).filter((placed) => placed.id === 'bed').pop();
+    if (!bed) {
+      return null;
+    }
+    const mattress = pointOnPiece(bed, findSticker('bed'), 62, 60);
+    const size = clampSize((mattress.width * 0.8) / ROOM_BUDDY_WIDTH);
+    const buddyWidth = ROOM_BUDDY_WIDTH * size;
+    return {
+      bed,
+      x: clampSpot(mattress.x),
+      y: clampSpot(mattress.y - BUDDY_BODY_BOTTOM * buddyWidth * ROOM_SHAPE),
+      size,
+    };
+  }
+
   // ---------- The room's light ----------
   // The room takes on the time of day: a rosy tint in the morning, none in the day, golden in the
   // evening, and a cozy dim blue at night. Lamps and fairy lights are on in the evening and at
@@ -471,15 +529,10 @@ const PlannerStickers = (() => {
   // Where a placed piece's lights are in the room (percentages, like spots) and how wide each glow
   // is (a percentage of the room's width), following its size and tilt.
   function glowSpots(placed, item) {
-    const width = item.width * stickerSize(placed);
-    const turn = (stickerTilt(placed) * Math.PI) / 180;
     const round = (value) => Math.round(value * 10) / 10;
     return (item.glows || []).map(([glowX, glowY, radius]) => {
-      const across = ((glowX - 50) / 100) * width;
-      const down = ((glowY - 50) / 100) * width;
-      const turnedAcross = across * Math.cos(turn) - down * Math.sin(turn);
-      const turnedDown = across * Math.sin(turn) + down * Math.cos(turn);
-      return { x: round(placed.x + turnedAcross), y: round(placed.y + turnedDown * ROOM_SHAPE), size: round(((2 * radius) / 100) * width) };
+      const { x, y, width } = pointOnPiece(placed, item, glowX, glowY);
+      return { x: round(x), y: round(y), size: round(((2 * radius) / 100) * width) };
     });
   }
 
@@ -513,12 +566,7 @@ const PlannerStickers = (() => {
         </g>
         <rect x="16" y="52" width="70" height="20" rx="7" fill="#fffdf8" stroke="#d6d0c6" stroke-width="2.5" />
         <path d="M22 50 C22 40 44 40 44 50 C44 56 22 56 22 50 Z" fill="#fff" stroke="#d6d0c6" stroke-width="2.5" />
-        <path d="M40 50 C40 46 44 45 48 45 H84 C87 45 88 47 88 50 V70 C88 74 86 76 82 76 H46 C42 76 40 74 40 70 Z" fill="#c9b6f2" stroke="#a48ad8" stroke-width="2.5" stroke-linejoin="round" />
-        <path d="M40 54 H88" stroke="#a48ad8" stroke-width="2" />
-        <path d="M40 50 V54 C40 52 44 51 48 51 H88" fill="#e3d8fb" stroke="#a48ad8" stroke-width="2" />
-        <g fill="#fff" opacity="0.85">
-          <circle cx="52" cy="62" r="2.2" /><circle cx="64" cy="68" r="2.2" /><circle cx="76" cy="61" r="2.2" /><circle cx="58" cy="71" r="1.8" /><circle cx="82" cy="70" r="1.8" />
-        </g>`,
+        ${BED_BLANKET}`,
     },
     {
       id: 'desk',
@@ -1315,6 +1363,9 @@ const PlannerStickers = (() => {
     glowSpots,
     drawWindowArt,
     clockHandAngles,
+    isBedtime,
+    bedSpot,
+    BED_BLANKET,
     drawClockArt,
     WALLPAPERS,
     FLOORS,

@@ -4124,6 +4124,21 @@ button.buddy-path-chest {
   display: none;
 }
 
+/* At bedtime the buddy sits on the bed (in front of it, even if the bed was brought to the front)
+   with the bed's blanket over it. */
+.page-sticker.room-buddy.is-in-bed {
+  z-index: 3;
+}
+
+.page-sticker.bed-blanket {
+  z-index: 4;
+  pointer-events: none;
+}
+
+.bed-blanket .sticker-art {
+  filter: none; /* the bed under it already has the shadow */
+}
+
 /* A visiting buddy is drawn as itself (no sticker edge). Outside Decorate it can be tapped to say hi. */
 :is(.page-sticker, .tray-sticker) > .buddy-art {
   display: block;
