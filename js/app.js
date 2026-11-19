@@ -1248,12 +1248,17 @@
     layer.innerHTML = surface(width, height, Number(track.dataset.waves)).join('');
   }
 
-  // ---------- The theme shop ----------
+  // ---------- The gem shop ----------
+  // Path themes and furniture for the buddy's room, both bought with gems. From the Study Buddy
+  // tab it opens at the Room section.
 
-  function openThemeShop() {
+  function openThemeShop(section = null) {
     renderThemeShop();
     if (!elements.shopDialog.open) {
       elements.shopDialog.showModal();
+    }
+    if (section === 'room') {
+      elements.shopDialog.querySelector('#shop-room-heading').scrollIntoView({ block: 'start' });
     }
   }
 
@@ -1303,8 +1308,9 @@
       .filter((themeId) => !inShop.has(themeId) && buddy.ownsTheme(state, themeId))
       .map((themeId) => ({ themeId, status: 'owned', label: themeId === 'meadow' ? 'Free' : 'Yours' }));
     elements.shopDialog.innerHTML = `
-      <h2 id="shop-heading">Theme shop</h2>
+      <h2 id="shop-heading">Gem shop</h2>
       <p class="shop-balance">You have <strong>💎 ${buddy.gemBalance(state)}</strong>. Earn gems by checking things off on time.</p>
+      <h3 class="shop-section-heading">Path themes</h3>
       <h3 class="due-heading">${escapeHtml(semester.name)}’s seasons</h3>
       <ul class="shop-grid">${cards(seasons)}</ul>
       <h3 class="due-heading">Specials</h3>
@@ -1312,7 +1318,47 @@
       <h3 class="due-heading">Your themes</h3>
       <ul class="shop-grid">${cards(others)}</ul>
       <p class="buddy-muted">Themes you buy are yours in every semester. Switching is free, and each semester keeps its own.</p>
+      <h3 class="shop-section-heading" id="shop-room-heading">Room</h3>
+      <ul class="shop-grid">${renderFurnitureCards()}</ul>
+      <p class="buddy-muted">Furniture goes in your buddy’s room with 🎨 Decorate on the Study Buddy tab, as many times as you like.</p>
       <div class="button-row"><button type="button" class="text-button" data-action="close-shop">Close</button></div>`;
+  }
+
+  function renderFurnitureCards() {
+    const balance = buddy.gemBalance(state);
+    return PlannerStickers.furnitureShop(state)
+      .map((item) => {
+        const piece = PlannerStickers.findSticker(item.id);
+        const action =
+          item.status === 'owned'
+            ? '<span class="shop-in-use">Yours ✓</span>'
+            : item.status === 'short'
+              ? `<button type="button" class="secondary-button" disabled>Need 💎 ${item.price - balance} more</button>`
+              : `<button type="button" class="primary-button" data-action="shop-buy-furniture" data-furniture-id="${item.id}">Buy for 💎 ${item.price}</button>`;
+        return `<li class="shop-card">
+            <span class="shop-furniture-preview">${PlannerStickers.drawSticker(piece)}</span>
+            <strong>${piece.name}</strong>
+            <span class="buddy-muted">For your buddy’s room</span>
+            ${action}
+          </li>`;
+      })
+      .join('');
+  }
+
+  async function buyFurniture(furnitureId) {
+    const offer = PlannerStickers.furnitureShop(state).find((item) => item.id === furnitureId);
+    if (!offer || offer.status !== 'affordable') {
+      return;
+    }
+    const name = PlannerStickers.findSticker(furnitureId).name;
+    const answer = await askChoice(`Buy the ${name} for 💎 ${offer.price}? You can put it in your buddy’s room with 🎨 Decorate.`, [
+      { value: 'buy', label: `Buy for 💎 ${offer.price}`, className: 'primary-button' },
+    ]);
+    if (answer !== 'buy') {
+      return;
+    }
+    applyChange(`Bought the ${name}! Find it in 🎨 Decorate 🎉`, () => PlannerStickers.buyFurniture(state, furnitureId));
+    renderThemeShop();
   }
 
   async function buyPathTheme(themeId) {
@@ -1372,7 +1418,7 @@
         </div>
       </div>
       </div>
-      ${currentBuddy() ? '<div class="shop-row"><button type="button" class="secondary-button" data-action="open-shop">🛒 Theme shop</button></div>' : ''}
+      ${currentBuddy() ? '<div class="shop-row"><button type="button" class="secondary-button" data-action="open-shop">🛒 Gem shop</button></div>' : ''}
       ${renderNextUp(stones, buddyStone, chest)}
       ${renderPathList(stones)}
       ${
@@ -1491,7 +1537,7 @@
       buddyText = `<span class="hud-buddy">${escapeHtml(buddy.displayName(currentBuddy()))} · <strong class="hud-points">${points}</strong> ✨${grown ? ' 🌼' : ''}</span>`;
     }
     const gems = currentBuddy()
-      ? `<button type="button" class="hud-gems" data-action="open-shop" aria-label="${buddy.gemBalance(state)} gems. Open the theme shop">${GEM_ART}<strong class="hud-gem-count">${buddy.gemBalance(state)}</strong></button>`
+      ? `<button type="button" class="hud-gems" data-action="open-shop" aria-label="${buddy.gemBalance(state)} gems. Open the gem shop">${GEM_ART}<strong class="hud-gem-count">${buddy.gemBalance(state)}</strong></button>`
       : '';
     return `<div class="buddy-path-hud"><span class="hud-left">${progress}${gems}</span>${chestIcon}${buddyText}</div>`;
   }
@@ -4019,26 +4065,53 @@
   // The selected one has a corner dot: drag it in or out to resize, around to tilt. Arrow keys move
   // it, + and − resize it, and [ and ] tilt it.
   let decoratingRoom = false;
-  let selectedPageSticker = null;
+  let selectedPageSticker = null; // a sticker's key, ROOM_BUDDY_KEY, or null
+  const ROOM_BUDDY_KEY = 'buddy';
+  // The page key on a sticker's (or the buddy's) button.
+  const pageKeyOf = (element) => (element.dataset.pageKey === ROOM_BUDDY_KEY ? ROOM_BUDDY_KEY : Number(element.dataset.pageKey));
   const PAGE_ARROW_STEP = 2; // percent of the room per arrow key press
   const PAGE_SIZE_STEP = 0.1; // size change per + or − key press
   const PAGE_TILT_STEP = 15; // degrees per [ or ] key press
   const RESHAPE_SIZE_DEAD_ZONE = 0.05; // a drag of the corner dot under 5% in or out only tilts
 
-  function foundStickersInOrder() {
+  // What can go in the room: found stickers, then bought furniture.
+  function roomItemsInOrder() {
     const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
-    return [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS].filter((sticker) => foundIds.has(sticker.id));
+    const stickers = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS].filter((sticker) => foundIds.has(sticker.id));
+    return [...stickers, ...PlannerStickers.ownedFurniture(state)];
   }
+
+  // A sticker is "peeled off"; furniture is "taken out".
+  const roomItemName = (item) => (item.furniture ? `the ${item.name}` : item.name);
+
+  // The buddy, placed in the room like a sticker. While decorating it can be selected, dragged,
+  // and resized (but not tilted, peeled off, or moved to the front or back).
+  function renderRoomBuddy(buddyArt) {
+    const spot = PlannerStickers.roomBuddy(state);
+    const style = `left:${spot.x}%;top:${spot.y}%;--sticker-size:${spot.size}`;
+    if (!decoratingRoom) {
+      return `<div class="page-sticker room-buddy" style="${style}">${buddyArt}</div>`;
+    }
+    const selected = selectedPageSticker === ROOM_BUDDY_KEY;
+    return `<button type="button" class="page-sticker room-buddy${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
+        data-page-key="${ROOM_BUDDY_KEY}" style="${style}" aria-pressed="${selected}"
+        aria-label="${escapeHtml(roomBuddyName())}. Drag or use arrow keys to move it${selected ? ', and plus and minus keys to resize it' : ''}."
+        >${buddyArt}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
+  }
+
+  // The buddy's name, or "Your buddy" (capitalized for starting a sentence, or not).
+  const roomBuddyName = (capital = true) => currentBuddy().name || (capital ? 'Your buddy' : 'your buddy');
 
   function renderBuddyRoom(buddyArt) {
     const placed = PlannerStickers.pageStickers(state);
-    if (!decoratingRoom || !placed.some((sticker) => sticker.key === selectedPageSticker)) {
+    if (!decoratingRoom || (selectedPageSticker !== ROOM_BUDDY_KEY && !placed.some((sticker) => sticker.key === selectedPageSticker))) {
       selectedPageSticker = null;
     }
     const stickers = placed
       .map((placedSticker) => {
         const sticker = PlannerStickers.findSticker(placedSticker.id);
-        const style = `left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
+        const base = sticker.furniture ? `--sticker-base:${sticker.width}%;` : '';
+        const style = `${base}left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
         const front = PlannerStickers.isInFront(placedSticker) ? ' is-front' : '';
         if (!decoratingRoom) {
           return `<span class="page-sticker${front}" style="${style}" aria-hidden="true">${PlannerStickers.drawSticker(sticker)}</span>`;
@@ -4046,39 +4119,45 @@
         const selected = placedSticker.key === selectedPageSticker;
         return `<button type="button" class="page-sticker${front}${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
-            aria-label="${sticker.name} sticker. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
+            aria-label="${sticker.name}${sticker.furniture ? '' : ' sticker'}. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
             >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
-    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${stickers}${buddyArt}</div>`;
+    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${stickers}${renderRoomBuddy(buddyArt)}</div>`;
   }
 
+  // 🎨 Decorate (once there's a sticker or furniture to use) and the Gem shop's Room section.
   function renderDecorateButton() {
-    return foundStickersInOrder().length === 0
-      ? ''
-      : '<button type="button" class="text-button buddy-decorate" data-action="decorate-room">🎨 Decorate</button>';
+    const decorate =
+      roomItemsInOrder().length === 0 ? '' : '<button type="button" class="text-button" data-action="decorate-room">🎨 Decorate</button>';
+    return `<div class="buddy-room-actions">${decorate}
+        <button type="button" class="text-button" data-action="open-shop" data-shop-section="room">🛒 Gem shop</button>
+      </div>`;
   }
 
   // While decorating: what's selected, Peel off, Done, and the tray of found stickers.
   function renderDecorateTools() {
     const placed = PlannerStickers.pageStickers(state);
     const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
-    const status = selected
-      ? `<span><strong>${PlannerStickers.findSticker(selected.id).name}</strong> selected · drag its corner dot to resize or tilt</span>
+    const selectedItem = selected ? PlannerStickers.findSticker(selected.id) : null;
+    const status = selectedPageSticker === ROOM_BUDDY_KEY
+      ? `<span><strong>${escapeHtml(roomBuddyName())}</strong> selected · drag to move, or drag its corner dot to resize</span>`
+      : selected
+      ? `<span><strong>${selectedItem.name}</strong> selected · drag its corner dot to resize or tilt</span>
          <button type="button" class="secondary-button" data-action="page-sticker-to-front">To front</button>
          <button type="button" class="secondary-button" data-action="page-sticker-to-back">To back</button>
-         <button type="button" class="secondary-button" data-action="peel-page-sticker">Peel off</button>`
-      : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag a sticker to move it. Tap one to peel it off.'}</span>`;
-    const tray = foundStickersInOrder()
+         <button type="button" class="secondary-button" data-action="peel-page-sticker">${selectedItem.furniture ? 'Take out' : 'Peel off'}</button>`
+      : `<span class="buddy-muted">${placed.length === 0 ? 'Tap a sticker below to stick it on.' : 'Drag your buddy or a sticker to move it. Tap one to resize it, peel it off, or move it to the front or back.'}</span>`;
+    const tray = roomItemsInOrder()
       .map(
         (sticker) => `<li><button type="button" class="tray-sticker" data-action="place-page-sticker" data-sticker-id="${sticker.id}"
-            aria-label="Stick on ${sticker.name}" title="${sticker.name}">${PlannerStickers.drawSticker(sticker)}</button></li>`,
+            aria-label="${sticker.furniture ? `Put ${roomItemName(sticker)} in the room` : `Stick on ${sticker.name}`}" title="${sticker.name}">${PlannerStickers.drawSticker(sticker)}</button></li>`,
       )
       .join('');
     return `<div class="decorate-tools">
         <div class="sticker-page-toolbar">${status}</div>
         <button type="button" class="primary-button" data-action="done-decorating">Done</button>
-        <p class="buddy-muted">Your stickers · tap one to stick it on (as many times as you like)</p>
+        <p class="buddy-muted">Your stickers${PlannerStickers.ownedFurniture(state).length > 0 ? ' and furniture' : ''} · tap one to add it (as many times as you like)</p>
         <ul class="sticker-tray">${tray}</ul>
       </div>`;
   }
@@ -4088,8 +4167,8 @@
       showToast(`Your page is full (${PlannerStickers.PAGE_MAX_STICKERS} stickers). Peel one off to add more.`, null);
       return;
     }
-    const name = PlannerStickers.findSticker(stickerId).name;
-    applyChange(`Stuck on ${name}`, () => {
+    const item = PlannerStickers.findSticker(stickerId);
+    applyChange(item.furniture ? `Put ${roomItemName(item)} in the room` : `Stuck on ${item.name}`, () => {
       selectedPageSticker = PlannerStickers.placeSticker(state, stickerId).key;
     });
   }
@@ -4099,7 +4178,8 @@
     if (!placed) {
       return;
     }
-    applyChange(`Peeled off ${PlannerStickers.findSticker(placed.id).name}`, () => {
+    const item = PlannerStickers.findSticker(placed.id);
+    applyChange(item.furniture ? `Took out ${roomItemName(item)}` : `Peeled off ${item.name}`, () => {
       PlannerStickers.peelSticker(state, placed.key);
       selectedPageSticker = null;
     });
@@ -4122,6 +4202,10 @@
   }
 
   function movePageSticker(key, x, y) {
+    if (key === ROOM_BUDDY_KEY) {
+      moveRoomBuddy(x, y);
+      return;
+    }
     const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
     if (!placed) {
       return;
@@ -4132,8 +4216,31 @@
     });
   }
 
+  function moveRoomBuddy(x, y) {
+    applyChange(`Moved ${roomBuddyName(false)}`, () => {
+      PlannerStickers.moveRoomBuddy(state, x, y);
+      selectedPageSticker = ROOM_BUDDY_KEY;
+    });
+  }
+
+  function resizeRoomBuddy(size) {
+    const before = PlannerStickers.roomBuddy(state).size;
+    if (PlannerStickers.stickerSize({ size }) === before) {
+      renderBuddy();
+      return;
+    }
+    applyChange(`Resized ${roomBuddyName(false)}`, () => {
+      PlannerStickers.resizeRoomBuddy(state, size);
+      selectedPageSticker = ROOM_BUDDY_KEY;
+    });
+  }
+
   // Changes the size, the tilt, or both, as one change to undo. The message says which changed.
   function reshapePageSticker(key, { size, tilt }) {
+    if (key === ROOM_BUDDY_KEY) {
+      resizeRoomBuddy(size);
+      return;
+    }
     const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
     if (!placed) {
       return;
@@ -4172,7 +4279,9 @@
       const box = element.getBoundingClientRect();
       const centerX = box.left + box.width / 2;
       const centerY = box.top + box.height / 2;
-      const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === Number(element.dataset.pageKey));
+      const key = pageKeyOf(element);
+      const placed =
+        key === ROOM_BUDDY_KEY ? PlannerStickers.roomBuddy(state) : PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
       stickerDrag.resize = {
         centerX,
         centerY,
@@ -4180,6 +4289,7 @@
         startAngle: Math.atan2(event.clientY - centerY, event.clientX - centerX),
         startSize: PlannerStickers.stickerSize(placed),
         startTilt: PlannerStickers.stickerTilt(placed),
+        tilts: key !== ROOM_BUDDY_KEY,
         size: null,
         tilt: null,
       };
@@ -4203,9 +4313,11 @@
       const size = Math.abs(stretch - 1) < RESHAPE_SIZE_DEAD_ZONE ? resize.startSize : resize.startSize * stretch;
       resize.size = Math.min(PlannerStickers.PAGE_SIZE_MAX, Math.max(PlannerStickers.PAGE_SIZE_MIN, size));
       const turned = ((Math.atan2(event.clientY - resize.centerY, event.clientX - resize.centerX) - resize.startAngle) * 180) / Math.PI;
-      resize.tilt = resize.startTilt + turned;
       element.style.setProperty('--sticker-size', resize.size);
-      element.style.setProperty('--sticker-tilt', `${PlannerStickers.stickerTilt({ tilt: resize.tilt })}deg`);
+      if (resize.tilts) {
+        resize.tilt = resize.startTilt + turned;
+        element.style.setProperty('--sticker-tilt', `${PlannerStickers.stickerTilt({ tilt: resize.tilt })}deg`);
+      }
       return;
     }
     element.classList.add('is-dragging');
@@ -4227,9 +4339,9 @@
     // A drag shouldn't also count as a tap that selects or unselects the sticker.
     element.addEventListener('click', (clickEvent) => clickEvent.stopPropagation(), { capture: true, once: true });
     if (resize) {
-      reshapePageSticker(Number(element.dataset.pageKey), { size: resize.size, tilt: resize.tilt });
+      reshapePageSticker(pageKeyOf(element), { size: resize.size, tilt: resize.tilt });
     } else {
-      movePageSticker(Number(element.dataset.pageKey), x, y);
+      movePageSticker(pageKeyOf(element), x, y);
     }
   }
 
@@ -4241,9 +4353,12 @@
     if (!element || (!steps[event.key] && !sizeSteps[event.key] && !tiltSteps[event.key])) {
       return;
     }
+    const key = pageKeyOf(element);
+    if (key === ROOM_BUDDY_KEY && tiltSteps[event.key]) {
+      return; // The buddy doesn't tilt.
+    }
     event.preventDefault();
-    const key = Number(element.dataset.pageKey);
-    const placed = PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
+    const placed = key === ROOM_BUDDY_KEY ? PlannerStickers.roomBuddy(state) : PlannerStickers.pageStickers(state).find((sticker) => sticker.key === key);
     if (sizeSteps[event.key]) {
       reshapePageSticker(key, { size: PlannerStickers.stickerSize(placed) + sizeSteps[event.key] * PAGE_SIZE_STEP });
     } else if (tiltSteps[event.key]) {
@@ -4337,9 +4452,11 @@
         : `<ul class="buddy-log">${log.slice(0, RECENT_POINTS_COUNT).map(renderPointsEntry).join('')}</ul>`;
     elements.buddy.innerHTML = `
       <div class="buddy-layout">
-        <section class="buddy-home">
+        <section class="buddy-stage">
           ${renderBuddyRoom(`<div class="buddy-big">${drawCurrentBuddy(where, mood, streak)}${renderStreakFlame(streak)}</div>`)}
-          ${decoratingRoom ? renderDecorateTools() : `${renderDecorateButton()}
+          ${decoratingRoom ? renderDecorateTools() : renderDecorateButton()}
+        </section>
+        <section class="buddy-home">
           ${renderMoodLine(mood)}
           <form class="buddy-name-form" id="buddy-name-form">
             <label class="field">
@@ -4355,7 +4472,7 @@
           <div class="buddy-streak-box">
             <p class="buddy-streak-now">${streakText(streak)}</p>
             <p class="buddy-muted">Best: ${dayCount(streak.best)} · ${nextBonusText(streak)}</p>
-          </div>`}
+          </div>
         </section>
         <div class="buddy-side">
           <section class="home-box">
@@ -4812,7 +4929,7 @@
     } else if (action === 'place-page-sticker') {
       placePageSticker(target.dataset.stickerId);
     } else if (action === 'select-page-sticker') {
-      const key = Number(target.dataset.pageKey) || null;
+      const key = pageKeyOf(target);
       selectedPageSticker = key === selectedPageSticker ? null : key;
       renderBuddy();
       if (key) {
@@ -4823,7 +4940,9 @@
     } else if (action === 'page-sticker-to-front' || action === 'page-sticker-to-back') {
       layerPageSticker(action === 'page-sticker-to-front');
     } else if (action === 'open-shop') {
-      openThemeShop();
+      openThemeShop(target.dataset.shopSection || null);
+    } else if (action === 'shop-buy-furniture') {
+      buyFurniture(target.dataset.furnitureId);
     } else if (action === 'close-shop') {
       elements.shopDialog.close();
     } else if (action === 'shop-buy') {

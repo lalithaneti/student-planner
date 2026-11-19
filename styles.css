@@ -3249,6 +3249,19 @@ dialog::backdrop {
   margin-top: 4px;
 }
 
+/* Path themes and Room, the shop's two parts. */
+.shop-section-heading {
+  margin: 20px 0 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 8px;
+}
+
+.shop-furniture-preview .sticker-art {
+  width: 70px;
+  margin: 0 auto;
+}
+
 .shop-in-use {
   margin-top: 4px;
   font-weight: 700;
@@ -3986,6 +3999,15 @@ button.buddy-path-chest {
     drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
 }
 
+/* Furniture has no die-cut edge, just a soft shadow, and isn't round. */
+.sticker-art.is-furniture {
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 25%));
+}
+
+.page-sticker:has(.is-furniture) {
+  border-radius: 8px;
+}
+
 /* A rare sticker's edge is gold instead of white. */
 .sticker-art.is-rare {
   width: 96px;
@@ -4001,38 +4023,59 @@ button.buddy-path-chest {
   color: var(--text-muted);
 }
 
-/* The buddy's room: the top of its box, where found stickers sit behind it. It spans the
-   box's full width (undoing the box's padding) so stickers can go right to the edges. */
+/* The buddy's room: a wide box across the top of the Study Buddy tab, with the buddy, stickers,
+   and furniture in it. It's the same shape on a phone and a laptop (a phone shows a smaller copy),
+   so every spot, saved as a percentage, looks the same everywhere. */
+.buddy-stage {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
+  text-align: center;
+}
+
 .buddy-room {
   position: relative;
-  margin: -20px -16px 0;
-  padding: 20px 16px 4px;
-  border-radius: var(--radius) var(--radius) 0 0;
+  aspect-ratio: 3 / 2;
+  border-radius: calc(var(--radius) - 4px);
 }
 
-.buddy-room .buddy-big {
+/* The buddy stands in the room like a sticker, in front of stickers sent to the back. */
+.page-sticker.room-buddy {
+  --sticker-base: 38%;
   z-index: 1;
+  border-radius: 12px;
 }
 
-/* While decorating, stickers come in front so ones behind the buddy can be grabbed. */
+.room-buddy .buddy-big {
+  width: 100%;
+}
+
+/* While decorating, everything keeps its real front/back order, so To back shows right away. The
+   buddy is a little see-through, so things behind it still show. */
 .buddy-room.is-decorating {
   outline: 2px dashed var(--accent);
-  outline-offset: -6px;
+  outline-offset: 2px;
 }
 
-.buddy-room.is-decorating .page-sticker {
-  z-index: 2;
+.buddy-room.is-decorating .room-buddy:not(.is-selected) {
+  opacity: 0.8;
 }
 
-.buddy-decorate {
+.buddy-room-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   margin-top: 4px;
 }
 
-/* Each sticker is about a sixth of the room wide times its size (half to double), centered on its spot. */
+/* Each sticker is about a ninth of the room wide times its size (half to double), centered on its spot. */
 .page-sticker {
   position: absolute;
   z-index: 0;
-  width: calc(17% * var(--sticker-size, 1));
+  width: calc(var(--sticker-base, 11%) * var(--sticker-size, 1));
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -4060,11 +4103,6 @@ button.page-sticker {
   outline-offset: 3px;
 }
 
-/* The selected sticker sits on top so its corner dot can always be grabbed. */
-.buddy-room.is-decorating .page-sticker.is-selected {
-  z-index: 3;
-}
-
 /* The corner dot for resizing: small to look at, with a finger-sized area around it to grab. */
 .sticker-resize-handle {
   position: absolute;
@@ -4086,7 +4124,6 @@ button.page-sticker {
 }
 
 .page-sticker.is-dragging {
-  z-index: 1;
   cursor: grabbing;
   scale: 1.08;
 }

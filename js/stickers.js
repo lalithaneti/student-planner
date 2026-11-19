@@ -370,9 +370,40 @@ const PlannerStickers = (() => {
       </svg>`;
   }
 
+  // ---------- Furniture ----------
+  // Things for the buddy's room, bought with gems in the Gem shop (state.ownedFurniture lists
+  // what's been bought, for every semester). Once bought, a piece goes in the room like a sticker,
+  // as many times as wanted. `width` is its normal width as a percentage of the room.
+  const FURNITURE = [
+    {
+      id: 'bed',
+      name: 'Bed',
+      price: 20,
+      width: 30,
+      furniture: true,
+      art: `<g fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5">
+          <rect x="11" y="78" width="7" height="14" rx="2" /><rect x="83" y="78" width="7" height="14" rx="2" />
+          <rect x="5" y="20" width="18" height="64" rx="9" />
+          <rect x="79" y="44" width="16" height="40" rx="8" />
+          <rect x="9" y="68" width="83" height="14" rx="5" />
+        </g>
+        <rect x="16" y="52" width="70" height="20" rx="7" fill="#fffdf8" stroke="#d6d0c6" stroke-width="2.5" />
+        <path d="M22 50 C22 40 44 40 44 50 C44 56 22 56 22 50 Z" fill="#fff" stroke="#d6d0c6" stroke-width="2.5" />
+        <path d="M40 50 C40 46 44 45 48 45 H84 C87 45 88 47 88 50 V70 C88 74 86 76 82 76 H46 C42 76 40 74 40 70 Z" fill="#c9b6f2" stroke="#a48ad8" stroke-width="2.5" stroke-linejoin="round" />
+        <path d="M40 54 H88" stroke="#a48ad8" stroke-width="2" />
+        <path d="M40 50 V54 C40 52 44 51 48 51 H88" fill="#e3d8fb" stroke="#a48ad8" stroke-width="2" />
+        <g fill="#fff" opacity="0.85">
+          <circle cx="52" cy="62" r="2.2" /><circle cx="64" cy="68" r="2.2" /><circle cx="76" cy="61" r="2.2" /><circle cx="58" cy="71" r="1.8" /><circle cx="82" cy="70" r="1.8" />
+        </g>`,
+    },
+  ];
+
   function drawSticker(sticker) {
     if (sticker.rare) {
       return drawRareSticker(sticker);
+    }
+    if (sticker.furniture) {
+      return `<svg class="sticker-art is-furniture" viewBox="0 0 100 100" aria-hidden="true" focusable="false">${sticker.art}</svg>`;
     }
     return `<svg class="sticker-art" viewBox="-4 -4 108 108" aria-hidden="true" focusable="false">${sticker.art}</svg>`;
   }
@@ -385,11 +416,38 @@ const PlannerStickers = (() => {
   const RARE_CHANCE = 6;
 
   function findSticker(id) {
-    return [...STICKERS, ...RARE_STICKERS].find((sticker) => sticker.id === id) || null;
+    return [...STICKERS, ...RARE_STICKERS, ...FURNITURE].find((sticker) => sticker.id === id) || null;
   }
 
   function foundStickers(state) {
     return (state.stickerBook && state.stickerBook.found) || [];
+  }
+
+  function ownedFurniture(state) {
+    return FURNITURE.filter((piece) => (state.ownedFurniture || []).includes(piece.id));
+  }
+
+  // The Gem shop's Room section: each piece marked 'owned', 'affordable', or 'short' (not enough gems).
+  function furnitureShop(state) {
+    const balance = PlannerBuddy.gemBalance(state);
+    const owned = new Set(ownedFurniture(state).map((piece) => piece.id));
+    return FURNITURE.map((piece) => ({
+      id: piece.id,
+      price: piece.price,
+      status: owned.has(piece.id) ? 'owned' : balance >= piece.price ? 'affordable' : 'short',
+    }));
+  }
+
+  // Buys a piece of furniture. Returns false (and changes nothing) if it isn't sold, is already
+  // owned, or costs more gems than there are.
+  function buyFurniture(state, id) {
+    const offer = furnitureShop(state).find((item) => item.id === id);
+    if (!offer || offer.status !== 'affordable') {
+      return false;
+    }
+    state.ownedFurniture = [...(state.ownedFurniture || []), id];
+    state.gemsSpent = (state.gemsSpent || 0) + offer.price;
+    return true;
   }
 
   // A number from a chest's semester and week, so its sticker looks random but is the same
@@ -447,8 +505,13 @@ const PlannerStickers = (() => {
   const PAGE_MAX_STICKERS = 60;
 
   // The stickers on the page, oldest (bottom) first. Skips anything not found or not readable.
+  // Found stickers and bought furniture can go on the page.
+  function placeableIds(state) {
+    return new Set([...foundStickers(state).map((entry) => entry.id), ...ownedFurniture(state).map((piece) => piece.id)]);
+  }
+
   function pageStickers(state) {
-    const found = new Set(foundStickers(state).map((entry) => entry.id));
+    const found = placeableIds(state);
     const placed = (state.stickerPage && state.stickerPage.stickers) || [];
     return placed.filter(
       (sticker) => sticker && found.has(sticker.id) && Number.isInteger(sticker.key) && Number.isFinite(sticker.x) && Number.isFinite(sticker.y),
@@ -470,10 +533,11 @@ const PlannerStickers = (() => {
     return Number.isFinite(sticker.size) ? clampSize(sticker.size) : 1;
   }
 
-  // Sticks a found sticker on the page and returns it, or null if it isn't found or the page is full.
+  // Sticks a found sticker (or bought furniture) on the page and returns it, or null if it isn't
+  // found or bought, or the page is full.
   function placeSticker(state, stickerId) {
     const placed = pageStickers(state);
-    if (!foundStickers(state).some((entry) => entry.id === stickerId) || placed.length >= PAGE_MAX_STICKERS) {
+    if (!placeableIds(state).has(stickerId) || placed.length >= PAGE_MAX_STICKERS) {
       return null;
     }
     const key = placed.reduce((highest, sticker) => Math.max(highest, sticker.key), 0) + 1;
@@ -544,6 +608,27 @@ const PlannerStickers = (() => {
     return true;
   }
 
+  // Where the buddy stands in the room (its middle, as percentages like a sticker) and its size.
+  // One spot for every semester's buddy; until it's moved, it stands in the middle near the bottom.
+  const ROOM_BUDDY_HOME = { x: 50, y: 60, size: 1 };
+
+  function roomBuddy(state) {
+    const spot = state.roomBuddy || {};
+    return {
+      x: Number.isFinite(spot.x) ? clampSpot(spot.x) : ROOM_BUDDY_HOME.x,
+      y: Number.isFinite(spot.y) ? clampSpot(spot.y) : ROOM_BUDDY_HOME.y,
+      size: stickerSize(spot),
+    };
+  }
+
+  function moveRoomBuddy(state, x, y) {
+    state.roomBuddy = { ...roomBuddy(state), x: clampSpot(x), y: clampSpot(y) };
+  }
+
+  function resizeRoomBuddy(state, size) {
+    state.roomBuddy = { ...roomBuddy(state), size: clampSize(size) };
+  }
+
   function peelSticker(state, key) {
     state.stickerPage = { stickers: pageStickers(state).filter((sticker) => sticker.key !== key) };
   }
@@ -551,12 +636,16 @@ const PlannerStickers = (() => {
   return {
     STICKERS,
     RARE_STICKERS,
+    FURNITURE,
     PAGE_MAX_STICKERS,
     drawSticker,
     findSticker,
     foundStickers,
     giveSticker,
     giveMissedStickers,
+    ownedFurniture,
+    furnitureShop,
+    buyFurniture,
     pageStickers,
     placeSticker,
     moveSticker,
@@ -567,6 +656,9 @@ const PlannerStickers = (() => {
     stickerTilt,
     tiltSticker,
     isInFront,
+    roomBuddy,
+    moveRoomBuddy,
+    resizeRoomBuddy,
     stickerToFront,
     stickerToBack,
     peelSticker,
