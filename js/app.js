@@ -4180,8 +4180,8 @@
     return PlannerStickers.drawSticker(roomLook(item));
   }
 
-  // Tapping a visiting buddy (outside Decorate) shows a speech bubble; each tap says the next line.
-  const VISITOR_LINES = ['Hi from {semester}!', 'You’ve got this!', 'So proud of you!', 'Don’t forget to take a break!', 'I love what you did with the room!'];
+  // Tapping a visiting buddy (outside Decorate) shows a speech bubble; each tap says the next line,
+  // fitting the time of day.
   const VISITOR_BUBBLE_MS = 3500;
   const visitorLinesSaid = new Map();
 
@@ -4193,7 +4193,16 @@
     const bubble = document.createElement('span');
     bubble.className = 'visitor-bubble';
     bubble.setAttribute('role', 'status');
-    bubble.textContent = VISITOR_LINES[said % VISITOR_LINES.length].replace('{semester}', item.semesterName);
+    const today = todayKey();
+    const tomorrow = model.addDays(today, 1);
+    const notDone = model.buildDueList(state).filter((due) => !due.done);
+    bubble.textContent = PlannerStickers.visitorLine({
+      semesterName: item.semesterName,
+      time: roomTimeOfDay(),
+      said,
+      leftToday: notDone.filter((due) => due.date === today).length,
+      dueTomorrow: notDone.filter((due) => due.date === tomorrow).length,
+    });
     button.append(bubble);
     setTimeout(() => bubble.remove(), VISITOR_BUBBLE_MS);
   }

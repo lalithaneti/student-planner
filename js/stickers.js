@@ -1098,6 +1098,34 @@ const PlannerStickers = (() => {
   }
 
   // Every semester with a buddy can visit.
+  // What a visitor says when tapped: "Hi from <semester>!" first, then, tap by tap, the lines for
+  // the time of day and one about the real day (what's left today, or at night what's due tomorrow).
+  const VISITOR_TIME_LINES = {
+    morning: ['Good morning! ☀️', 'Ready for today?', 'Breakfast first!'],
+    day: ['You’ve got this!', 'Don’t forget to take a break!', 'So proud of you!'],
+    evening: ['Almost done for the day!', 'Dinner time? 🍜', 'I love what you did with the room!'],
+    night: ['It’s getting late…', 'Get some rest soon! 🌙', 'Sweet dreams! 💤'],
+  };
+
+  const things = (count) => `${count} thing${count === 1 ? '' : 's'}`;
+
+  function visitorDueLine(time, leftToday, dueTomorrow) {
+    if (time === 'night') {
+      return dueTomorrow > 0 ? `You have ${things(dueTomorrow)} due tomorrow 👀` : 'Nothing due tomorrow. Sleep well! 🌙';
+    }
+    return leftToday > 0 ? `You have ${things(leftToday)} left today!` : 'All done for today! 🎉';
+  }
+
+  // `said` is how many lines this visitor has said before; `leftToday` and `dueTomorrow` count work
+  // not checked off yet.
+  function visitorLine({ semesterName, time, said, leftToday, dueTomorrow }) {
+    if (said === 0) {
+      return `Hi from ${semesterName}!`;
+    }
+    const lines = [...VISITOR_TIME_LINES[time], visitorDueLine(time, leftToday, dueTomorrow)];
+    return lines[(said - 1) % lines.length];
+  }
+
   function visitorIds(state) {
     return Object.keys(state.buddies || {})
       .filter((semesterId) => (state.semesters || []).some((semester) => semester.id === semesterId))
@@ -1380,6 +1408,8 @@ const PlannerStickers = (() => {
     buyFurniture,
     visitorId,
     visitorSemester,
+    VISITOR_TIME_LINES,
+    visitorLine,
     trophiesFor,
     drawTrophyShelf,
     findSurface,
