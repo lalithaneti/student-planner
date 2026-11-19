@@ -1323,8 +1323,10 @@
       <ul class="shop-grid">${renderFurnitureCards()}</ul>
       <p class="buddy-muted">Furniture goes in your buddy’s room with 🎨 Decorate on the Study Buddy tab, as many times as you like.</p>
       <h3 class="due-heading">Wallpaper</h3>
-      <ul class="shop-grid">${renderWallpaperCards()}</ul>
-      <p class="buddy-muted">Wallpaper you buy is yours to keep. Switching is free.</p>
+      <ul class="shop-grid">${renderSurfaceCards('wall')}</ul>
+      <h3 class="due-heading">Floors</h3>
+      <ul class="shop-grid">${renderSurfaceCards('floor')}</ul>
+      <p class="buddy-muted">Wallpaper and floors you buy are yours to keep. Switching is free.</p>
       <div class="button-row"><button type="button" class="text-button" data-action="close-shop">Close</button></div>`;
   }
 
@@ -1349,51 +1351,68 @@
       .join('');
   }
 
-  function renderWallpaperCards() {
+  // How the shop talks about each of the room's surfaces.
+  const SURFACE_WORDS = {
+    wall: { label: 'For your buddy’s wall', what: 'wallpaper', goesIn: 'goes up' },
+    floor: { label: 'For your buddy’s floor', what: 'floor', goesIn: 'goes in' },
+  };
+
+  // The shop's cards for wallpaper ('wall') or floors ('floor'): In use, Use, Buy, or not enough gems yet.
+  function renderSurfaceCards(kind) {
     const balance = buddy.gemBalance(state);
-    const inUse = PlannerStickers.roomWallpaper(state).id;
-    return PlannerStickers.wallpaperShop(state)
+    const inUse = PlannerStickers.roomSurface(state, kind).id;
+    return PlannerStickers.surfaceShop(state, kind)
       .map((item) => {
-        const wallpaper = PlannerStickers.findWallpaper(item.id);
+        const pattern = PlannerStickers.findSurface(kind, item.id);
+        const data = `data-surface="${kind}" data-pattern-id="${item.id}"`;
         let action;
         if (item.status === 'owned') {
           action =
             item.id === inUse
               ? '<span class="shop-in-use">In use ✓</span>'
-              : `<button type="button" class="secondary-button" data-action="shop-use-wallpaper" data-wallpaper-id="${item.id}">Use</button>`;
+              : `<button type="button" class="secondary-button" data-action="shop-use-surface" ${data}>Use</button>`;
         } else if (item.status === 'short') {
           action = `<button type="button" class="secondary-button" disabled>Need 💎 ${item.price - balance} more</button>`;
         } else {
-          action = `<button type="button" class="primary-button" data-action="shop-buy-wallpaper" data-wallpaper-id="${item.id}">Buy for 💎 ${item.price}</button>`;
+          action = `<button type="button" class="primary-button" data-action="shop-buy-surface" ${data}>Buy for 💎 ${item.price}</button>`;
         }
         return `<li class="shop-card">
-            <span class="shop-wallpaper-preview${wallpaper.pattern ? '' : ' is-plain'}" style="${wallpaper.pattern ? `background:${wallpaper.pattern}` : ''}" aria-hidden="true"></span>
-            <strong>${wallpaper.name}</strong>
-            <span class="buddy-muted">${item.price === 0 ? 'Free' : 'For your buddy’s wall'}</span>
+            ${renderSurfacePreview(kind, pattern.pattern)}
+            <strong>${pattern.name}</strong>
+            <span class="buddy-muted">${item.price === 0 ? 'Free' : SURFACE_WORDS[kind].label}</span>
             ${action}
           </li>`;
       })
       .join('');
   }
 
-  async function buyWallpaper(wallpaperId) {
-    const offer = PlannerStickers.wallpaperShop(state).find((item) => item.id === wallpaperId);
+  // A wallpaper preview is the wall's shape. A floor preview is a tiny room: a plain wall with the
+  // floor below it in its true shape, so the pattern isn't stretched.
+  function renderSurfacePreview(kind, pattern) {
+    const fill = pattern ? `<span class="shop-surface-fill" style="background:${pattern}"></span>` : '';
+    return `<span class="shop-surface-preview is-${kind}${pattern ? '' : ' is-plain'}" aria-hidden="true">${fill}</span>`;
+  }
+
+  async function buySurface(kind, patternId) {
+    const offer = PlannerStickers.surfaceShop(state, kind).find((item) => item.id === patternId);
     if (!offer || offer.status !== 'affordable') {
       return;
     }
-    const name = PlannerStickers.findWallpaper(wallpaperId).name;
-    const answer = await askChoice(`Buy ${name} wallpaper for 💎 ${offer.price}? It goes up in your buddy’s room right away.`, [
+    const name = PlannerStickers.findSurface(kind, patternId).name;
+    const { what, goesIn } = SURFACE_WORDS[kind];
+    const answer = await askChoice(`Buy the ${name} ${what} for 💎 ${offer.price}? It ${goesIn} in your buddy’s room right away.`, [
       { value: 'buy', label: `Buy for 💎 ${offer.price}`, className: 'primary-button' },
     ]);
     if (answer !== 'buy') {
       return;
     }
-    applyChange(`Bought ${name} wallpaper! It’s up in the room now 🎉`, () => PlannerStickers.buyWallpaper(state, wallpaperId));
+    applyChange(`Bought the ${name} ${what}! It’s in the room now 🎉`, () => PlannerStickers.buySurface(state, kind, patternId));
     renderThemeShop();
   }
 
-  function useWallpaper(wallpaperId) {
-    applyChange(`Wallpaper: ${PlannerStickers.findWallpaper(wallpaperId).name}`, () => PlannerStickers.useWallpaper(state, wallpaperId));
+  function useSurface(kind, patternId) {
+    const name = PlannerStickers.findSurface(kind, patternId).name;
+    applyChange(`${kind === 'wall' ? 'Wallpaper' : 'Floor'}: ${name}`, () => PlannerStickers.useSurface(state, kind, patternId));
     renderThemeShop();
   }
 
@@ -4175,9 +4194,13 @@
             >${PlannerStickers.drawSticker(sticker)}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
-    const { pattern } = PlannerStickers.roomWallpaper(state);
-    const wall = pattern ? `<div class="room-wall" style="background:${pattern}" aria-hidden="true"></div>` : '';
-    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${wall}${stickers}${renderRoomBuddy(buddyArt)}</div>`;
+    const surfaces = ['wall', 'floor']
+      .map((kind) => {
+        const { pattern } = PlannerStickers.roomSurface(state, kind);
+        return pattern ? `<div class="room-${kind}" style="background:${pattern}" aria-hidden="true"></div>` : '';
+      })
+      .join('');
+    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${surfaces}${stickers}${renderRoomBuddy(buddyArt)}</div>`;
   }
 
   // 🎨 Decorate (once there's a sticker or furniture to use) and the Gem shop's Room section.
@@ -4997,10 +5020,10 @@
       openThemeShop(target.dataset.shopSection || null);
     } else if (action === 'shop-buy-furniture') {
       buyFurniture(target.dataset.furnitureId);
-    } else if (action === 'shop-buy-wallpaper') {
-      buyWallpaper(target.dataset.wallpaperId);
-    } else if (action === 'shop-use-wallpaper') {
-      useWallpaper(target.dataset.wallpaperId);
+    } else if (action === 'shop-buy-surface') {
+      buySurface(target.dataset.surface, target.dataset.patternId);
+    } else if (action === 'shop-use-surface') {
+      useSurface(target.dataset.surface, target.dataset.patternId);
     } else if (action === 'close-shop') {
       elements.shopDialog.close();
     } else if (action === 'shop-buy') {

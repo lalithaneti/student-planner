@@ -4041,31 +4041,60 @@ button.buddy-path-chest {
   border-radius: calc(var(--radius) - 4px);
 }
 
-/* The wallpaper covers the top 70% of the room (its wall), with a wooden baseboard along the
-   bottom. Dimmer in dark mode, like the decorated themes. */
-.room-wall {
+/* The wallpaper covers the top 70% of the room (its wall) and the floor the bottom 30%, with a
+   wooden baseboard between them. Dimmer in dark mode, like the decorated themes. */
+.room-wall,
+.room-floor {
   position: absolute;
-  inset: 0 0 30%;
   border-radius: inherit;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom: 5px solid #c98f5c;
   pointer-events: none;
 }
 
-.dark .room-wall {
+.room-wall {
+  inset: 0 0 30%;
+  border-bottom: 5px solid #c98f5c;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* The floor sits under the baseboard, with a soft shadow along the wall. */
+.room-floor {
+  inset: 70% 0 0;
+  border-top: 5px solid #c98f5c;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  box-shadow: inset 0 10px 12px -8px rgb(0 0 0 / 0.25);
+}
+
+/* With both, the wall's baseboard is the only one. */
+.room-wall + .room-floor {
+  border-top: 0;
+}
+
+.dark :is(.room-wall, .room-floor) {
   filter: brightness(0.85);
 }
 
-.shop-wallpaper-preview {
+.shop-surface-preview {
+  position: relative;
   display: block;
+  overflow: hidden;
   aspect-ratio: 3 / 1.4;
   border: 1px solid var(--border);
   border-radius: 8px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
 }
 
-.shop-wallpaper-preview.is-plain {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface));
+.shop-surface-fill {
+  position: absolute;
+  inset: 0;
+}
+
+/* The floor's true shape (3 by 0.6) along the bottom, under a baseboard. */
+.shop-surface-preview.is-floor .shop-surface-fill {
+  inset: auto 0 0;
+  aspect-ratio: 3 / 0.6;
+  border-top: 3px solid #c98f5c;
 }
 
 /* The buddy stands in the room like a sticker, in front of stickers sent to the back. */

@@ -574,21 +574,41 @@ const PlannerStickers = (() => {
     },
   ];
 
-  // ---------- Wallpaper ----------
-  // Patterns for the top of the buddy's room (its wall), bought with gems in the Gem shop like path
-  // themes: bought once (state.ownedWallpapers), then switched for free (state.roomWallpaper).
-  // Plain, the room with no wallpaper, is free. Each pattern is a CSS background, sized in
-  // percentages of the wall so it looks the same on a phone and a laptop.
+  // ---------- Wallpaper and floors ----------
+  // The room's two surfaces: the wall (its top 70%) and the floor (its bottom 30%, under the
+  // baseboard). Patterns are bought with gems in the Gem shop like path themes: bought once, then
+  // switched for free. Plain (no pattern) is free. Each pattern is a CSS background, sized in
+  // percentages of its surface so it looks the same on a phone and a laptop.
 
-  // The wall is the top 70% of a 3-by-2 room, so it's 3 wide by 1.4 tall.
+  // A 3-by-2 room: the wall is 3 wide by 1.4 tall, the floor 3 wide by 0.6 tall.
   const WALL_SHAPE = 3 / 1.4;
+  const FLOOR_SHAPE = 3 / 0.6;
 
-  // A small square picture repeated `across` times across the wall, over a solid color. The color
-  // is its own layer (not part of each picture) so no thin lines show where the pictures meet.
-  function wallTile(svg, color, across) {
+  // A small picture (`viewWidth` by `viewHeight`) repeated `across` times across a surface of the
+  // given shape, over a solid color. The color is its own layer (not part of each picture) so no
+  // thin lines show where the pictures meet.
+  function surfaceTile({ svg, viewWidth = 40, viewHeight = 40, color, across, shape }) {
     const width = 100 / across;
-    const picture = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">${svg}</svg>`);
-    return `url('data:image/svg+xml,${picture}') 0 0 / ${width.toFixed(3)}% ${(width * WALL_SHAPE).toFixed(3)}%, ${color}`;
+    const height = (width * shape * viewHeight) / viewWidth;
+    const picture = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewWidth} ${viewHeight}">${svg}</svg>`);
+    return `url('data:image/svg+xml,${picture}') 0 0 / ${width.toFixed(3)}% ${height.toFixed(3)}%, ${color}`;
+  }
+
+  const wallTile = (svg, color, across) => surfaceTile({ svg, color, across, shape: WALL_SHAPE });
+  const floorTile = (svg, color, across) => surfaceTile({ svg, color, across, shape: FLOOR_SHAPE });
+
+  // Checks of two colors, `across` pairs wide, square on a surface of the given shape.
+  function checks(first, second, across, shape) {
+    const width = 100 / across;
+    return `conic-gradient(${first} 25%, ${second} 0 50%, ${first} 0 75%, ${second} 0) 0 0 / ${width.toFixed(3)}% ${(width * shape).toFixed(3)}%`;
+  }
+
+  // Long floorboards running sideways, four rows deep, with staggered ends.
+  function floorboards(color, line) {
+    const svg = `<g fill="${line}"><rect x="50" y="0" width="30" height="16" opacity="0.14" /><rect x="0" y="16" width="12" height="16" opacity="0.08" /><rect x="66" y="16" width="14" height="16" opacity="0.2" /></g>
+      <path d="M0 15.5 H80 M0 31.5 H80 M50 0 V15.5 M12 16 V31.5 M66 16 V31.5" stroke="${line}" stroke-width="1.2" />
+      <path d="M6 6 H30 M56 10 H74 M20 22 H48 M30 27 H60" stroke="${line}" stroke-width="0.6" opacity="0.5" />`;
+    return surfaceTile({ svg, viewWidth: 80, viewHeight: 32, color, across: 4, shape: FLOOR_SHAPE });
   }
 
   const DAISY = [0, 72, 144, 216, 288]
@@ -654,49 +674,101 @@ const PlannerStickers = (() => {
     },
   ];
 
-  function findWallpaper(id) {
-    return WALLPAPERS.find((wallpaper) => wallpaper.id === id) || null;
+  const FLOORS = [
+    { id: 'plain', name: 'Plain', price: 0, pattern: null },
+    {
+      id: 'pink-carpet',
+      name: 'Pink carpet',
+      price: 8,
+      pattern:
+        'repeating-linear-gradient(45deg, rgb(255 255 255 / 0.2) 0 0.5%, transparent 0.5% 1%), repeating-linear-gradient(-45deg, rgb(229 138 165 / 0.15) 0 0.5%, transparent 0.5% 1%), #f6c6d6',
+    },
+    { id: 'mint-tiles', name: 'Mint tiles', price: 8, pattern: checks('#bfe8d4', '#f4fffa', 12, FLOOR_SHAPE) },
+    {
+      id: 'night-rug',
+      name: 'Night rug',
+      price: 12,
+      pattern: floorTile(
+        '<circle cx="8" cy="10" r="1.3" fill="#ffd97a" /><circle cx="27" cy="6" r="0.9" fill="#fff3b0" /><circle cx="20" cy="26" r="1.1" fill="#ffd97a" /><circle cx="35" cy="33" r="0.8" fill="#fff" /><circle cx="5" cy="34" r="0.8" fill="#fff3b0" />',
+        '#2b3160',
+        16,
+      ),
+    },
+    { id: 'picnic', name: 'Picnic checks', price: 10, pattern: checks('#ff9eb9', '#fff', 6, FLOOR_SHAPE) },
+    {
+      id: 'grass',
+      name: 'Grass',
+      price: 12,
+      pattern: floorTile(
+        '<path d="M8 30 L10 22 L12 30 M14 30 L15 24 L17 30 M27 14 L29 7 L31 14 M33 14 L34 9 L36 14" fill="none" stroke="#6fb864" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /><circle cx="22" cy="34" r="1.6" fill="#fff" /><circle cx="22" cy="34" r="0.7" fill="#ffc94d" />',
+        '#a3dc95',
+        14,
+      ),
+    },
+    {
+      id: 'cloud-carpet',
+      name: 'Cloud carpet',
+      price: 12,
+      pattern: floorTile(
+        '<path d="M6 22 C6 14 16 14 16 20 C16 26 9 25 10 20" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" /><path d="M24 36 C24 30 32 30 32 34" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.8" /><circle cx="30" cy="10" r="3" fill="#fff" opacity="0.7" />',
+        '#dceeff',
+        14,
+      ),
+    },
+    { id: 'light-wood', name: 'Light wood', price: 15, pattern: floorboards('#f0c995', '#c99a62') },
+    { id: 'dark-wood', name: 'Dark wood', price: 15, pattern: floorboards('#9a6a46', '#6f4a30') },
+  ];
+
+  // Where each surface's patterns and choices are kept in the planner.
+  const SURFACES = {
+    wall: { patterns: WALLPAPERS, owned: 'ownedWallpapers', picked: 'roomWallpaper' },
+    floor: { patterns: FLOORS, owned: 'ownedFloors', picked: 'roomFloor' },
+  };
+
+  function findSurface(kind, id) {
+    return SURFACES[kind].patterns.find((pattern) => pattern.id === id) || null;
   }
 
-  function ownsWallpaper(state, id) {
-    return id === 'plain' || (state.ownedWallpapers || []).includes(id);
+  function ownsSurface(state, kind, id) {
+    return id === 'plain' || (state[SURFACES[kind].owned] || []).includes(id);
   }
 
-  // The wallpaper on the room's wall: the one picked, if it's owned, or else Plain.
-  function roomWallpaper(state) {
-    const picked = findWallpaper(state.roomWallpaper);
-    return picked && ownsWallpaper(state, picked.id) ? picked : WALLPAPERS[0];
+  // The pattern on a surface: the one picked, if it's owned, or else Plain.
+  function roomSurface(state, kind) {
+    const picked = findSurface(kind, state[SURFACES[kind].picked]);
+    return picked && ownsSurface(state, kind, picked.id) ? picked : SURFACES[kind].patterns[0];
   }
 
-  // The Gem shop's wallpapers, each marked 'owned', 'affordable', or 'short' (not enough gems).
-  function wallpaperShop(state) {
+  // The Gem shop's patterns for a surface, each marked 'owned', 'affordable', or 'short' (not enough gems).
+  function surfaceShop(state, kind) {
     const balance = PlannerBuddy.gemBalance(state);
-    return WALLPAPERS.map((wallpaper) => ({
-      id: wallpaper.id,
-      price: wallpaper.price,
-      status: ownsWallpaper(state, wallpaper.id) ? 'owned' : balance >= wallpaper.price ? 'affordable' : 'short',
+    return SURFACES[kind].patterns.map((pattern) => ({
+      id: pattern.id,
+      price: pattern.price,
+      status: ownsSurface(state, kind, pattern.id) ? 'owned' : balance >= pattern.price ? 'affordable' : 'short',
     }));
   }
 
-  // Buys a wallpaper and puts it up. Returns false (and changes nothing) if it isn't sold, is
+  // Buys a pattern and puts it in. Returns false (and changes nothing) if it isn't sold, is
   // already owned, or costs more gems than there are.
-  function buyWallpaper(state, id) {
-    const offer = wallpaperShop(state).find((item) => item.id === id);
+  function buySurface(state, kind, id) {
+    const offer = surfaceShop(state, kind).find((item) => item.id === id);
     if (!offer || offer.status !== 'affordable') {
       return false;
     }
-    state.ownedWallpapers = [...(state.ownedWallpapers || []), id];
+    const { owned, picked } = SURFACES[kind];
+    state[owned] = [...(state[owned] || []), id];
     state.gemsSpent = (state.gemsSpent || 0) + offer.price;
-    state.roomWallpaper = id;
+    state[picked] = id;
     return true;
   }
 
-  // Puts up an owned wallpaper, for free. Returns false for one that isn't owned.
-  function useWallpaper(state, id) {
-    if (!findWallpaper(id) || !ownsWallpaper(state, id)) {
+  // Puts in an owned pattern, for free. Returns false for one that isn't owned.
+  function useSurface(state, kind, id) {
+    if (!findSurface(kind, id) || !ownsSurface(state, kind, id)) {
       return false;
     }
-    state.roomWallpaper = id;
+    state[SURFACES[kind].picked] = id;
     return true;
   }
 
@@ -940,6 +1012,7 @@ const PlannerStickers = (() => {
     RARE_STICKERS,
     FURNITURE,
     WALLPAPERS,
+    FLOORS,
     PAGE_MAX_STICKERS,
     drawSticker,
     findSticker,
@@ -949,11 +1022,11 @@ const PlannerStickers = (() => {
     ownedFurniture,
     furnitureShop,
     buyFurniture,
-    findWallpaper,
-    roomWallpaper,
-    wallpaperShop,
-    buyWallpaper,
-    useWallpaper,
+    findSurface,
+    roomSurface,
+    surfaceShop,
+    buySurface,
+    useSurface,
     pageStickers,
     placeSticker,
     moveSticker,
