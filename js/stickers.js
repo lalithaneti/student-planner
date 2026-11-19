@@ -371,11 +371,11 @@ const PlannerStickers = (() => {
   }
 
   // ---------- The window's sky ----------
-  // A window in the room shows the sky for the time of day: sunrise from 5 to 9 AM, day until
-  // 5 PM, sunset until 8 PM, then night. The shop and Decorate's tray show the daytime one.
+  // The time of day is morning from 5 to 9 AM, day until 5 PM, evening until 8 PM, then night.
+  // A window in the room shows the sky for it. The shop and Decorate's tray show the daytime one.
   const WINDOW_TIMES = ['morning', 'day', 'evening', 'night'];
 
-  function windowTimeFor(hour) {
+  function timeOfDayFor(hour) {
     if (hour >= 5 && hour < 9) {
       return 'morning';
     }
@@ -431,6 +431,49 @@ const PlannerStickers = (() => {
       <rect x="3" y="3" width="94" height="6" rx="3" fill="#e8b98a" stroke="#c98f5c" stroke-width="2" />`;
   }
 
+  // ---------- The room's light ----------
+  // The room takes on the time of day: a rosy tint in the morning, none in the day, golden in the
+  // evening, and a cozy dim blue at night. Lamps and fairy lights are on in the evening and at
+  // night; each `glows` spot ([x, y, radius] on the piece's 100-by-100 drawing) lights up the room
+  // around it.
+  const ROOM_LIGHTS = {
+    morning: { color: '#ffd2c8', opacity: 0.3 },
+    day: null,
+    evening: { color: '#ffc27f', opacity: 0.35 },
+    night: { color: '#34407a', opacity: 0.5 },
+  };
+
+  const lightsOnAt = (time) => time === 'evening' || time === 'night';
+
+  // The room is 3 wide by 2 tall: a distance across it is 1.5 times as much of its height.
+  const ROOM_SHAPE = 3 / 2;
+
+  // Where a placed piece's lights are in the room (percentages, like spots) and how wide each glow
+  // is (a percentage of the room's width), following its size and tilt.
+  function glowSpots(placed, item) {
+    const width = item.width * stickerSize(placed);
+    const turn = (stickerTilt(placed) * Math.PI) / 180;
+    const round = (value) => Math.round(value * 10) / 10;
+    return (item.glows || []).map(([glowX, glowY, radius]) => {
+      const across = ((glowX - 50) / 100) * width;
+      const down = ((glowY - 50) / 100) * width;
+      const turnedAcross = across * Math.cos(turn) - down * Math.sin(turn);
+      const turnedDown = across * Math.sin(turn) + down * Math.cos(turn);
+      return { x: round(placed.x + turnedAcross), y: round(placed.y + turnedDown * ROOM_SHAPE), size: round(((2 * radius) / 100) * width) };
+    });
+  }
+
+  // Fairy lights' bulbs: where each hangs on the string, and its color.
+  const FAIRY_BULBS = [
+    [11, 31, '#ffd97a'],
+    [24, 37, '#ffb3c7'],
+    [37, 35, '#b5e3cf'],
+    [50, 27, '#cfe9ff'],
+    [63, 35, '#ffd97a'],
+    [76, 37, '#ffb3c7'],
+    [89, 31, '#b5e3cf'],
+  ];
+
   // ---------- Furniture ----------
   // Things for the buddy's room, bought with gems in the Gem shop (state.ownedFurniture lists
   // what's been bought, for every semester). Once bought, a piece goes in the room like a sticker,
@@ -463,7 +506,8 @@ const PlannerStickers = (() => {
       price: 15,
       width: 26,
       furniture: true,
-      art: `<circle cx="27" cy="30" r="15" fill="#fff3b0" opacity="0.45" />
+      glows: [[27, 24, 34]],
+      art: `<circle class="lamp-glow" cx="27" cy="30" r="15" fill="#fff3b0" opacity="0.45" />
         <g fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5">
           <rect x="12" y="58" width="7" height="36" rx="2" /><rect x="81" y="58" width="7" height="36" rx="2" />
           <rect x="54" y="58" width="30" height="22" rx="3" />
@@ -531,18 +575,11 @@ const PlannerStickers = (() => {
       price: 10,
       width: 30,
       furniture: true,
+      glows: FAIRY_BULBS.map(([x, y]) => [x, y + 7, 16]),
       art: `<path d="M2 22 Q26 52 50 26 Q74 52 98 22" fill="none" stroke="#9c8a7a" stroke-width="2" />
-        ${[
-          [11, 31, '#ffd97a'],
-          [24, 37, '#ffb3c7'],
-          [37, 35, '#b5e3cf'],
-          [50, 27, '#cfe9ff'],
-          [63, 35, '#ffd97a'],
-          [76, 37, '#ffb3c7'],
-          [89, 31, '#b5e3cf'],
-        ]
+        ${FAIRY_BULBS
           .map(
-            ([x, y, color]) => `<circle cx="${x}" cy="${y + 7}" r="9" fill="${color}" opacity="0.35" />
+            ([x, y, color]) => `<circle class="lamp-glow" cx="${x}" cy="${y + 7}" r="9" fill="${color}" opacity="0.35" />
               <rect x="${x - 2}" y="${y - 1}" width="4" height="4" fill="#9c8a7a" />
               <ellipse cx="${x}" cy="${y + 7}" rx="4" ry="5.5" fill="${color}" stroke="#fff" stroke-width="1.2" />`,
           )
@@ -601,7 +638,8 @@ const PlannerStickers = (() => {
       price: 8,
       width: 11,
       furniture: true,
-      art: `<circle cx="50" cy="20" r="18" fill="#fff3b0" opacity="0.45" />
+      glows: [[50, 18, 40]],
+      art: `<circle class="lamp-glow" cx="50" cy="20" r="18" fill="#fff3b0" opacity="0.45" />
         <g fill="#e8b98a" stroke="#c98f5c" stroke-width="2.5">
           <rect x="27" y="88" width="7" height="8" rx="2" /><rect x="66" y="88" width="7" height="8" rx="2" />
           <rect x="20" y="46" width="60" height="44" rx="5" />
@@ -1256,7 +1294,10 @@ const PlannerStickers = (() => {
     FURNITURE,
     TROPHY_SHELF,
     WINDOW_TIMES,
-    windowTimeFor,
+    timeOfDayFor,
+    ROOM_LIGHTS,
+    lightsOnAt,
+    glowSpots,
     drawWindowArt,
     WALLPAPERS,
     FLOORS,

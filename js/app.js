@@ -4209,13 +4209,31 @@
     return PlannerStickers.drawTrophyShelf(trophies, frames, tappable);
   }
 
-  // A window in the room shows the sky for the time of day right now (the room redraws each minute).
+  // Morning, day, evening, or night right now (the room redraws each minute).
+  const roomTimeOfDay = () => PlannerStickers.timeOfDayFor(Number(currentTime().slice(0, 2)));
+
+  // A window in the room shows the sky for the time of day right now.
   function roomLook(sticker) {
-    if (sticker.id !== 'window') {
-      return sticker;
+    return sticker.id === 'window' ? { ...sticker, art: PlannerStickers.drawWindowArt(roomTimeOfDay()) } : sticker;
+  }
+
+  // Outside Decorate, the room's light for the time of day: a tint over everything, and a warm spot
+  // of light around each lamp and fairy light while they're on. While decorating, the room shows its
+  // normal colors so you can see what you're placing.
+  function renderRoomLight(placed) {
+    const time = roomTimeOfDay();
+    const tint = PlannerStickers.ROOM_LIGHTS[time];
+    if (decoratingRoom || !tint) {
+      return '';
     }
-    const time = PlannerStickers.windowTimeFor(Number(currentTime().slice(0, 2)));
-    return { ...sticker, art: PlannerStickers.drawWindowArt(time) };
+    const glows = PlannerStickers.lightsOnAt(time)
+      ? placed.flatMap((placedItem) => {
+          const item = roomItem(placedItem.id);
+          return item && item.glows ? PlannerStickers.glowSpots(placedItem, item) : [];
+        })
+      : [];
+    const spots = glows.map((glow) => `<span class="room-glow" style="left:${glow.x}%;top:${glow.y}%;width:${glow.size}%"></span>`).join('');
+    return `<div class="room-light" style="background:${tint.color};opacity:${tint.opacity}" aria-hidden="true"></div>${spots}`;
   }
 
   function trophyCount() {
@@ -4289,7 +4307,8 @@
         return pattern ? `<div class="room-${kind}" style="background:${pattern}" aria-hidden="true"></div>` : '';
       })
       .join('');
-    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}">${surfaces}${stickers}${renderRoomBuddy(buddyArt)}</div>`;
+    const lightsOn = PlannerStickers.lightsOnAt(roomTimeOfDay()) ? ' is-lights-on' : '';
+    return `<div class="buddy-room${decoratingRoom ? ' is-decorating' : ''}${lightsOn}">${surfaces}${stickers}${renderRoomBuddy(buddyArt)}${renderRoomLight(placed)}</div>`;
   }
 
   // 🎨 Decorate (there's always the buddy and the trophy shelf to place) and the Gem shop's Room section.

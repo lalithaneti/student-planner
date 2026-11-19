@@ -4097,6 +4097,33 @@ button.buddy-path-chest {
   border-top: 3px solid #c98f5c;
 }
 
+/* The room's light for the time of day: a tint over everything (on top of the buddy and every
+   item), then a warm spot of light around each lamp that's on. Lamps' own little glows only show
+   while they're on. */
+.room-light {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.room-glow {
+  position: absolute;
+  z-index: 7;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(255 226 150 / 0.7), rgb(255 214 130 / 0.25) 45%, transparent 70%);
+  mix-blend-mode: screen;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.buddy-room:not(.is-lights-on) .lamp-glow {
+  display: none;
+}
+
 /* A visiting buddy is drawn as itself (no sticker edge). Outside Decorate it can be tapped to say hi. */
 :is(.page-sticker, .tray-sticker) > .buddy-art {
   display: block;
@@ -4109,7 +4136,7 @@ button.buddy-path-chest {
 
 /* While it's talking, it comes in front so its speech bubble shows. */
 .page-sticker.is-visitor:has(.visitor-bubble) {
-  z-index: 5;
+  z-index: 8; /* above the room's light, so the bubble isn't dimmed */
 }
 
 .visitor-bubble {
