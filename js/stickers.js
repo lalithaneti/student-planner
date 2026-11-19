@@ -982,6 +982,27 @@ const PlannerStickers = (() => {
       <g transform="translate(78 58) scale(1.2)">${drawCup(CUP_COLORS[1])}</g>`,
   };
 
+  // ---------- Visiting buddies ----------
+  // Other semesters' buddies can visit the room, placed in Decorate like furniture (free, each
+  // once). One is saved on the page as 'visitor:' and its semester's id. While that semester is the
+  // one being viewed, its buddy is the main buddy, so the app hides the visitor instead.
+  const VISITOR_PREFIX = 'visitor:';
+  const VISITOR_WIDTH = 24;
+
+  const visitorId = (semesterId) => `${VISITOR_PREFIX}${semesterId}`;
+
+  // The semester a visitor id is for, or null for anything that isn't a visitor.
+  function visitorSemester(id) {
+    return typeof id === 'string' && id.startsWith(VISITOR_PREFIX) ? id.slice(VISITOR_PREFIX.length) : null;
+  }
+
+  // Every semester with a buddy can visit.
+  function visitorIds(state) {
+    return Object.keys(state.buddies || {})
+      .filter((semesterId) => (state.semesters || []).some((semester) => semester.id === semesterId))
+      .map(visitorId);
+  }
+
   function drawSticker(sticker) {
     if (sticker.rare) {
       return drawRareSticker(sticker);
@@ -1000,6 +1021,10 @@ const PlannerStickers = (() => {
   const RARE_CHANCE = 6;
 
   function findSticker(id) {
+    const semesterId = visitorSemester(id);
+    if (semesterId) {
+      return { id, name: 'Visiting buddy', width: VISITOR_WIDTH, furniture: true, visitor: true, semesterId };
+    }
     return [...STICKERS, ...RARE_STICKERS, ...FURNITURE, TROPHY_SHELF].find((sticker) => sticker.id === id) || null;
   }
 
@@ -1089,9 +1114,14 @@ const PlannerStickers = (() => {
   const PAGE_MAX_STICKERS = 60;
 
   // The stickers on the page, oldest (bottom) first. Skips anything not found or not readable.
-  // Found stickers and bought furniture can go on the page.
+  // Found stickers, bought furniture, the trophy shelf, and visiting buddies can go on the page.
   function placeableIds(state) {
-    return new Set([...foundStickers(state).map((entry) => entry.id), ...ownedFurniture(state).map((piece) => piece.id), TROPHY_SHELF_ID]);
+    return new Set([
+      ...foundStickers(state).map((entry) => entry.id),
+      ...ownedFurniture(state).map((piece) => piece.id),
+      TROPHY_SHELF_ID,
+      ...visitorIds(state),
+    ]);
   }
 
   function pageStickers(state) {
@@ -1117,12 +1147,14 @@ const PlannerStickers = (() => {
     return Number.isFinite(sticker.size) ? clampSize(sticker.size) : 1;
   }
 
-  // Sticks a found sticker (or bought furniture) on the page and returns it, or null if it isn't
-  // found or bought, or the page is full.
+  // Puts a found sticker, bought furniture, the trophy shelf, or a visiting buddy on the page and
+  // returns it, or null if it can't go there, is a once-only one already there, or the page is full.
   function placeSticker(state, stickerId) {
     const placed = pageStickers(state);
-    const shelfAlreadyUp = stickerId === TROPHY_SHELF_ID && placed.some((sticker) => sticker.id === TROPHY_SHELF_ID);
-    if (!placeableIds(state).has(stickerId) || placed.length >= PAGE_MAX_STICKERS || shelfAlreadyUp) {
+    // The trophy shelf and each visiting buddy go in only once.
+    const onlyOnce = stickerId === TROPHY_SHELF_ID || visitorSemester(stickerId) !== null;
+    const alreadyIn = onlyOnce && placed.some((sticker) => sticker.id === stickerId);
+    if (!placeableIds(state).has(stickerId) || placed.length >= PAGE_MAX_STICKERS || alreadyIn) {
       return null;
     }
     const key = placed.reduce((highest, sticker) => Math.max(highest, sticker.key), 0) + 1;
@@ -1237,6 +1269,8 @@ const PlannerStickers = (() => {
     ownedFurniture,
     furnitureShop,
     buyFurniture,
+    visitorId,
+    visitorSemester,
     trophiesFor,
     drawTrophyShelf,
     findSurface,

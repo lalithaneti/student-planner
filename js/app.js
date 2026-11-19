@@ -4145,11 +4145,57 @@
   const PAGE_TILT_STEP = 15; // degrees per [ or ] key press
   const RESHAPE_SIZE_DEAD_ZONE = 0.05; // a drag of the corner dot under 5% in or out only tilts
 
-  // What can go in the room: found stickers, then bought furniture.
+  // What can go in the room: found stickers, bought furniture, other semesters' buddies (oldest
+  // first), then the trophy shelf.
   function roomItemsInOrder() {
     const foundIds = new Set(PlannerStickers.foundStickers(state).map((entry) => entry.id));
     const stickers = [...PlannerStickers.STICKERS, ...PlannerStickers.RARE_STICKERS].filter((sticker) => foundIds.has(sticker.id));
-    return [...stickers, ...PlannerStickers.ownedFurniture(state), PlannerStickers.TROPHY_SHELF];
+    const visitors = state.semesters
+      .filter((semester) => semester.id !== state.currentSemesterId && (state.buddies || {})[semester.id])
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map((semester) => roomItem(PlannerStickers.visitorId(semester.id)));
+    return [...stickers, ...PlannerStickers.ownedFurniture(state), ...visitors, PlannerStickers.TROPHY_SHELF];
+  }
+
+  // A room item by id, with a visiting buddy named after itself or its semester.
+  function roomItem(id) {
+    const item = PlannerStickers.findSticker(id);
+    if (!item || !item.visitor) {
+      return item;
+    }
+    const semester = state.semesters.find((candidate) => candidate.id === item.semesterId);
+    const buddyName = ((state.buddies || {})[item.semesterId] || {}).name;
+    return { ...item, name: buddyName || `${semester ? semester.name : 'Visiting'} buddy`, named: Boolean(buddyName), semesterName: semester ? semester.name : '' };
+  }
+
+  // How a room item looks: the trophy shelf with what's earned, a window with the sky right now,
+  // a visiting buddy as it is now, or the item's own drawing.
+  function roomItemArt(item, tappable) {
+    if (item.id === PlannerStickers.TROPHY_SHELF.id) {
+      return renderTrophyShelf(tappable);
+    }
+    if (item.visitor) {
+      return semesterBuddy(item.semesterId).art;
+    }
+    return PlannerStickers.drawSticker(roomLook(item));
+  }
+
+  // Tapping a visiting buddy (outside Decorate) shows a speech bubble; each tap says the next line.
+  const VISITOR_LINES = ['Hi from {semester}!', 'You’ve got this!', 'So proud of you!', 'Don’t forget to take a break!', 'I love what you did with the room!'];
+  const VISITOR_BUBBLE_MS = 3500;
+  const visitorLinesSaid = new Map();
+
+  function sayVisitorHello(button) {
+    const item = roomItem(PlannerStickers.visitorId(button.dataset.visitorSemester));
+    const said = visitorLinesSaid.get(item.semesterId) || 0;
+    visitorLinesSaid.set(item.semesterId, said + 1);
+    button.querySelector('.visitor-bubble')?.remove();
+    const bubble = document.createElement('span');
+    bubble.className = 'visitor-bubble';
+    bubble.setAttribute('role', 'status');
+    bubble.textContent = VISITOR_LINES[said % VISITOR_LINES.length].replace('{semester}', item.semesterName);
+    button.append(bubble);
+    setTimeout(() => bubble.remove(), VISITOR_BUBBLE_MS);
   }
 
   // The trophy shelf with what's been earned. Outside Decorate, tapping a trophy says what it's for.
@@ -4178,8 +4224,14 @@
     return `${all.filter((trophy) => trophy.earned).length} of ${all.length} trophies earned`;
   }
 
-  // A sticker is "peeled off"; furniture is "taken out".
-  const roomItemName = (item) => (item.furniture ? `the ${item.name}` : item.name);
+  // How messages name a room item: "the Bed", "your Spring 2027 buddy", a buddy's own name, or a
+  // sticker's name. (A sticker is "peeled off"; furniture and visitors are "taken out".)
+  function roomItemName(item) {
+    if (item.visitor) {
+      return item.named ? item.name : `your ${item.name}`;
+    }
+    return item.furniture ? `the ${item.name}` : item.name;
+  }
 
   // The buddy, placed in the room like a sticker. While decorating it can be selected, dragged,
   // and resized (but not tilted, peeled off, or moved to the front or back).
@@ -4206,12 +4258,20 @@
     }
     const stickers = placed
       .map((placedSticker) => {
-        const sticker = PlannerStickers.findSticker(placedSticker.id);
+        const sticker = roomItem(placedSticker.id);
+        // The semester being viewed has its buddy as the main buddy, so it isn't also a visitor.
+        if (sticker.visitor && sticker.semesterId === state.currentSemesterId) {
+          return '';
+        }
         const base = sticker.furniture ? `--sticker-base:${sticker.width}%;` : '';
         const style = `${base}left:${placedSticker.x}%;top:${placedSticker.y}%;--sticker-size:${PlannerStickers.stickerSize(placedSticker)};--sticker-tilt:${PlannerStickers.stickerTilt(placedSticker)}deg`;
         const front = PlannerStickers.isInFront(placedSticker) ? ' is-front' : '';
         const isShelf = sticker.id === PlannerStickers.TROPHY_SHELF.id;
-        const art = isShelf ? renderTrophyShelf(!decoratingRoom) : PlannerStickers.drawSticker(roomLook(sticker));
+        const art = roomItemArt(sticker, !decoratingRoom);
+        if (!decoratingRoom && sticker.visitor) {
+          return `<button type="button" class="page-sticker is-visitor${front}" style="${style}" data-action="visitor-hello"
+              data-visitor-semester="${sticker.semesterId}" aria-label="${escapeHtml(roomItemName(sticker))}, visiting. Tap to say hi.">${art}</button>`;
+        }
         if (!decoratingRoom) {
           const about = isShelf ? `role="img" aria-label="Trophy shelf: ${trophyCount()}"` : 'aria-hidden="true"';
           return `<span class="page-sticker${front}${isShelf ? ' is-trophy-shelf' : ''}" style="${style}" ${about}>${art}</span>`;
@@ -4219,7 +4279,7 @@
         const selected = placedSticker.key === selectedPageSticker;
         return `<button type="button" class="page-sticker${front}${selected ? ' is-selected' : ''}" data-action="select-page-sticker"
             data-page-key="${placedSticker.key}" style="${style}" aria-pressed="${selected}"
-            aria-label="${sticker.name}${sticker.furniture ? '' : ' sticker'}. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
+            aria-label="${escapeHtml(sticker.name)}${sticker.furniture ? '' : ' sticker'}. Drag or use arrow keys to move it${selected ? ', plus and minus keys to resize it, and bracket keys to tilt it' : ''}."
             >${art}${selected ? '<span class="sticker-resize-handle" aria-hidden="true"></span>' : ''}</button>`;
       })
       .join('');
@@ -4243,11 +4303,11 @@
   function renderDecorateTools() {
     const placed = PlannerStickers.pageStickers(state);
     const selected = placed.find((sticker) => sticker.key === selectedPageSticker);
-    const selectedItem = selected ? PlannerStickers.findSticker(selected.id) : null;
+    const selectedItem = selected ? roomItem(selected.id) : null;
     const status = selectedPageSticker === ROOM_BUDDY_KEY
       ? `<span><strong>${escapeHtml(roomBuddyName())}</strong> selected · drag to move, or drag its corner dot to resize</span>`
       : selected
-      ? `<span><strong>${selectedItem.name}</strong> selected · drag its corner dot to resize or tilt</span>
+      ? `<span><strong>${escapeHtml(selectedItem.name)}</strong> selected · drag its corner dot to resize or tilt</span>
          <button type="button" class="secondary-button" data-action="page-sticker-to-front">To front</button>
          <button type="button" class="secondary-button" data-action="page-sticker-to-back">To back</button>
          <button type="button" class="secondary-button" data-action="peel-page-sticker">${selectedItem.furniture ? 'Take out' : 'Peel off'}</button>`
@@ -4255,13 +4315,13 @@
     const tray = roomItemsInOrder()
       .map(
         (sticker) => `<li><button type="button" class="tray-sticker" data-action="place-page-sticker" data-sticker-id="${sticker.id}"
-            aria-label="${sticker.furniture ? `Put ${roomItemName(sticker)} in the room` : `Stick on ${sticker.name}`}" title="${sticker.name}">${PlannerStickers.drawSticker(sticker)}</button></li>`,
+            aria-label="${escapeHtml(sticker.furniture ? `Put ${roomItemName(sticker)} in the room` : `Stick on ${sticker.name}`)}" title="${escapeHtml(sticker.name)}">${sticker.visitor ? roomItemArt(sticker, false) : PlannerStickers.drawSticker(sticker)}</button></li>`,
       )
       .join('');
     return `<div class="decorate-tools">
         <div class="sticker-page-toolbar">${status}</div>
         <button type="button" class="primary-button" data-action="done-decorating">Done</button>
-        <p class="buddy-muted">Your stickers${PlannerStickers.ownedFurniture(state).length > 0 ? ' and furniture' : ''} · tap one to add it (as many times as you like)</p>
+        <p class="buddy-muted">Tap one to add it to the room (stickers and furniture as many times as you like)</p>
         <ul class="sticker-tray">${tray}</ul>
       </div>`;
   }
@@ -4271,14 +4331,16 @@
       showToast(`Your page is full (${PlannerStickers.PAGE_MAX_STICKERS} stickers). Peel one off to add more.`, null);
       return;
     }
-    const shelf = PlannerStickers.pageStickers(state).find((placed) => placed.id === PlannerStickers.TROPHY_SHELF.id);
-    if (stickerId === PlannerStickers.TROPHY_SHELF.id && shelf) {
-      selectedPageSticker = shelf.key;
+    const item = roomItem(stickerId);
+    // The trophy shelf and each visiting buddy go in once; tapping one again selects it.
+    const alreadyIn = (item.visitor || item.id === PlannerStickers.TROPHY_SHELF.id) && PlannerStickers.pageStickers(state).find((placed) => placed.id === stickerId);
+    if (alreadyIn) {
+      selectedPageSticker = alreadyIn.key;
       renderBuddy();
-      showToast('Your trophy shelf is already in the room. It’s selected now.', null);
+      const name = roomItemName(item);
+      showToast(`${name[0].toUpperCase()}${name.slice(1)} is already in the room. It’s selected now.`, null);
       return;
     }
-    const item = PlannerStickers.findSticker(stickerId);
     applyChange(item.furniture ? `Put ${roomItemName(item)} in the room` : `Stuck on ${item.name}`, () => {
       selectedPageSticker = PlannerStickers.placeSticker(state, stickerId).key;
     });
@@ -4289,7 +4351,7 @@
     if (!placed) {
       return;
     }
-    const item = PlannerStickers.findSticker(placed.id);
+    const item = roomItem(placed.id);
     applyChange(item.furniture ? `Took out ${roomItemName(item)}` : `Peeled off ${item.name}`, () => {
       PlannerStickers.peelSticker(state, placed.key);
       selectedPageSticker = null;
@@ -4302,7 +4364,7 @@
     if (!placed) {
       return;
     }
-    const name = PlannerStickers.findSticker(placed.id).name;
+    const name = roomItemName(roomItem(placed.id));
     let moved = false;
     applyChange(
       () => (moved ? `Moved ${name} to the ${toFront ? 'front' : 'back'}` : `${name} is already ${toFront ? 'in front' : 'at the back'}`),
@@ -4321,7 +4383,7 @@
     if (!placed) {
       return;
     }
-    applyChange(`Moved ${PlannerStickers.findSticker(placed.id).name}`, () => {
+    applyChange(`Moved ${roomItemName(roomItem(placed.id))}`, () => {
       PlannerStickers.moveSticker(state, key, x, y);
       selectedPageSticker = key;
     });
@@ -4366,7 +4428,7 @@
       return;
     }
     const verb = resized && tilted ? 'Resized and tilted' : resized ? 'Resized' : 'Tilted';
-    applyChange(`${verb} ${PlannerStickers.findSticker(placed.id).name}`, () => {
+    applyChange(`${verb} ${roomItemName(roomItem(placed.id))}`, () => {
       PlannerStickers.resizeSticker(state, key, after.size);
       PlannerStickers.tiltSticker(state, key, after.tilt);
       selectedPageSticker = key;
@@ -4381,7 +4443,8 @@
 
   function startStickerDrag(event) {
     const element = event.target.closest('button.page-sticker');
-    if (!element || event.button !== 0) {
+    // Outside Decorate, buttons in the room (visiting buddies) are for tapping, not dragging.
+    if (!element || event.button !== 0 || !decoratingRoom) {
       return;
     }
     const page = element.closest('.buddy-room').getBoundingClientRect();
@@ -5053,6 +5116,8 @@
       if (key) {
         elements.buddyPanel.querySelector(`.page-sticker[data-page-key="${key}"]`)?.focus();
       }
+    } else if (action === 'visitor-hello') {
+      sayVisitorHello(target);
     } else if (action === 'show-trophy') {
       showToast(target.dataset.trophyText, null);
     } else if (action === 'peel-page-sticker') {

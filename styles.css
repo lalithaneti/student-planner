@@ -4097,6 +4097,64 @@ button.buddy-path-chest {
   border-top: 3px solid #c98f5c;
 }
 
+/* A visiting buddy is drawn as itself (no sticker edge). Outside Decorate it can be tapped to say hi. */
+:is(.page-sticker, .tray-sticker) > .buddy-art {
+  display: block;
+  width: 100%;
+}
+
+.page-sticker.is-visitor:not(.is-selected) {
+  cursor: pointer;
+}
+
+/* While it's talking, it comes in front so its speech bubble shows. */
+.page-sticker.is-visitor:has(.visitor-bubble) {
+  z-index: 5;
+}
+
+.visitor-bubble {
+  position: absolute;
+  bottom: 64%; /* just above a young buddy's head (a buddy's drawing has room above it to grow) */
+  left: 50%;
+  z-index: 4;
+  width: max-content;
+  max-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  transform: translateX(-50%);
+  animation: visitor-bubble-pop 0.2s ease-out;
+}
+
+.visitor-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  border: 6px solid transparent;
+  border-top-color: var(--surface);
+  transform: translateX(-50%);
+}
+
+@keyframes visitor-bubble-pop {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visitor-bubble {
+    animation: none;
+  }
+}
+
 /* Outside Decorate, each trophy can be tapped to say what it's for. */
 .is-trophy-shelf .trophy[data-action] {
   cursor: pointer;
